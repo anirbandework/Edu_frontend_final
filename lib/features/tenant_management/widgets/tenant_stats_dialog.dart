@@ -1,6 +1,7 @@
 // lib/features/admin/widgets/tenant_stats_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/models/tenant.dart';
@@ -37,7 +38,7 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
     try {
       final response = await http.get(
         Uri.parse('${AppConstants.apiBaseUrl}/api/v1/tenants/${widget.tenant.id}/stats'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -88,9 +89,8 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                       ),
                       Text(
                         widget.tenant.schoolName,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
+                        style: AppTheme.bodySmall.copyWith(
+                          color: AppTheme.neutral500,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -129,7 +129,7 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
           const SizedBox(height: 16),
           Text(
             'Loading statistics...',
-            style: TextStyle(color: Colors.grey[600]),
+            style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500),
           ),
         ],
       ),
@@ -141,18 +141,18 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+          Icon(Icons.error_outline, size: 64, color: AppTheme.error),
           const SizedBox(height: 16),
           Text(
             'Unable to load statistics',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.grey[700],
+              color: AppTheme.neutral700,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             _error ?? 'Unknown error occurred',
-            style: TextStyle(color: Colors.grey[600]),
+            style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
@@ -230,11 +230,11 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
               mainAxisSpacing: 16,
               childAspectRatio: 1.2,
               children: [
-                _buildOverviewCard('Total Students', '${widget.tenant.totalStudents}', Icons.people, Colors.blue),
-                _buildOverviewCard('Total Teachers', '${widget.tenant.totalTeachers}', Icons.person_2, Colors.green),
-                _buildOverviewCard('Total Staff', '${widget.tenant.totalStaff}', Icons.work, Colors.orange),
-                _buildOverviewCard('Capacity Used', '${widget.tenant.capacityUtilization.toStringAsFixed(1)}%', Icons.donut_small, 
-                  widget.tenant.isOverCapacity ? Colors.red : Colors.purple),
+                _buildOverviewCard('Total Students', '${widget.tenant.totalStudents}', Icons.people, AppTheme.info),
+                _buildOverviewCard('Total Teachers', '${widget.tenant.totalTeachers}', Icons.person_2, AppTheme.greenPrimary),
+                _buildOverviewCard('Total Staff', '${widget.tenant.totalStaff}', Icons.work, AppTheme.warning),
+                _buildOverviewCard('Capacity Used', '${widget.tenant.capacityUtilization.toStringAsFixed(1)}%', Icons.donut_small,
+                  widget.tenant.isOverCapacity ? AppTheme.error : Colors.purple),
               ],
             );
           },
@@ -264,17 +264,15 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
             const SizedBox(height: 8),
             Text(
               value,
-              style: TextStyle(
-                fontSize: 20,
+              style: AppTheme.headingSmall.copyWith(
                 fontWeight: FontWeight.bold,
                 color: color,
               ),
             ),
             Text(
               title,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+              style: AppTheme.bodyMicro.copyWith(
+                color: AppTheme.neutral500,
               ),
               textAlign: TextAlign.center,
               maxLines: 2,
@@ -320,11 +318,11 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                     children: [
                       _buildCapacityRow('Current Enrollment', '${widget.tenant.currentEnrollment}', Icons.people),
                       _buildCapacityRow('Maximum Capacity', '${widget.tenant.maximumCapacity}', Icons.business),
-                      _buildCapacityRow('Available Spaces', '$availableSpaces', 
+                      _buildCapacityRow('Available Spaces', '$availableSpaces',
                         availableSpaces < 0 ? Icons.warning : Icons.check_circle,
-                        valueColor: availableSpaces < 0 ? Colors.red : Colors.green),
+                        valueColor: availableSpaces < 0 ? AppTheme.error : AppTheme.success),
                       _buildCapacityRow('Utilization Rate', '${utilizationPercent.toStringAsFixed(1)}%', Icons.timeline,
-                        valueColor: isOverCapacity ? Colors.red : Colors.blue),
+                        valueColor: isOverCapacity ? AppTheme.error : AppTheme.info),
                     ],
                   ),
                 ),
@@ -337,12 +335,12 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          isOverCapacity ? Colors.red[100]! : Colors.green[100]!,
-                          isOverCapacity ? Colors.red[50]! : Colors.green[50]!,
+                          isOverCapacity ? AppTheme.error.withValues(alpha: 0.2) : AppTheme.green50,
+                          isOverCapacity ? AppTheme.error.withValues(alpha: 0.1) : AppTheme.green50,
                         ],
                       ),
                       border: Border.all(
-                        color: isOverCapacity ? Colors.red[300]! : Colors.green[300]!,
+                        color: isOverCapacity ? AppTheme.error : AppTheme.greenLight,
                         width: 3,
                       ),
                     ),
@@ -352,17 +350,15 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                         children: [
                           Text(
                             '${utilizationPercent.toStringAsFixed(1)}%',
-                            style: TextStyle(
-                              fontSize: 20,
+                            style: AppTheme.headingSmall.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: isOverCapacity ? Colors.red[700] : Colors.green[700],
+                              color: isOverCapacity ? AppTheme.error : AppTheme.greenPrimary,
                             ),
                           ),
                           Text(
                             'Utilized',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isOverCapacity ? Colors.red[600] : Colors.green[600],
+                            style: AppTheme.bodyMicro.copyWith(
+                              color: isOverCapacity ? AppTheme.error : AppTheme.greenPrimary,
                             ),
                           ),
                         ],
@@ -379,18 +375,18 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red[100],
+                  color: AppTheme.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[300]!),
+                  border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning, color: Colors.red[700]),
+                    Icon(Icons.warning, color: AppTheme.error),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Over capacity by ${widget.tenant.currentEnrollment - widget.tenant.maximumCapacity} students. Consider expanding facilities or limiting new admissions.',
-                        style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.w500),
+                        style: AppTheme.bodyMedium.copyWith(color: AppTheme.error, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
@@ -408,19 +404,19 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.grey[600]),
+          Icon(icon, size: 18, color: AppTheme.neutral500),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               label,
-              style: TextStyle(color: Colors.grey[700]),
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral700),
             ),
           ),
           Text(
             value,
-            style: TextStyle(
+            style: AppTheme.bodyMedium.copyWith(
               fontWeight: FontWeight.bold,
-              color: valueColor ?? Colors.black87,
+              color: valueColor ?? AppTheme.neutral800,
             ),
           ),
         ],
@@ -458,11 +454,11 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
             Row(
               children: [
                 Expanded(
-                  child: _buildFinancialCard('Annual Tuition', '₹${_formatCurrency(widget.tenant.annualTuition)}', Icons.school, Colors.blue),
+                  child: _buildFinancialCard('Annual Tuition', '₹${_formatCurrency(widget.tenant.annualTuition)}', Icons.school, AppTheme.info),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: _buildFinancialCard('Registration Fee', '₹${_formatCurrency(widget.tenant.registrationFee)}', Icons.payment, Colors.green),
+                  child: _buildFinancialCard('Registration Fee', '₹${_formatCurrency(widget.tenant.registrationFee)}', Icons.payment, AppTheme.greenLight),
                 ),
               ],
             ),
@@ -476,7 +472,7 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: _buildFinancialCard('Revenue/Student', '₹${_formatCurrency(revenuePerStudent.toDouble())}', Icons.person, Colors.orange),
+                  child: _buildFinancialCard('Revenue/Student', '₹${_formatCurrency(revenuePerStudent.toDouble())}', Icons.person, AppTheme.warning),
                 ),
               ],
             ),
@@ -504,9 +500,8 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[700],
+                  style: AppTheme.bodyMicro.copyWith(
+                    color: AppTheme.neutral700,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -516,8 +511,7 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 16,
+            style: AppTheme.bodyMedium.copyWith(
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -555,9 +549,9 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
             
             _buildMetricRow('Student-Teacher Ratio', '${studentTeacherRatio.toStringAsFixed(1)}:1', 
               _getRatioColor(studentTeacherRatio), _getRatioStatus(studentTeacherRatio)),
-            _buildMetricRow('Staff per 100 Students', '${staffPerHundred.toStringAsFixed(1)}', Colors.blue, 'Good'),
-            _buildMetricRow('Capacity Efficiency', '${widget.tenant.capacityUtilization.toStringAsFixed(1)}%', 
-              widget.tenant.isOverCapacity ? Colors.red : Colors.green,
+            _buildMetricRow('Staff per 100 Students', '${staffPerHundred.toStringAsFixed(1)}', AppTheme.info, 'Good'),
+            _buildMetricRow('Capacity Efficiency', '${widget.tenant.capacityUtilization.toStringAsFixed(1)}%',
+              widget.tenant.isOverCapacity ? AppTheme.error : AppTheme.success,
               widget.tenant.isOverCapacity ? 'Over Capacity' : 'Optimal'),
             if (widget.tenant.gradeLevels.isNotEmpty)
               _buildMetricRow('Grade Levels', '${widget.tenant.gradeLevels.length} levels', Colors.purple, 'Active'),
@@ -568,9 +562,9 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
   }
 
   Color _getRatioColor(double ratio) {
-    if (ratio > 30) return Colors.red;
-    if (ratio > 20) return Colors.orange;
-    return Colors.green;
+    if (ratio > 30) return AppTheme.error;
+    if (ratio > 20) return AppTheme.warning;
+    return AppTheme.success;
   }
 
   String _getRatioStatus(double ratio) {
@@ -586,7 +580,7 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Text(label, style: TextStyle(color: Colors.grey[700])),
+            child: Text(label, style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral700)),
           ),
           Row(
             children: [
@@ -598,9 +592,8 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                 ),
                 child: Text(
                   status,
-                  style: TextStyle(
+                  style: AppTheme.bodyMicro.copyWith(
                     color: color,
-                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -614,7 +607,7 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                 ),
                 child: Text(
                   value,
-                  style: TextStyle(
+                  style: AppTheme.bodyMedium.copyWith(
                     color: color,
                     fontWeight: FontWeight.bold,
                   ),
@@ -679,9 +672,9 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
               const SizedBox(height: 16),
               Text(
                 'Grade Levels Offered (${widget.tenant.gradeLevels.length})',
-                style: TextStyle(
+                style: AppTheme.bodyMedium.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[700],
+                  color: AppTheme.neutral700,
                 ),
               ),
               const SizedBox(height: 8),
@@ -692,9 +685,8 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
                   return Chip(
                     label: Text('Grade $grade'),
                     backgroundColor: AppTheme.lightGreen.withValues(alpha: 0.2),
-                    labelStyle: TextStyle(
+                    labelStyle: AppTheme.bodyMicro.copyWith(
                       color: AppTheme.primaryGreen,
-                      fontSize: 12,
                     ),
                   );
                 }).toList(),
@@ -710,22 +702,21 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: AppTheme.neutral50,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: AppTheme.neutral200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: Colors.grey[600]),
+              Icon(icon, size: 16, color: AppTheme.neutral500),
               const SizedBox(width: 6),
               Text(
                 title,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
+                style: AppTheme.bodyMicro.copyWith(
+                  color: AppTheme.neutral500,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -734,8 +725,7 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
           const SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
+            style: AppTheme.bodySmall.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -768,9 +758,8 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
             const SizedBox(height: 8),
             Text(
               'Based on current enrollment and capacity',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+              style: AppTheme.bodyMicro.copyWith(
+                color: AppTheme.neutral500,
               ),
             ),
             const SizedBox(height: 16),
@@ -778,15 +767,15 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
             Row(
               children: [
                 Expanded(
-                  child: _buildTrendCard('Student Growth', '+${(widget.tenant.totalStudents * 0.08).toInt()}', '8.2%', Colors.green, true),
+                  child: _buildTrendCard('Student Growth', '+${(widget.tenant.totalStudents * 0.08).toInt()}', '8.2%', AppTheme.greenPrimary, true),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: _buildTrendCard('Teacher Hiring', '+${(widget.tenant.totalTeachers * 0.12).toInt()}', '12.5%', Colors.blue, true),
+                  child: _buildTrendCard('Teacher Hiring', '+${(widget.tenant.totalTeachers * 0.12).toInt()}', '12.5%', AppTheme.info, true),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: _buildTrendCard('Capacity Usage', '+5.3%', '5.3%', Colors.orange, true),
+                  child: _buildTrendCard('Capacity Usage', '+5.3%', '5.3%', AppTheme.warning, true),
                 ),
               ],
             ),
@@ -800,26 +789,24 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: AppTheme.neutral50,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: AppTheme.neutral200),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
+            style: AppTheme.bodyMicro.copyWith(
+              color: AppTheme.neutral600,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 18,
+            style: AppTheme.bodyLarge.copyWith(
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -830,14 +817,13 @@ class _TenantStatsDialogState extends State<TenantStatsDialog> {
               Icon(
                 isPositive ? Icons.trending_up : Icons.trending_down,
                 size: 16,
-                color: isPositive ? Colors.green : Colors.red,
+                color: isPositive ? AppTheme.success : AppTheme.error,
               ),
               const SizedBox(width: 4),
               Text(
                 percentage,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isPositive ? Colors.green : Colors.red,
+                style: AppTheme.bodyMicro.copyWith(
+                  color: isPositive ? AppTheme.success : AppTheme.error,
                   fontWeight: FontWeight.w500,
                 ),
               ),

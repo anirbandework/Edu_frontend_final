@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/models/notification.dart';
 import '../core/constants/app_constants.dart';
+import '../core/auth/auth_session.dart';
 
 class NotificationService {
   static const String baseUrl = AppConstants.apiBaseUrl;
@@ -44,7 +45,7 @@ class NotificationService {
       final response = await http.post(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          ...AuthSession.instance.headers(),
           'Accept': 'application/json',
         },
         body: json.encode(requestBody),
@@ -97,7 +98,7 @@ class NotificationService {
       final response = await http.get(
         uri,
         headers: {
-          'Content-Type': 'application/json',
+          ...AuthSession.instance.headers(),
           'Accept': 'application/json',
         },
       );
@@ -128,7 +129,7 @@ class NotificationService {
       final response = await http.patch(
         Uri.parse(url),
         headers: {
-          'Content-Type': 'application/json',
+          ...AuthSession.instance.headers(),
           'Accept': 'application/json',
         },
       );
@@ -140,5 +141,96 @@ class NotificationService {
       print('NotificationService: Error marking as read: $e');
       throw Exception('Failed to mark notification as read: $e');
     }
+  }
+
+  // Archive a notification (PATCH .../{id}/archive?user_id=)
+  static Future<void> archive({
+    required String notificationId,
+    required String userId,
+  }) =>
+      _userScopedPatch(notificationId, 'archive', userId, 'archive');
+
+  // Unarchive (PATCH .../{id}/unarchive?user_id=)
+  static Future<void> unarchive({
+    required String notificationId,
+    required String userId,
+  }) =>
+      _userScopedPatch(notificationId, 'unarchive', userId, 'unarchive');
+
+  static Future<void> _userScopedPatch(
+      String notificationId, String action, String userId, String label) async {
+    final uri = Uri.parse(
+            '$baseUrl/api/v1/school_authority/notifications/$notificationId/$action')
+        .replace(queryParameters: {'user_id': userId});
+    final r = await http.patch(uri, headers: {
+      ...AuthSession.instance.headers(),
+      'Accept': 'application/json',
+    });
+    if (r.statusCode != 200) {
+      throw Exception('Failed to $label notification: ${r.body}');
+    }
+  }
+
+  // Delete a notification for a user (DELETE .../{id}/delete?user_id=)
+  static Future<void> deleteNotification({
+    required String notificationId,
+    required String userId,
+  }) async {
+    final uri = Uri.parse(
+            '$baseUrl/api/v1/school_authority/notifications/$notificationId/delete')
+        .replace(queryParameters: {'user_id': userId});
+    final r = await http.delete(uri, headers: {
+      ...AuthSession.instance.headers(),
+      'Accept': 'application/json',
+    });
+    if (r.statusCode != 200) {
+      throw Exception('Failed to delete notification: ${r.body}');
+    }
+  }
+
+  // Archived notifications for a user.
+  static Future<List<AppNotification>> getArchived({
+    required String userId,
+    required String userType,
+    required String tenantId,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse(
+            '$baseUrl/api/v1/school_authority/notifications/archived/$userId')
+        .replace(queryParameters: {
+      'tenant_id': tenantId,
+      'user_type': userType,
+      'limit': limit.toString(),
+    });
+    final r = await http.get(uri, headers: {
+      ...AuthSession.instance.headers(),
+      'Accept': 'application/json',
+    });
+    if (r.statusCode == 200) {
+      final List<dynamic> list = json.decode(r.body);
+      return list.map((j) => AppNotification.fromJson(j)).toList();
+    }
+    throw Exception('Failed to load archived notifications: ${r.body}');
+  }
+
+  // Notifications a user has sent (staff outbox). Raw maps — different shape
+  // (includes recipients + delivered_count).
+  static Future<List<Map<String, dynamic>>> getSentBy({
+    required String senderId,
+    required String tenantId,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse(
+            '$baseUrl/api/v1/school_authority/notifications/sent-by/$senderId')
+        .replace(queryParameters: {'tenant_id': tenantId, 'limit': limit.toString()});
+    final r = await http.get(uri, headers: {
+      ...AuthSession.instance.headers(),
+      'Accept': 'application/json',
+    });
+    if (r.statusCode == 200) {
+      final List<dynamic> list = json.decode(r.body);
+      return list.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    }
+    throw Exception('Failed to load sent notifications: ${r.body}');
   }
 }

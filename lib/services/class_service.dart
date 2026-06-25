@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:file_picker/file_picker.dart';
+import '../core/auth/auth_session.dart';
 
 class ClassApi {
   final String baseUrl;
@@ -24,6 +25,7 @@ class ClassApi {
     h.addAll(defaultHeaders);
     h['Content-Type'] = 'application/json';
     h['Accept'] = h['Accept'] ?? 'application/json';
+    h.addAll(AuthSession.instance.headers());
     return h;
   }
 
@@ -47,6 +49,7 @@ class ClassApi {
       if (isActive != null) 'is_active': isActive,
     };
     final headers = Map<String, String>.from(defaultHeaders)..remove('Content-Type');
+    headers.addAll(AuthSession.instance.headers(json: false));
     final res = await http.get(_u('/api/v1/school_authority/classes/', query), headers: headers);
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -145,6 +148,7 @@ class ClassApi {
     defaultHeaders.forEach((k, v) {
       if (k.toLowerCase() != 'content-type') req.headers[k] = v;
     });
+    req.headers.addAll(AuthSession.instance.headers(json: false));
     final res = await req.send();
     final body = await res.stream.bytesToString();
     if (res.statusCode >= 200 && res.statusCode < 300) {

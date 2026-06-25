@@ -1,0 +1,385 @@
+// lib/features/super_admin/screens/analytics_screen.dart
+//
+// Super-admin platform analytics: headline KPIs (schools/admins/students/
+// teachers), active-vs-inactive ratios, capacity utilisation, school-type
+// distribution, and top admins by school count. Real backend, AppTheme only.
+import 'package:flutter/material.dart';
+
+import '../../../core/constants/app_theme.dart';
+import '../../../services/super_admin_service.dart';
+import '../widgets/super_admin_action_bar.dart';
+import '../widgets/super_admin_header.dart';
+
+class AnalyticsScreen extends StatefulWidget {
+  const AnalyticsScreen({super.key});
+
+  @override
+  State<AnalyticsScreen> createState() => _AnalyticsScreenState();
+}
+
+class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic> _stats = {};
+  List<Map<String, dynamic>> _admins = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final stats = await SuperAdminService.getComprehensiveStats();
+      List<Map<String, dynamic>> admins = const [];
+      try {
+        admins = await SuperAdminService.getAdmins();
+      } catch (_) {/* per-admin breakdown is best-effort */}
+      if (!mounted) return;
+      setState(() {
+        _stats = stats;
+        _admins = admins;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  int _i(String k) => (_stats[k] is num) ? (_stats[k] as num).toInt() : 0;
+  num _n(String k) => (_stats[k] is num) ? _stats[k] as num : 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SuperAdminHeader(
+          title: 'Analytics',
+          subtitle: 'Platform overview across all schools',
+          icon: Icons.insights,
+        ),
+        const SizedBox(height: 12),
+        SuperAdminActionBar(
+          actions: [
+            SaActionButton(
+              icon: Icons.refresh,
+              label: 'Refresh',
+              onPressed: _loading ? null : _load,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Expanded(child: _body()),
+      ],
+    );
+  }
+
+  Widget _body() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
+    }
+    if (_error != null) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
+          const SizedBox(height: 12),
+          Text(_error!,
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh, size: AppTheme.iconSmall),
+              label: const Text('Retry')),
+        ]),
+      );
+    }
+    return RefreshIndicator(
+      color: AppTheme.greenPrimary,
+      onRefresh: _load,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          _kpiGrid(),
+          const SizedBox(height: 16),
+          _ratiosCard(),
+          const SizedBox(height: 16),
+          _capacityCard(),
+          const SizedBox(height: 16),
+          _distributionCard(),
+          const SizedBox(height: 16),
+          _topAdminsCard(),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ---- KPI cards ----
+  Widget _kpiGrid() {
+    final kpis = [
+      _Kpi('Schools', _i('total_tenants'), '${_i('active_tenants')} active',
+          Icons.business, AppTheme.greenPrimary),
+      _Kpi('Admins', _i('total_admins'), '${_i('active_admins')} active',
+          Icons.admin_panel_settings, AppTheme.info),
+      _Kpi('Students', _i('total_students'), 'enrolled', Icons.school, AppTheme.warning),
+      _Kpi('Teachers', _i('total_teachers'), 'platform-wide', Icons.person, AppTheme.success),
+    ];
+    return LayoutBuilder(builder: (context, c) {
+      final cols = c.maxWidth > 900 ? 4 : (c.maxWidth > 480 ? 2 : 1);
+      return GridView.count(
+        crossAxisCount: cols,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        childAspectRatio: cols == 1 ? 3.4 : 1.5,
+        children: kpis.map(_kpiCard).toList(),
+      );
+    });
+  }
+
+  Widget _kpiCard(_Kpi k) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.glassCardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(children: [
+            Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(
+                  color: k.color.withOpacity(0.12), borderRadius: AppTheme.borderRadius12),
+              child: Icon(k.icon, color: k.color, size: AppTheme.iconMedium),
+            ),
+            const Spacer(),
+            Text(_fmt(k.value),
+                style: AppTheme.headingMedium.copyWith(
+                    color: AppTheme.neutral900, fontWeight: FontWeight.w800)),
+          ]),
+          const SizedBox(height: 8),
+          Text(k.label,
+              style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w700)),
+          Text(k.sub, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+        ],
+      ),
+    );
+  }
+
+  // ---- active / inactive ratios ----
+  Widget _ratiosCard() {
+    return _section('Active vs inactive', Icons.toggle_on, [
+      _ratioRow('Schools', _i('active_tenants'), _i('inactive_tenants'), AppTheme.greenPrimary),
+      const SizedBox(height: 12),
+      _ratioRow('Admins', _i('active_admins'), _i('inactive_admins'), AppTheme.info),
+    ]);
+  }
+
+  Widget _ratioRow(String label, int active, int inactive, Color color) {
+    final total = active + inactive;
+    final pct = total > 0 ? active / total : 0.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Expanded(
+            child: Text(label,
+                style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w600)),
+          ),
+          Text('$active / $total  (${(pct * 100).round()}%)',
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+        ]),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: AppTheme.borderRadius8,
+          child: LinearProgressIndicator(
+            value: pct.toDouble(),
+            minHeight: 10,
+            backgroundColor: AppTheme.neutral200,
+            valueColor: AlwaysStoppedAnimation(color),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Row(children: [
+          _legend('Active $active', color),
+          const SizedBox(width: 14),
+          _legend('Inactive $inactive', AppTheme.neutral400),
+        ]),
+      ],
+    );
+  }
+
+  Widget _legend(String text, Color color) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 9, height: 9,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      const SizedBox(width: 5),
+      Text(text, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+    ]);
+  }
+
+  // ---- capacity ----
+  Widget _capacityCard() {
+    final cap = _i('total_capacity');
+    final students = _i('total_students');
+    final util = (_n('capacity_utilization')).toDouble();
+    final avgTuition = _n('average_tuition');
+    return _section('Capacity & finance', Icons.donut_large, [
+      Row(children: [
+        Expanded(child: _miniStat('Total capacity', _fmt(cap), Icons.event_seat)),
+        Expanded(child: _miniStat('Enrolled', _fmt(students), Icons.groups)),
+        Expanded(child: _miniStat('Avg tuition', '₹${_fmt(avgTuition.round())}', Icons.payments)),
+      ]),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(
+          child: Text('Capacity utilisation',
+              style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w600)),
+        ),
+        Text('${util.round()}%',
+            style: AppTheme.labelMedium.copyWith(
+                color: AppTheme.greenPrimary, fontWeight: FontWeight.w700)),
+      ]),
+      const SizedBox(height: 6),
+      ClipRRect(
+        borderRadius: AppTheme.borderRadius8,
+        child: LinearProgressIndicator(
+          value: (util / 100).clamp(0, 1).toDouble(),
+          minHeight: 10,
+          backgroundColor: AppTheme.neutral200,
+          valueColor: const AlwaysStoppedAnimation(AppTheme.greenPrimary),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _miniStat(String label, String value, IconData icon) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
+        const SizedBox(height: 4),
+        Text(value,
+            style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w800)),
+        Text(label, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+      ],
+    );
+  }
+
+  // ---- school-type distribution ----
+  Widget _distributionCard() {
+    final dist = (_stats['school_type_distribution'] as Map?)?.cast<String, dynamic>() ?? {};
+    if (dist.isEmpty) {
+      return _section('Schools by type', Icons.category, [
+        Text('No schools yet', style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+      ]);
+    }
+    final entries = dist.entries.toList()
+      ..sort((a, b) => ((b.value as num?) ?? 0).compareTo((a.value as num?) ?? 0));
+    final maxV = entries.fold<int>(1, (m, e) => ((e.value as num?)?.toInt() ?? 0) > m ? (e.value as num).toInt() : m);
+    return _section('Schools by type', Icons.category,
+        entries.map((e) => _barRow(e.key, (e.value as num?)?.toInt() ?? 0, maxV, AppTheme.info)).toList());
+  }
+
+  // ---- top admins by school count ----
+  Widget _topAdminsCard() {
+    final admins = [..._admins]
+      ..sort((a, b) => ((b['school_count'] as num?) ?? 0).compareTo((a['school_count'] as num?) ?? 0));
+    final top = admins.take(6).where((a) => ((a['school_count'] as num?) ?? 0) > 0).toList();
+    if (top.isEmpty) {
+      return _section('Top admins by schools', Icons.leaderboard, [
+        Text('No admin owns a school yet',
+            style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+      ]);
+    }
+    final maxV = top.fold<int>(1, (m, a) => ((a['school_count'] as num?)?.toInt() ?? 0) > m ? (a['school_count'] as num).toInt() : m);
+    return _section('Top admins by schools', Icons.leaderboard, top.map((a) {
+      final name = '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.trim();
+      return _barRow(name.isEmpty ? 'Admin' : name,
+          (a['school_count'] as num?)?.toInt() ?? 0, maxV, AppTheme.greenPrimary);
+    }).toList());
+  }
+
+  Widget _barRow(String label, int value, int maxV, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(children: [
+        SizedBox(
+          width: 110,
+          child: Text(label,
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral700),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: AppTheme.borderRadius8,
+            child: LinearProgressIndicator(
+              value: maxV > 0 ? (value / maxV).clamp(0, 1).toDouble() : 0,
+              minHeight: 14,
+              backgroundColor: AppTheme.neutral100,
+              valueColor: AlwaysStoppedAnimation(color.withOpacity(0.85)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text('$value',
+            style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w700)),
+      ]),
+    );
+  }
+
+  // ---- shared section card ----
+  Widget _section(String title, IconData icon, List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.glassCardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, size: AppTheme.iconSmall, color: AppTheme.greenPrimary),
+            const SizedBox(width: 8),
+            Text(title, style: AppTheme.labelLarge),
+          ]),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  String _fmt(int n) {
+    final s = n.toString();
+    if (n < 1000) return s;
+    // thousands separators
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+}
+
+class _Kpi {
+  final String label;
+  final int value;
+  final String sub;
+  final IconData icon;
+  final Color color;
+  _Kpi(this.label, this.value, this.sub, this.icon, this.color);
+}

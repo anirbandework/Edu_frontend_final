@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_theme.dart';
 import '../../core/utils/responsive.dart';
+import '../../core/auth/auth_session.dart';
+import '../../shared/widgets/login_card.dart';
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
@@ -104,7 +106,7 @@ class LandingScreen extends StatelessWidget {
         _buildActionButton(
           context,
           title: 'Get Started',
-          subtitle: 'Select your school and continue',
+          subtitle: 'Choose your school and sign in',
           icon: Icons.rocket_launch,
           onPressed: () => context.go(AppConstants.schoolSelectionRoute),
           isPrimary: true,
@@ -365,163 +367,31 @@ class LandingScreen extends StatelessWidget {
     );
   }
 
+  // "Manage Schools" opens the login card directly (phone/email + password) —
+  // no intermediate "Admin Access" card. Super-admin logs in here.
   void _showLoginDialog(BuildContext context) {
     showDialog(
       context: context,
       barrierColor: AppTheme.surfaceOverlay,
-      builder: (context) => Dialog(
+      builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
-        child: Container(
-          width: context.isMobile ? context.screenWidth * 0.9 : 400,
-          constraints: const BoxConstraints(maxWidth: 400),
-          decoration: AppTheme.getGlassDecoration(
-            borderRadius: AppTheme.borderRadius16,
-          ),
-          padding: EdgeInsets.all(
-            context.responsive(ResponsiveSize.paddingMedium) + 2,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: EdgeInsets.all(
-                  context.responsive(ResponsiveSize.paddingSmall) + 2,
-                ),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  borderRadius: AppTheme.borderRadius12,
-                  boxShadow: const [AppTheme.cardShadow],
-                ),
-                child: Icon(
-                  Icons.admin_panel_settings,
-                  size: context.responsive(ResponsiveSize.iconMedium),
-                  color: Colors.white,
-                ),
-              ),
-
-              SizedBox(
-                height: context.responsive(ResponsiveSize.paddingSmall) + 2,
-              ),
-
-              Text(
-                'Admin Access',
-                style: AppTheme.headingSmall.copyWith(
-                  fontSize: context.responsive(ResponsiveSize.headingSmall),
-                  color: AppTheme.neutral900,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              SizedBox(
-                height: context.responsive(ResponsiveSize.paddingSmall) / 2,
-              ),
-
-              Text(
-                'Access the admin panel to manage schools and educational institutions',
-                style: AppTheme.bodySmall.copyWith(
-                  fontSize: context.responsive(ResponsiveSize.bodySmall),
-                  color: AppTheme.neutral600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              SizedBox(
-                height: context.responsive(ResponsiveSize.paddingMedium),
-              ),
-
-              context.isMobile
-                  ? Column(
-                      children: [
-                        _buildDialogButton(
-                          context,
-                          'Cancel',
-                          () => Navigator.pop(context),
-                          false,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildDialogButton(context, 'Access Panel', () {
-                          Navigator.pop(context);
-                          context.go(AppConstants.tenantManagementRoute);
-                        }, true),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: _buildDialogButton(
-                            context,
-                            'Cancel',
-                            () => Navigator.pop(context),
-                            false,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildDialogButton(
-                            context,
-                            'Access Panel',
-                            () {
-                              Navigator.pop(context);
-                              context.go(AppConstants.tenantManagementRoute);
-                            },
-                            true,
-                          ),
-                        ),
-                      ],
-                    ),
-            ],
+        insetPadding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: LoginCard(
+            roleLabel: 'Admin',
+            onClose: () => Navigator.of(ctx).pop(),
+            onForgot: () {
+              Navigator.of(ctx).pop();
+              context.go(AppConstants.forgotPasswordRoute);
+            },
+            onSuccess: () {
+              Navigator.of(ctx).pop();
+              context.go(AuthSession.instance.landingRoute());
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDialogButton(
-    BuildContext context,
-    String text,
-    VoidCallback onPressed,
-    bool isPrimary,
-  ) {
-    if (isPrimary) {
-      return Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-          borderRadius: AppTheme.borderRadius8,
-          boxShadow: const [AppTheme.cardShadow],
-        ),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-          ),
-          child: Text(
-            text,
-            style: AppTheme.labelMedium.copyWith(
-              color: Colors.white,
-              fontSize: context.responsive(ResponsiveSize.bodySmall) + 1,
-            ),
-          ),
-        ),
-      );
-    } else {
-      return SizedBox(
-        width: double.infinity,
-        child: TextButton(
-          onPressed: onPressed,
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-          ),
-          child: Text(
-            text,
-            style: AppTheme.labelMedium.copyWith(
-              fontSize: context.responsive(ResponsiveSize.bodySmall) + 1,
-            ),
-          ),
-        ),
-      );
-    }
-  }
 }

@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 
@@ -126,7 +127,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
 
       final response = await http.post(
         Uri.parse('${AppConstants.apiBaseUrl}/api/v1/tenants/$endpoint'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(requestBody),
       );
 
@@ -150,7 +151,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
           ),
         );
       }
@@ -187,10 +188,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                       ),
                       Text(
                         '${widget.selectedTenantIds.length} schools selected',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
+                        style: AppTheme.bodySmall,
                       ),
                     ],
                   ),
@@ -223,21 +221,21 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                       'Update Status',
                       'Activate or deactivate selected schools',
                       Icons.toggle_on,
-                      Colors.blue,
+                      AppTheme.info,
                     ),
                     _buildOperationCard(
                       BulkOperationType.updateCapacity,
                       'Update Capacity',
                       'Set maximum capacity for selected schools',
                       Icons.people,
-                      Colors.green,
+                      AppTheme.greenLight,
                     ),
                     _buildOperationCard(
                       BulkOperationType.updateFinancial,
                       'Update Financial Info',
                       'Update tuition and fees for selected schools',
                       Icons.attach_money,
-                      Colors.orange,
+                      AppTheme.warning,
                     ),
                     _buildOperationCard(
                       BulkOperationType.updateStatistics,
@@ -251,7 +249,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                       'Delete Schools',
                       'Permanently delete selected schools',
                       Icons.delete,
-                      Colors.red,
+                      AppTheme.error,
                     ),
                   ],
                 ),
@@ -265,9 +263,9 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: AppTheme.neutral50,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(color: AppTheme.neutral300),
                 ),
                 child: _buildOperationForm(),
               ),
@@ -288,7 +286,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                     onPressed: _isLoading ? null : _performBulkOperation,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _selectedOperation == BulkOperationType.delete 
-                          ? Colors.red 
+                          ? AppTheme.error 
                           : AppTheme.primaryGreen,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -346,17 +344,14 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
+                      style: AppTheme.labelLarge.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: isSelected ? color : Colors.black87,
+                        color: isSelected ? color : AppTheme.neutral800,
                       ),
                     ),
                     Text(
                       description,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: AppTheme.bodyMicro,
                     ),
                   ],
                 ),
@@ -376,7 +371,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('New Status', style: TextStyle(fontWeight: FontWeight.w600)),
+            Text('New Status', style: AppTheme.labelLarge),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -475,20 +470,20 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.red[50],
+            color: AppTheme.error.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.red[200]!),
+            border: Border.all(color: AppTheme.error.withOpacity(0.3)),
           ),
           child: Column(
             children: [
               Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red[700]),
+                  Icon(Icons.warning, color: AppTheme.error),
                   const SizedBox(width: 8),
                   Text(
                     'Warning: This action cannot be undone!',
-                    style: TextStyle(
-                      color: Colors.red[700],
+                    style: AppTheme.labelLarge.copyWith(
+                      color: AppTheme.error,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -497,7 +492,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
               const SizedBox(height: 8),
               Text(
                 'This will permanently delete ${widget.selectedTenantIds.length} schools and all their associated data.',
-                style: TextStyle(color: Colors.red[600]),
+                style: AppTheme.bodySmall.copyWith(color: AppTheme.error),
               ),
             ],
           ),

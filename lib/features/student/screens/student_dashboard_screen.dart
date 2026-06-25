@@ -179,7 +179,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _error!,
+            'We couldn\'t load your dashboard right now. Please check your connection and try again.',
             style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral600),
             textAlign: TextAlign.center,
           ),
@@ -288,15 +288,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                         _buildStudentInfo(gradeLevel, section, rollNumber),
                         style: AppTheme.bodyMicro.copyWith(color: Colors.white70),
                       ),
-                    // Display student ID for debugging (remove in production)
-                    if (StudentSession.studentId != null)
-                      Text(
-                        'ID: ${StudentSession.studentId!.length > 8 ? StudentSession.studentId!.substring(0, 8) + '...' : StudentSession.studentId!}',
-                        style: AppTheme.bodyMicro.copyWith(
-                          color: Colors.white60,
-                          fontSize: 7,
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -336,19 +327,19 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
       children: [
         _buildInfoCard(
           'Email',
-          email.length > 20 ? '${email.substring(0, 17)}...' : email,
+          email,
           Icons.email,
           AppTheme.info,
         ),
         _buildInfoCard(
           'Phone',
-          phone.length > 15 ? '${phone.substring(0, 12)}...' : phone,
+          phone,
           Icons.phone,
           AppTheme.success,
         ),
         _buildInfoCard(
           'Address',
-          address.length > 20 ? '${address.substring(0, 17)}...' : address,
+          address,
           Icons.location_on,
           AppTheme.warning,
         ),
@@ -470,13 +461,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     ),
                     child: Text(
                       value.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 8,
+                      style: AppTheme.bodyMicro.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: value.toLowerCase() == 'active' 
+                        color: value.toLowerCase() == 'active'
                             ? AppTheme.success
                             : AppTheme.error,
-                        fontFamily: AppTheme.bauhausFontFamily,
                       ),
                     ),
                   )
@@ -519,7 +508,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 4,
+            crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 4,
             crossAxisSpacing: 6,
             mainAxisSpacing: 6,
             childAspectRatio: 0.8,

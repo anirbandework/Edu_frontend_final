@@ -38,6 +38,8 @@ class _ClassScreenState extends State<ClassScreen> {
   int page = 1;
   int pageSize = 20;
   bool loading = false;
+  bool _isSubmitting = false;
+  String? _error;
   List<ClassModel> items = [];
   int total = 0;
 
@@ -61,7 +63,10 @@ class _ClassScreenState extends State<ClassScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+      _error = null;
+    });
     try {
       final res = await api.getPaginated(
         page: page,
@@ -74,6 +79,10 @@ class _ClassScreenState extends State<ClassScreen> {
       );
       items = ClassModel.listFromPaginated(res);
       total = (res is Map && res['total'] is int) ? res['total'] as int : items.length;
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'We could not load classes. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -102,9 +111,34 @@ class _ClassScreenState extends State<ClassScreen> {
     }
   }
 
-  Future<void> _delete(String id) async {
-    await api.delete(id);
-    _resetAndReload();
+  Future<void> _delete(ClassModel m) async {
+    if (_isSubmitting) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete class'),
+        content: Text('Delete ${m.className}? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await api.delete(m.id);
+      _resetAndReload();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _updateCount(ClassModel m) async {
@@ -355,19 +389,19 @@ class _ClassScreenState extends State<ClassScreen> {
         ElevatedButton.icon(
           icon: const Icon(Icons.add),
           label: const Text('New Class'),
-          onPressed: () => _createOrEdit(),
+          onPressed: _isSubmitting ? null : () => _createOrEdit(),
         ),
         const SizedBox(width: 8),
         OutlinedButton.icon(
           icon: const Icon(Icons.file_upload),
           label: const Text('Bulk Import CSV'),
-          onPressed: _bulkImport,
+          onPressed: _isSubmitting ? null : _bulkImport,
         ),
         const SizedBox(width: 8),
         OutlinedButton.icon(
           icon: const Icon(Icons.roofing),
           label: const Text('Rollover'),
-          onPressed: _rollover,
+          onPressed: _isSubmitting ? null : _rollover,
         ),
         const SizedBox(width: 8),
         // NEW: Create Class Timetable
@@ -417,10 +451,52 @@ class _ClassScreenState extends State<ClassScreen> {
             IconButton(icon: const Icon(Icons.visibility), onPressed: () => _showDetails(m)),
             IconButton(icon: const Icon(Icons.group), onPressed: () => _updateCount(m)),
             IconButton(icon: const Icon(Icons.edit), onPressed: () => _createOrEdit(m)),
-            IconButton(icon: const Icon(Icons.delete), onPressed: () => _delete(m.id)),
+            IconButton(icon: const Icon(Icons.delete), onPressed: _isSubmitting ? null : () => _delete(m)),
           ],
         )),
       ],
+    );
+  }
+
+  Widget _errorPanel(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
+          const SizedBox(height: 12),
+          Text(
+            _error ?? 'Something went wrong.',
+            textAlign: TextAlign.center,
+            style: AppTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try Again'),
+            onPressed: _load,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.class_outlined, size: 48, color: AppTheme.neutral400),
+          const SizedBox(height: 12),
+          Text('No classes found', style: AppTheme.bodyMedium),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('New Class'),
+            onPressed: _isSubmitting ? null : () => _createOrEdit(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -455,27 +531,31 @@ class _ClassScreenState extends State<ClassScreen> {
                                 const Divider(),
                                 if (loading) const LinearProgressIndicator(),
                                 Expanded(
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(minWidth: 600),
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.vertical,
-                                        child: DataTable(
-                                          columns: const [
-                                            DataColumn(label: Text('Name')),
-                                            DataColumn(label: Text('Grade-Section')),
-                                            DataColumn(label: Text('Year')),
-                                            DataColumn(label: Text('Room')),
-                                            DataColumn(label: Text('Students')),
-                                            DataColumn(label: Text('Status')),
-                                            DataColumn(label: Text('Actions')),
-                                          ],
-                                          rows: items.map(_row).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  child: _error != null
+                                      ? _errorPanel(context)
+                                      : (!loading && items.isEmpty)
+                                          ? _emptyState(context)
+                                          : SingleChildScrollView(
+                                              scrollDirection: Axis.horizontal,
+                                              child: ConstrainedBox(
+                                                constraints: const BoxConstraints(minWidth: 600),
+                                                child: SingleChildScrollView(
+                                                  scrollDirection: Axis.vertical,
+                                                  child: DataTable(
+                                                    columns: const [
+                                                      DataColumn(label: Text('Name')),
+                                                      DataColumn(label: Text('Grade-Section')),
+                                                      DataColumn(label: Text('Year')),
+                                                      DataColumn(label: Text('Room')),
+                                                      DataColumn(label: Text('Students')),
+                                                      DataColumn(label: Text('Status')),
+                                                      DataColumn(label: Text('Actions')),
+                                                    ],
+                                                    rows: items.map(_row).toList(),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
                                 ),
                                 const SizedBox(height: 8),
                                 Row(

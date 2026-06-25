@@ -5,12 +5,10 @@ import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_theme.dart';
 import '../../core/models/tenant.dart';
 import '../../core/utils/responsive.dart';
-import '../../core/utils/school_session.dart';
 import '../../shared/widgets/search_bar_widget.dart';
+import '../../shared/widgets/login_card.dart';
+import '../../core/auth/auth_session.dart';
 import '../../services/tenant_management_service.dart';
-import '../../services/student_service.dart';
-import '../../services/teacher_service.dart';
-import '../../services/school_authority_service.dart';
 
 class SchoolSelectionScreen extends StatefulWidget {
   const SchoolSelectionScreen({super.key});
@@ -95,26 +93,15 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
     });
 
     try {
-      final result = await TenantService.getTenants(
-        page: currentPage,
-        size: pageSize,
-        includeInactive: includeInactive,
-      );
-      
+      final newSchools = await TenantService.getPublicSchools();
+
       if (!mounted) return;
 
-      final List<Tenant> newSchools = result['tenants'];
-      hasMoreData = result['hasMoreData'];
+      schools = newSchools;
+      hasMoreData = false; // public endpoint returns all active schools at once
 
-      if (refresh) {
-        schools = newSchools;
-      } else {
-        schools.addAll(newSchools);
-      }
-      
       filteredSchools = schools;
-      currentPage++;
-      
+
       if (searchController.text.isNotEmpty) {
         filterSchools();
       }
@@ -218,6 +205,16 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
         ),
       ),
       actions: [
+        // Sign in directly with phone + password (no school needed). The backend
+        // resolves the school from the user's phone, so admins (who may have no
+        // school yet) and everyone else can log in straight away.
+        TextButton.icon(
+          onPressed: _openDirectLogin,
+          icon: const Icon(Icons.login, color: Colors.white, size: 16),
+          label: Text('Sign in',
+              style: AppTheme.labelSmall.copyWith(
+                  color: Colors.white, fontWeight: FontWeight.w700)),
+        ),
         IconButton(
           icon: Icon(
             includeInactive ? Icons.visibility : Icons.visibility_off,
@@ -539,7 +536,9 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: isInactive ? null : () => selectSchool(school),
+          onTap: isInactive
+              ? () => _showInactiveSchoolMessage()
+              : () => selectSchool(school),
           borderRadius: AppTheme.borderRadius8,
           child: Container(
             padding: const EdgeInsets.all(10), // Reduced
@@ -699,9 +698,100 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
     );
   }
 
+  void _showInactiveSchoolMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              Icons.info_outline,
+              color: Colors.white,
+              size: 14,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'This school is currently inactive. Contact your administrator.',
+                style: AppTheme.bodyMedium.copyWith(
+                  color: Colors.white,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppTheme.warning,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppTheme.borderRadius8,
+        ),
+        margin: const EdgeInsets.all(8),
+      ),
+    );
+  }
+
+  /// Opens the phone+password login as a card IN PLACE (dialog), not a new page.
+  /// Direct sign-in: phone + password with no school pre-selected. The backend
+  /// authenticates by phone and derives the school from the user's record, so
+  /// this works for every role (and for admins who have no school yet).
+  void _openDirectLogin() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppTheme.surfaceOverlay,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: LoginCard(
+            roleLabel: 'Sign in',
+            onClose: () => Navigator.of(ctx).pop(),
+            onForgot: () {
+              Navigator.of(ctx).pop();
+              context.go(AppConstants.forgotPasswordRoute);
+            },
+            onSuccess: () {
+              Navigator.of(ctx).pop();
+              context.go(AuthSession.instance.landingRoute());
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openLoginCard(Tenant school, String roleLabel) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppTheme.surfaceOverlay,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: LoginCard(
+            schoolName: school.schoolName,
+            roleLabel: roleLabel,
+            tenantId: school.id,
+            onClose: () => Navigator.of(ctx).pop(),
+            onForgot: () {
+              Navigator.of(ctx).pop();
+              context.go(AppConstants.forgotPasswordRoute);
+            },
+            onSuccess: () {
+              Navigator.of(ctx).pop();
+              context.go(AuthSession.instance.landingRoute());
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   void selectSchool(Tenant school) {
     showDialog(
       context: context,
+      barrierDismissible: true,
       barrierColor: AppTheme.surfaceOverlay,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
@@ -714,6 +804,20 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Align(
+                alignment: Alignment.topRight,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.close,
+                    size: 18,
+                    color: AppTheme.neutral600,
+                  ),
+                  tooltip: 'Close',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
               Container(
                 padding: const EdgeInsets.all(12), // Reduced
                 decoration: const BoxDecoration(
@@ -775,7 +879,7 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
                     AppTheme.info,
                     () {
                       Navigator.pop(context);
-                      showLoginDialog(school, 'student');
+                      _openLoginCard(school, 'Student');
                     },
                   ),
                   const SizedBox(height: 8),
@@ -785,7 +889,7 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
                     AppTheme.success,
                     () {
                       Navigator.pop(context);
-                      showLoginDialog(school, 'teacher');
+                      _openLoginCard(school, 'Teacher');
                     },
                   ),
                   const SizedBox(height: 8),
@@ -795,7 +899,7 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
                     AppTheme.warning,
                     () {
                       Navigator.pop(context);
-                      showLoginDialog(school, 'admin');
+                      _openLoginCard(school, 'School Authority');
                     },
                   ),
                 ],
@@ -858,486 +962,4 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
     );
   }
 
-  void showLoginDialog(Tenant school, String role) {
-    final TextEditingController idController = TextEditingController();
-    final ValueNotifier<bool> isLoadingNotifier = ValueNotifier(false);
-
-    showDialog(
-      context: context,
-      barrierColor: AppTheme.surfaceOverlay,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            child: Container(
-              width: context.isMobile ? context.screenWidth * 0.9 : 360, // Reduced
-              constraints: BoxConstraints(
-                maxHeight: context.screenHeight * 0.8,
-              ),
-              decoration: AppTheme.getGlassDecoration(
-                borderRadius: AppTheme.borderRadius12,
-              ),
-              padding: const EdgeInsets.all(16), // Reduced
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16), // Reduced
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
-                        borderRadius: AppTheme.borderRadius12,
-                        boxShadow: [AppTheme.cardShadow],
-                      ),
-                      child: Icon(
-                        getRoleIcon(role),
-                        size: 28, // Reduced
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Login as ${getRoleDisplayName(role)}',
-                      style: AppTheme.headingSmall.copyWith(
-                        fontSize: 14, // Reduced
-                        color: AppTheme.neutral900,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(10), // Reduced
-                      decoration: AppTheme.getGlassDecoration(
-                        color: AppTheme.green50,
-                        border: Border.all(
-                          color: AppTheme.greenPrimary.withOpacity(0.3),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            school.schoolName,
-                            style: AppTheme.labelMedium.copyWith(
-                              fontSize: 12, // Reduced
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.greenPrimary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          if (school.schoolCode != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              'School Code: ${school.schoolCode}',
-                              style: AppTheme.bodySmall.copyWith(
-                                fontSize: 10, // Reduced
-                                color: AppTheme.neutral600,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: idController,
-                      style: AppTheme.bodyMedium.copyWith(
-                        fontSize: 12, // Reduced
-                      ),
-                      decoration: InputDecoration(
-                        labelText: '${getRoleDisplayName(role)} ID',
-                        hintText: getIdPlaceholder(role),
-                        labelStyle: AppTheme.labelSmall.copyWith(
-                          fontSize: 11, // Reduced
-                        ),
-                        hintStyle: AppTheme.bodySmall.copyWith(
-                          fontSize: 10, // Reduced
-                        ),
-                        prefixIcon: Container(
-                          margin: const EdgeInsets.all(8), // Reduced
-                          padding: const EdgeInsets.all(6), // Reduced
-                          decoration: BoxDecoration(
-                            color: AppTheme.greenPrimary.withOpacity(0.1),
-                            borderRadius: AppTheme.borderRadius8,
-                          ),
-                          child: Icon(
-                            getRoleIcon(role),
-                            color: AppTheme.greenPrimary,
-                            size: 14, // Reduced
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: AppTheme.neutral50,
-                        border: OutlineInputBorder(
-                          borderRadius: AppTheme.borderRadius8,
-                          borderSide: const BorderSide(color: AppTheme.neutral300, width: 0.5),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: AppTheme.borderRadius8,
-                          borderSide: const BorderSide(color: AppTheme.greenPrimary, width: 1),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, // Reduced
-                          vertical: 10, // Reduced
-                        ),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (value) {
-                        if (value.trim().isNotEmpty && !isLoadingNotifier.value) {
-                          performLogin(context, setState, school, role, value.trim(), isLoadingNotifier);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(10), // Reduced
-                      decoration: AppTheme.getGlassDecoration(
-                        color: AppTheme.info.withOpacity(0.05),
-                        border: Border.all(
-                          color: AppTheme.info.withOpacity(0.3),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: AppTheme.info,
-                            size: 14, // Reduced
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'UUID Format Required',
-                                  style: AppTheme.labelMedium.copyWith(
-                                    fontSize: 10, // Reduced
-                                    color: AppTheme.info,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Example: a8076f03-3873-4ff5-beea-332fa4b20003',
-                                  style: AppTheme.bodySmall.copyWith(
-                                    fontSize: 8, // Reduced
-                                    color: AppTheme.neutral600,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: isLoadingNotifier,
-                      builder: (context, isLoading, child) {
-                        if (isLoading) {
-                          return Column(
-                            children: [
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 16, // Reduced
-                                    height: 16, // Reduced
-                                    child: const CircularProgressIndicator(
-                                      color: AppTheme.greenPrimary,
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Verifying credentials...',
-                                    style: AppTheme.bodyMedium.copyWith(
-                                      color: AppTheme.neutral600,
-                                      fontSize: 11, // Reduced
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: isLoadingNotifier,
-                            builder: (context, isLoading, child) {
-                              return TextButton(
-                                onPressed: isLoading ? null : () => Navigator.pop(context),
-                                style: AppTheme.textButtonStyle.copyWith(
-                                  padding: MaterialStateProperty.all(
-                                    const EdgeInsets.symmetric(vertical: 10), // Reduced
-                                  ),
-                                ),
-                                child: Text(
-                                  'Cancel',
-                                  style: AppTheme.labelMedium.copyWith(
-                                    fontSize: 11, // Reduced
-                                    color: isLoading ? AppTheme.neutral400 : AppTheme.neutral600,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: isLoadingNotifier,
-                            builder: (context, isLoading, child) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  gradient: isLoading ? null : AppTheme.primaryGradient,
-                                  color: isLoading ? AppTheme.neutral300 : null,
-                                  borderRadius: AppTheme.borderRadius8,
-                                  boxShadow: isLoading ? null : [AppTheme.cardShadow],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: isLoading 
-                                      ? null 
-                                      : () => performLogin(
-                                          context, setState, school, role, 
-                                          idController.text.trim(), isLoadingNotifier
-                                        ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    padding: const EdgeInsets.symmetric(vertical: 10), // Reduced
-                                  ),
-                                  child: isLoading
-                                      ? SizedBox(
-                                          width: 16, // Reduced
-                                          height: 16, // Reduced
-                                          child: const CircularProgressIndicator(
-                                            color: AppTheme.neutral600,
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.login, size: 14), // Reduced
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Login',
-                                              style: AppTheme.labelMedium.copyWith(
-                                                fontSize: 11, // Reduced
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  String getIdPlaceholder(String role) {
-    switch (role) {
-      case 'student':
-        return 'Enter your student UUID';
-      case 'teacher':
-        return 'Enter your teacher UUID';
-      case 'admin':
-        return 'Enter your authority UUID';
-      default:
-        return 'Enter your UUID';
-    }
-  }
-
-  Future<void> performLogin(
-    BuildContext dialogContext,
-    StateSetter setDialogState,
-    Tenant school,
-    String role,
-    String userId,
-    ValueNotifier<bool> isLoadingNotifier,
-  ) async {
-    if (userId.isEmpty) {
-      showErrorSnackBar('Please enter your ${getRoleDisplayName(role)} ID');
-      return;
-    }
-
-    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-    if (!uuidRegex.hasMatch(userId)) {
-      showErrorSnackBar('Please enter a valid UUID format');
-      return;
-    }
-
-    isLoadingNotifier.value = true;
-
-    try {
-      Map<String, dynamic> userData;
-      switch (role) {
-        case 'student':
-          userData = await StudentService.getStudentById(userId);
-          break;
-        case 'teacher':
-          userData = await TeacherService.getTeacherById(userId);
-          break;
-        case 'admin':
-          userData = await AuthorityService.getAuthorityById(userId);
-          break;
-        default:
-          throw Exception('Invalid role');
-      }
-
-      if (role != 'admin') {
-        final userTenantId = userData['tenant_id']?.toString();
-        if (userTenantId != null && userTenantId != school.id) {
-          showErrorSnackBar('This ${getRoleDisplayName(role)} does not belong to ${school.schoolName}');
-          return;
-        }
-      }
-
-      // Set school data to session BEFORE navigation
-      SchoolSession.setSchoolData(
-        schoolName: school.schoolName,
-        schoolId: school.id,
-        schoolCode: school.schoolCode,
-        tenantId: school.id,
-      );
-      
-      // Debug logs
-      print('DEBUG: Set school name to: ${school.schoolName}');
-      print('DEBUG: SchoolSession.schoolName is now: ${SchoolSession.schoolName}');
-
-      Navigator.pop(dialogContext);
-      navigateToRole(role, school, userId, userData);
-      showSuccessSnackBar('Welcome ${userData['first_name'] ?? userData['last_name'] ?? ''}!');
-    } catch (e) {
-      showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
-    } finally {
-      isLoadingNotifier.value = false;
-    }
-  }
-
-  void showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: Colors.white,
-              size: 14, // Reduced
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: AppTheme.bodyMedium.copyWith(
-                  color: Colors.white,
-                  fontSize: 11, // Reduced
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTheme.borderRadius8,
-        ),
-        margin: const EdgeInsets.all(8), // Reduced
-      ),
-    );
-  }
-
-  void showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: Colors.white,
-              size: 14, // Reduced
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: AppTheme.bodyMedium.copyWith(
-                  color: Colors.white,
-                  fontSize: 11, // Reduced
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppTheme.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTheme.borderRadius8,
-        ),
-        margin: const EdgeInsets.all(8), // Reduced
-      ),
-    );
-  }
-
-  String getRoleDisplayName(String role) {
-    switch (role) {
-      case 'student':
-        return 'Student';
-      case 'teacher':
-        return 'Teacher';
-      case 'admin':
-        return 'School Authority';
-      default:
-        return 'User';
-    }
-  }
-
-  IconData getRoleIcon(String role) {
-    switch (role) {
-      case 'student':
-        return Icons.person;
-      case 'teacher':
-        return Icons.person_2;
-      case 'admin':
-        return Icons.admin_panel_settings;
-      default:
-        return Icons.person;
-    }
-  }
-
-  void navigateToRole(String role, Tenant school, String userId, Map<String, dynamic> userData) {
-    switch (role) {
-      case 'student':
-        context.go('${AppConstants.studentDashboardRoute}?tenantId=${school.id}&userId=$userId');
-        break;
-      case 'teacher':
-        context.go('${AppConstants.teacherDashboardRoute}?tenantId=${school.id}&userId=$userId');
-        break;
-      case 'admin':
-        context.go('${AppConstants.adminDashboardRoute}?tenantId=${school.id}&userId=$userId');
-        break;
-    }
-  }
 }

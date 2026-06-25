@@ -1,14 +1,16 @@
 // lib/features/admin/screens/tenant_management_screen.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/models/tenant.dart';
-import '../../../core/utils/responsive.dart';
-import '../widgets/tenant_create_dialog.dart';
+import '../../super_admin/widgets/super_admin_header.dart';
+import '../../super_admin/widgets/super_admin_action_bar.dart';
+// tenant_create_dialog is now used by the admin SchoolSwitcher, not here.
 import '../widgets/tenant_edit_dialog.dart';
 import '../widgets/tenant_details_dialog.dart';
 import '../widgets/tenant_stats_dialog.dart' as stats;
@@ -120,7 +122,9 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
         },
       );
       
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(uri, headers: AuthSession.instance.headers(json: false))
+          .timeout(const Duration(seconds: 10));
 
       if (!mounted) return;
 
@@ -162,7 +166,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
       }
     } catch (e) {
       if (!mounted) return;
-      _error = 'Network error: $e';
+      _error = _friendlyError(e);
     } finally {
       if (mounted) {
         setState(() {
@@ -171,6 +175,14 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
         });
       }
     }
+  }
+
+  // Convert raw exceptions into user-friendly messages.
+  // Raw technical detail is appended only in debug builds.
+  String _friendlyError(Object e) {
+    const friendly =
+        'Unable to connect. Please check your internet connection and try again.';
+    return kDebugMode ? '$friendly\n\nDetails: $e' : friendly;
   }
 
   void _filterTenants() {
@@ -218,7 +230,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
         queryParameters: hardDelete ? {'hard_delete': 'true'} : null,
       );
       
-      final response = await http.delete(uri);
+      final response = await http.delete(uri, headers: AuthSession.instance.headers(json: false));
 
       if (response.statusCode == 200) {
         await _loadTenants(refresh: true);
@@ -230,7 +242,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('Error: $e');
+        _showErrorSnackBar(_friendlyError(e));
       }
     }
   }
@@ -238,7 +250,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
   Future<void> _reactivateTenant(String tenantId) async {
     try {
       final uri = Uri.parse('${AppConstants.apiBaseUrl}/api/v1/tenants/$tenantId/reactivate');
-      final response = await http.patch(uri);
+      final response = await http.patch(uri, headers: AuthSession.instance.headers(json: false));
 
       if (response.statusCode == 200) {
         await _loadTenants(refresh: true);
@@ -250,7 +262,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('Error: $e');
+        _showErrorSnackBar(_friendlyError(e));
       }
     }
   }
@@ -266,7 +278,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: Colors.white, fontSize: 13),
+                style: AppTheme.bodySmall.copyWith(color: Colors.white),
               ),
             ),
           ],
@@ -290,7 +302,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: Colors.white, fontSize: 13),
+                style: AppTheme.bodySmall.copyWith(color: Colors.white),
               ),
             ),
           ],
@@ -305,108 +317,41 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Get exact screen dimensions to prevent infinite constraints
-    final screenSize = MediaQuery.of(context).size;
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-    final availableHeight = screenSize.height - statusBarHeight;
-
     if (_animationController == null || _fadeAnimation == null) {
-      return Container(
-        width: screenSize.width,
-        height: availableHeight,
-        color: AppTheme.backgroundPrimary,
-        child: const Center(child: CircularProgressIndicator()),
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.greenPrimary),
       );
     }
 
-    return Container(
-      width: screenSize.width,
-      height: availableHeight,
-      color: AppTheme.backgroundPrimary,
-      child: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation!,
-          child: Column(
-            children: [
-              // Header Section - Compact
-              _buildHeader(),
-              // Search Section - Compact
-              _buildSearchSection(),
-              // Bulk Actions (if any selected)
-              if (_selectedTenants.isNotEmpty) _buildBulkActions(),
-              // Main Content - Takes remaining space
-              Expanded(
-                child: _buildContent(),
+    return FadeTransition(
+      opacity: _fadeAnimation!,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SuperAdminHeader(
+            title: 'Organisations',
+            subtitle: 'Schools created by your admins',
+            icon: Icons.business,
+          ),
+          const SizedBox(height: 12),
+          SuperAdminActionBar(
+            actions: [
+              SaActionButton(
+                icon: Icons.refresh,
+                label: 'Refresh',
+                onPressed:
+                    _isLoading ? null : () => _loadTenants(refresh: true),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-      ),
-      child: Row(
-        children: [
+          const SizedBox(height: 12),
+          // Search Section - Compact
+          _buildSearchSection(),
+          // Bulk Actions (if any selected)
+          if (_selectedTenants.isNotEmpty) _buildBulkActions(),
+          // Main Content - Takes remaining space
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tenant Management',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20, // Compact but readable
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Manage schools and institutions',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14, // Compact
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _showCreateDialog(),
-              borderRadius: AppTheme.borderRadius12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: AppTheme.borderRadius12,
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.add, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Add School',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child: _buildContent(),
           ),
         ],
       ),
@@ -424,10 +369,10 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
       ),
       child: TextField(
         controller: _searchController,
-        style: TextStyle(fontSize: 15), // Compact but readable
+        style: AppTheme.bodyMedium, // Compact but readable
         decoration: InputDecoration(
           hintText: 'Search schools by name, address, or principal...',
-          hintStyle: TextStyle(color: AppTheme.neutral400, fontSize: 14),
+          hintStyle: AppTheme.bodySmall.copyWith(color: AppTheme.neutral400),
           prefixIcon: Icon(Icons.search, color: AppTheme.greenPrimary, size: 20),
           filled: true,
           fillColor: AppTheme.neutral50,
@@ -463,8 +408,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
           const SizedBox(width: 8),
           Text(
             '${_selectedTenants.length} selected',
-            style: TextStyle(
-              fontSize: 14,
+            style: AppTheme.labelSmall.copyWith(
               fontWeight: FontWeight.w600,
               color: AppTheme.greenPrimary,
             ),
@@ -472,7 +416,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
           const Spacer(),
           TextButton(
             onPressed: () => setState(() => _selectedTenants.clear()),
-            child: Text('Clear', style: TextStyle(fontSize: 13)),
+            child: Text('Clear', style: AppTheme.bodySmall),
           ),
           const SizedBox(width: 8),
           ElevatedButton(
@@ -481,7 +425,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
               backgroundColor: AppTheme.greenPrimary,
               foregroundColor: Colors.white,
             ),
-            child: Text('Actions', style: TextStyle(fontSize: 13, color: Colors.white)),
+            child: Text('Actions', style: AppTheme.bodySmall.copyWith(color: Colors.white)),
           ),
         ],
       ),
@@ -514,9 +458,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
           const SizedBox(height: 16),
           Text(
             'Loading schools...',
-            style: TextStyle(
+            style: AppTheme.bodyMedium.copyWith(
               color: AppTheme.neutral600,
-              fontSize: 16,
             ),
           ),
         ],
@@ -547,9 +490,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             const SizedBox(height: 16),
             Text(
               'Failed to load tenants',
-              style: TextStyle(
+              style: AppTheme.bodyLarge.copyWith(
                 color: AppTheme.error,
-                fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
@@ -557,9 +499,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             const SizedBox(height: 8),
             Text(
               _error!,
-              style: TextStyle(
+              style: AppTheme.bodySmall.copyWith(
                 color: AppTheme.neutral600,
-                fontSize: 14,
               ),
               textAlign: TextAlign.center,
             ),
@@ -577,7 +518,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
                   const SizedBox(width: 8),
                   Text(
                     'Try Again',
-                    style: TextStyle(color: Colors.white, fontSize: 14),
+                    style: AppTheme.bodySmall.copyWith(color: Colors.white),
                   ),
                 ],
               ),
@@ -608,9 +549,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             const SizedBox(height: 16),
             Text(
               'No schools found',
-              style: TextStyle(
+              style: AppTheme.bodyLarge.copyWith(
                 color: AppTheme.neutral600,
-                fontSize: 18,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
@@ -619,10 +559,9 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             Text(
               _searchController.text.isNotEmpty
                   ? 'Try adjusting your search terms or clear the search.'
-                  : 'Add your first school to get started.',
-              style: TextStyle(
+                  : 'Schools appear here once your admins create them.',
+              style: AppTheme.bodySmall.copyWith(
                 color: AppTheme.neutral500,
-                fontSize: 14,
               ),
               textAlign: TextAlign.center,
             ),
@@ -633,16 +572,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
                   _searchController.clear();
                   _filterTenants();
                 },
-                child: Text('Clear Search', style: TextStyle(fontSize: 14)),
-              )
-            else
-              ElevatedButton(
-                onPressed: () => _showCreateDialog(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.greenPrimary,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                ),
-                child: Text('Add School', style: TextStyle(color: Colors.white, fontSize: 14)),
+                child: Text('Clear Search', style: AppTheme.bodySmall),
               ),
           ],
         ),
@@ -683,9 +613,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
           const SizedBox(width: 12),
           Text(
             'Loading more...',
-            style: TextStyle(
+            style: AppTheme.bodySmall.copyWith(
               color: AppTheme.neutral600,
-              fontSize: 14,
             ),
           ),
         ],
@@ -772,8 +701,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
                             Expanded(
                               child: Text(
                                 tenant.schoolName,
-                                style: TextStyle(
-                                  fontSize: 16, // Comfortable reading size
+                                style: AppTheme.bodyMedium.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: isInactive ? AppTheme.neutral600 : AppTheme.neutral900,
                                 ),
@@ -787,9 +715,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
                         const SizedBox(height: 6),
                         Text(
                           tenant.address,
-                          style: TextStyle(
+                          style: AppTheme.bodySmall.copyWith(
                             color: AppTheme.neutral600,
-                            fontSize: 13, // Compact but readable
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -798,9 +725,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
                           const SizedBox(height: 4),
                           Text(
                             'Principal: ${tenant.principalName}',
-                            style: TextStyle(
+                            style: AppTheme.bodyMicro.copyWith(
                               color: AppTheme.neutral500,
-                              fontSize: 12, // Compact
                             ),
                           ),
                         ],
@@ -845,8 +771,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
       ),
       child: Text(
         tenant.statusText,
-        style: TextStyle(
-          fontSize: 11, // Compact
+        style: AppTheme.bodyMicro.copyWith(
           color: tenant.isActive ? AppTheme.success : AppTheme.error,
           fontWeight: FontWeight.w600,
         ),
@@ -872,8 +797,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
           const SizedBox(width: 4),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 11, // Compact but readable
+            style: AppTheme.bodyMicro.copyWith(
               fontWeight: FontWeight.w500,
               color: color,
             ),
@@ -919,7 +843,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             children: [
               Icon(Icons.visibility, size: 18, color: AppTheme.info),
               const SizedBox(width: 12),
-              Text('Details', style: TextStyle(fontSize: 14)),
+              Text('Details', style: AppTheme.bodySmall),
             ],
           ),
         ),
@@ -929,7 +853,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             children: [
               Icon(Icons.edit, size: 18, color: AppTheme.warning),
               const SizedBox(width: 12),
-              Text('Edit', style: TextStyle(fontSize: 14)),
+              Text('Edit', style: AppTheme.bodySmall),
             ],
           ),
         ),
@@ -939,7 +863,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             children: [
               Icon(Icons.analytics, size: 18, color: AppTheme.greenPrimary),
               const SizedBox(width: 12),
-              Text('Stats', style: TextStyle(fontSize: 14)),
+              Text('Stats', style: AppTheme.bodySmall),
             ],
           ),
         ),
@@ -950,7 +874,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
               children: [
                 Icon(Icons.visibility_off, size: 18, color: AppTheme.neutral600),
                 const SizedBox(width: 12),
-                Text('Deactivate', style: TextStyle(fontSize: 14)),
+                Text('Deactivate', style: AppTheme.bodySmall),
               ],
             ),
           )
@@ -961,7 +885,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
               children: [
                 Icon(Icons.visibility, size: 18, color: AppTheme.success),
                 const SizedBox(width: 12),
-                Text('Reactivate', style: TextStyle(fontSize: 14)),
+                Text('Reactivate', style: AppTheme.bodySmall),
               ],
             ),
           ),
@@ -972,7 +896,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             children: [
               Icon(Icons.delete_forever, size: 18, color: AppTheme.error),
               const SizedBox(width: 12),
-              Text('Delete', style: TextStyle(fontSize: 14, color: AppTheme.error)),
+              Text('Delete', style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
             ],
           ),
         ),
@@ -993,8 +917,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             const SizedBox(height: 16),
             Text(
               'Confirm Deletion',
-              style: TextStyle(
-                fontSize: 18,
+              style: AppTheme.bodyLarge.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppTheme.error,
               ),
@@ -1002,9 +925,17 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
             const SizedBox(height: 12),
             Text(
               'Delete "${tenant.schoolName}"?',
-              style: TextStyle(
-                fontSize: 15,
+              style: AppTheme.bodyMedium.copyWith(
                 color: AppTheme.neutral700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'This permanently deletes the school and ALL its data and cannot be undone.',
+              style: AppTheme.bodySmall.copyWith(
+                color: AppTheme.error,
+                fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1014,7 +945,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: Text('Cancel', style: TextStyle(fontSize: 14)),
+                    child: Text('Cancel', style: AppTheme.bodySmall),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1027,9 +958,8 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
                     ),
                     child: Text(
                       'Delete',
-                      style: TextStyle(
+                      style: AppTheme.bodySmall.copyWith(
                         color: Colors.white,
-                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1043,17 +973,7 @@ class _TenantManagementScreenState extends State<TenantManagementScreen>
     );
   }
 
-  // Keep all dialog methods exactly the same...
-  void _showCreateDialog() {
-    showDialog(
-      context: context,
-      barrierColor: AppTheme.surfaceOverlay,
-      builder: (context) => TenantCreateDialog(
-        onTenantCreated: () => _loadTenants(refresh: true),
-      ),
-    );
-  }
-
+  // Schools are created by their admin (see SchoolSwitcher), not the super-admin.
   void _showEditDialog(Tenant tenant) {
     showDialog(
       context: context,

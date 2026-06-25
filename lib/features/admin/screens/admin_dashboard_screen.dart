@@ -183,10 +183,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _error!,
-            style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral600),
+            "We couldn't load your dashboard. Check your connection and try again.",
+            style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral700),
             textAlign: TextAlign.center,
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              _error!,
+              style: AppTheme.bodyMicro.copyWith(
+                color: AppTheme.neutral500,
+                fontSize: 9,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -293,15 +304,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         _buildAuthorityInfo(position, department),
                         style: AppTheme.bodyMicro.copyWith(color: Colors.white70),
                       ),
-                    // Display authority ID for debugging (remove in production)
-                    if (AuthoritySession.authorityId != null)
-                      Text(
-                        'ID: ${AuthoritySession.authorityId!.length > 8 ? AuthoritySession.authorityId!.substring(0, 8) + '...' : AuthoritySession.authorityId!}',
-                        style: AppTheme.bodyMicro.copyWith(
-                          color: Colors.white60,
-                          fontSize: 7,
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -340,19 +342,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       children: [
         _buildInfoCard(
           'Email',
-          email.length > 20 ? '${email.substring(0, 17)}...' : email,
+          email,
           Icons.email,
           AppTheme.info,
         ),
         _buildInfoCard(
           'Phone',
-          phone.length > 15 ? '${phone.substring(0, 12)}...' : phone,
+          phone,
           Icons.phone,
           AppTheme.success,
         ),
         _buildInfoCard(
           'Authority ID',
-          authorityId.length > 15 ? '${authorityId.substring(0, 12)}...' : authorityId,
+          authorityId,
           Icons.badge,
           AppTheme.warning,
         ),
@@ -525,13 +527,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     child: Text(
                       value.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 8,
+                      style: AppTheme.bodyMicro.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: value.toLowerCase() == 'active' 
+                        color: value.toLowerCase() == 'active'
                             ? AppTheme.success
                             : AppTheme.error,
-                        fontFamily: AppTheme.bauhausFontFamily,
                       ),
                     ),
                   )
@@ -574,17 +574,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 4,
+            crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 4,
             crossAxisSpacing: 6,
             mainAxisSpacing: 6,
             childAspectRatio: 0.8,
             children: [
-              _buildQuickActionButton(
-                'Teachers',
-                Icons.person_2,
-                AppTheme.info,
-                () => _navigateToTeachers(),
-              ),
               _buildQuickActionButton(
                 'Students',
                 Icons.people,
@@ -592,16 +586,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 () => _navigateToStudents(),
               ),
               _buildQuickActionButton(
-                'Analytics',
-                Icons.analytics,
-                AppTheme.warning,
-                () => _navigateToAnalytics(),
+                'Classes',
+                Icons.class_,
+                AppTheme.info,
+                () => _navigateToClasses(),
               ),
               _buildQuickActionButton(
-                'Settings',
-                Icons.settings,
+                'Exams',
+                Icons.assignment,
+                AppTheme.warning,
+                () => _navigateToExams(),
+              ),
+              _buildQuickActionButton(
+                'Enrolment',
+                Icons.group_add,
                 AppTheme.greenPrimary,
-                () => _navigateToSettings(),
+                () => _navigateToEnrolment(),
               ),
             ],
           ),
@@ -641,20 +641,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  void _navigateToTeachers() {
-    context.go('${AppConstants.adminTeachersRoute}?userId=${AuthoritySession.authorityId}&tenantId=${AuthoritySession.tenantId}');
-  }
+  String get _idParams =>
+      'userId=${AuthoritySession.authorityId}&tenantId=${AuthoritySession.tenantId}';
 
   void _navigateToStudents() {
-    context.go('${AppConstants.adminStudentsRoute}?userId=${AuthoritySession.authorityId}&tenantId=${AuthoritySession.tenantId}');
+    context.go('/school_authority/students?$_idParams');
   }
 
-  void _navigateToAnalytics() {
-    context.go('${AppConstants.adminAnalyticsRoute}?userId=${AuthoritySession.authorityId}&tenantId=${AuthoritySession.tenantId}');
+  void _navigateToClasses() {
+    context.go('/school_authority/classes?$_idParams');
   }
 
-  void _navigateToSettings() {
-    context.go('${AppConstants.adminSettingsRoute}?userId=${AuthoritySession.authorityId}&tenantId=${AuthoritySession.tenantId}');
+  void _navigateToExams() {
+    context.go('${AppConstants.adminExamsRoute}?$_idParams');
+  }
+
+  void _navigateToEnrolment() {
+    context.go('${AppConstants.adminEnrollmentRoute}?$_idParams');
   }
 
   // Helper method to safely get string values from API response

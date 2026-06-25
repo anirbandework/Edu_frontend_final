@@ -361,9 +361,9 @@ class _MastersCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Master Timetables",
-              style: TextStyle(fontWeight: FontWeight.w600),
+              style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -549,7 +549,10 @@ class _ClassPickerState extends State<_ClassPicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Pick Class", style: TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          "Pick Class",
+          style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w600),
+        ),
         const SizedBox(height: 8),
         if (loading) const LinearProgressIndicator(),
         DropdownButtonFormField<String>(
@@ -621,30 +624,27 @@ class _WeeklyGridTable extends StatelessWidget {
                     children: [
                       Text(
                         "${cell.periodName} • ${cell.startTime}-${cell.endTime}",
-                        style: const TextStyle(fontSize: 12),
+                        style: AppTheme.bodyMicro,
                       ),
                       if (cell.subjectName != null)
                         Text(
                           cell.subjectName!,
-                          style: const TextStyle(
-                            fontSize: 13,
+                          style: AppTheme.labelSmall.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       if (cell.teacherName != null)
                         Text(
                           cell.teacherName!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                          style: AppTheme.bodyMicro.copyWith(
+                            color: AppTheme.neutral500,
                           ),
                         ),
                       if (cell.roomNumber != null)
                         Text(
                           "Room ${cell.roomNumber!}",
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
+                          style: AppTheme.bodyMicro.copyWith(
+                            color: AppTheme.neutral500,
                           ),
                         ),
                     ],
@@ -693,9 +693,9 @@ class _AnalyticsPanelState extends State<_AnalyticsPanel> {
         : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "Analytics",
-                style: TextStyle(fontWeight: FontWeight.w600),
+                style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 6),
               Text("Total classes: ${data!["total_classes"] ?? "-"}"),

@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/constants/app_constants.dart';
+import '../core/auth/auth_session.dart';
 
 class TeacherService {
   static const String _baseUrl = AppConstants.apiBaseUrl;
@@ -11,7 +12,7 @@ class TeacherService {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/api/v1/school_authority/teachers/$teacherId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -64,7 +65,10 @@ class TeacherService {
         queryParameters: queryParams,
       );
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http.get(
+        uri,
+        headers: AuthSession.instance.headers(json: false),
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
@@ -81,7 +85,7 @@ class TeacherService {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/v1/school_authority/teachers/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(teacherData),
       ).timeout(const Duration(seconds: 15));
 
@@ -101,7 +105,7 @@ class TeacherService {
     try {
       final response = await http.put(
         Uri.parse('$_baseUrl/api/v1/school_authority/teachers/$teacherId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(teacherData),
       ).timeout(const Duration(seconds: 15));
 
@@ -121,6 +125,7 @@ class TeacherService {
     try {
       final response = await http.delete(
         Uri.parse('$_baseUrl/api/v1/school_authority/teachers/$teacherId'),
+        headers: AuthSession.instance.headers(json: false),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
@@ -156,7 +161,10 @@ class TeacherService {
         queryParameters: queryParams,
       );
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http.get(
+        uri,
+        headers: AuthSession.instance.headers(json: false),
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
@@ -193,7 +201,10 @@ class TeacherService {
         queryParameters: queryParams,
       );
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http.get(
+        uri,
+        headers: AuthSession.instance.headers(json: false),
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
@@ -210,7 +221,7 @@ class TeacherService {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/v1/teachers/assignments/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(assignmentData),
       ).timeout(const Duration(seconds: 15));
 
@@ -245,7 +256,10 @@ class TeacherService {
         queryParameters: queryParams,
       );
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http.get(
+        uri,
+        headers: AuthSession.instance.headers(json: false),
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         return json.decode(response.body);

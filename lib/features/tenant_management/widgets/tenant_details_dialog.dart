@@ -29,14 +29,14 @@ class TenantDetailsDialog extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: tenant.isActive 
-                        ? AppTheme.lightGreen.withOpacity(0.2) 
-                        : Colors.grey[200],
+                    color: tenant.isActive
+                        ? AppTheme.greenLight.withOpacity(0.2)
+                        : AppTheme.neutral200,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.school,
-                    color: tenant.isActive ? AppTheme.primaryGreen : Colors.grey[600],
+                    color: tenant.isActive ? AppTheme.greenPrimary : AppTheme.neutral500,
                     size: 24,
                   ),
                 ),
@@ -56,14 +56,13 @@ class TenantDetailsDialog extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: tenant.isActive ? Colors.green[100] : Colors.red[100],
+                              color: tenant.isActive ? AppTheme.green50 : AppTheme.error.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               tenant.statusText,
-                              style: TextStyle(
-                                color: tenant.isActive ? Colors.green[700] : Colors.red[700],
-                                fontSize: 12,
+                              style: AppTheme.bodyMicro.copyWith(
+                                color: tenant.isActive ? AppTheme.greenPrimary : AppTheme.error,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -71,24 +70,20 @@ class TenantDetailsDialog extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             tenant.schoolType,
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 12,
-                            ),
+                            style: AppTheme.bodyMicro,
                           ),
                           if (tenant.schoolCode != null) ...[
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.blue[100],
+                                color: AppTheme.info.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 'Code: ${tenant.schoolCode}',
-                                style: TextStyle(
-                                  color: Colors.blue[700],
-                                  fontSize: 10,
+                                style: AppTheme.bodyMicro.copyWith(
+                                  color: AppTheme.info,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -172,7 +167,7 @@ class TenantDetailsDialog extends StatelessWidget {
                           '${tenant.studentTeacherRatio.toStringAsFixed(1)}:1'),
                         _buildInfoRow('Capacity Utilization', 
                           '${tenant.capacityUtilization.toStringAsFixed(1)}%',
-                          valueColor: tenant.isOverCapacity ? Colors.red : null),
+                          valueColor: tenant.isOverCapacity ? AppTheme.error : null),
                       ],
                     ),
                     
@@ -230,8 +225,7 @@ class TenantDetailsDialog extends StatelessWidget {
         children: [
           Text(
             'Quick Statistics',
-            style: TextStyle(
-              fontSize: 18,
+            style: AppTheme.bodyLarge.copyWith(
               fontWeight: FontWeight.bold,
               color: AppTheme.primaryGreen,
             ),
@@ -239,17 +233,17 @@ class TenantDetailsDialog extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(child: _buildStatCard('Students', '${tenant.totalStudents}', Icons.people, Colors.blue)),
+              Expanded(child: _buildStatCard('Students', '${tenant.totalStudents}', Icons.people, AppTheme.info)),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatCard('Teachers', '${tenant.totalTeachers}', Icons.person_2, Colors.green)),
+              Expanded(child: _buildStatCard('Teachers', '${tenant.totalTeachers}', Icons.person_2, AppTheme.greenPrimary)),
               const SizedBox(width: 16),
-              Expanded(child: _buildStatCard('Staff', '${tenant.totalStaff}', Icons.work, Colors.orange)),
+              Expanded(child: _buildStatCard('Staff', '${tenant.totalStaff}', Icons.work, AppTheme.warning)),
               const SizedBox(width: 16),
               Expanded(child: _buildStatCard(
-                'Capacity', 
-                '${tenant.capacityUtilization.toStringAsFixed(1)}%', 
-                Icons.donut_small, 
-                tenant.isOverCapacity ? Colors.red : Colors.purple
+                'Capacity',
+                '${tenant.capacityUtilization.toStringAsFixed(1)}%',
+                Icons.donut_small,
+                tenant.isOverCapacity ? AppTheme.error : Colors.purple
               )),
             ],
           ),
@@ -258,18 +252,18 @@ class TenantDetailsDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange[100],
+                color: AppTheme.warning.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange[300]!),
+                border: Border.all(color: AppTheme.warning.withOpacity(0.4)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.orange[700], size: 20),
+                  Icon(Icons.warning, color: AppTheme.warning, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     'School is over capacity by ${tenant.currentEnrollment - tenant.maximumCapacity} students',
-                    style: TextStyle(
-                      color: Colors.orange[800],
+                    style: AppTheme.bodySmall.copyWith(
+                      color: AppTheme.warning,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -288,7 +282,7 @@ class TenantDetailsDialog extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[300]!),
+        border: Border.all(color: AppTheme.neutral300),
       ),
       child: Column(
         children: [
@@ -296,18 +290,14 @@ class TenantDetailsDialog extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 18,
+            style: AppTheme.bodyLarge.copyWith(
               fontWeight: FontWeight.bold,
               color: color,
             ),
           ),
           Text(
             title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
+            style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral600),
           ),
         ],
       ),
@@ -324,8 +314,7 @@ class TenantDetailsDialog extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               title,
-              style: TextStyle(
-                fontSize: 18,
+              style: AppTheme.bodyLarge.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppTheme.primaryGreen,
               ),
@@ -337,9 +326,9 @@ class TenantDetailsDialog extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            color: AppTheme.neutral50,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey[200]!),
+            border: Border.all(color: AppTheme.neutral200),
           ),
           child: Column(
             children: children,
@@ -361,7 +350,7 @@ class TenantDetailsDialog extends StatelessWidget {
               label,
               style: TextStyle(
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+                color: AppTheme.neutral700,
               ),
             ),
           ),
@@ -392,7 +381,7 @@ class TenantDetailsDialog extends StatelessWidget {
                     child: Icon(
                       Icons.copy,
                       size: 16,
-                      color: Colors.grey[600],
+                      color: AppTheme.neutral600,
                     ),
                   ),
                 ],

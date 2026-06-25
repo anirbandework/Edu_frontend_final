@@ -199,9 +199,9 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
                             shadowColor: Colors.transparent,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
-                          child: const Text(
+                          child: Text(
                             'Hide',
-                            style: TextStyle(
+                            style: AppTheme.labelMedium.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                             ),
@@ -448,9 +448,8 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
                         ),
                         Text(
                           'Online now',
-                          style: AppTheme.bodySmall.copyWith(
+                          style: AppTheme.bodyMicro.copyWith(
                             color: Colors.white.withOpacity(0.8),
-                            fontSize: 11,
                           ),
                         ),
                       ],

@@ -1,419 +1,293 @@
 // lib/features/teacher/screens/teacher_classes_screen.dart
+//
+// The classes a teacher teaches, derived from their real timetable schedule
+// (the backend has no per-teacher classes endpoint; the schedule is the source
+// of truth for which class+subject a teacher is assigned to). No mock data.
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
-import '../../../core/constants/app_strings.dart';
+import '../../../core/constants/app_theme.dart';
+import '../../../services/teacher_portal_service.dart';
+
+class _TeacherClass {
+  final String name;
+  final Set<String> subjects = {};
+  final Set<String> rooms = {};
+  final Set<String> days = {};
+  int periods = 0;
+  _TeacherClass(this.name);
+}
 
 class TeacherClassesScreen extends StatefulWidget {
-  const TeacherClassesScreen({super.key});
+  final String? teacherId;
+  final String? academicYear;
+  const TeacherClassesScreen({super.key, this.teacherId, this.academicYear});
 
   @override
   State<TeacherClassesScreen> createState() => _TeacherClassesScreenState();
 }
 
 class _TeacherClassesScreenState extends State<TeacherClassesScreen> {
-  String _selectedFilter = 'All';
-
-  final List<Map<String, dynamic>> _classes = [
-    {
-      'id': '1',
-      'name': 'Mathematics - Grade 10A',
-      'students': 28,
-      'room': 'Room 201',
-      'time': 'Mon, Wed, Fri • 09:00 - 10:30',
-      'color': Colors.blue,
-      'status': 'Active',
-      'assignments': 5,
-      'pendingGrades': 3,
-    },
-    {
-      'id': '2',
-      'name': 'Advanced Calculus - Grade 12',
-      'students': 24,
-      'room': 'Room 205',
-      'time': 'Tue, Thu • 11:00 - 12:30',
-      'color': Colors.green,
-      'status': 'Active',
-      'assignments': 3,
-      'pendingGrades': 8,
-    },
-    {
-      'id': '3',
-      'name': 'Mathematics - Grade 10B',
-      'students': 30,
-      'room': 'Room 201',
-      'time': 'Mon, Wed, Fri • 14:00 - 15:30',
-      'color': Colors.orange,
-      'status': 'Active',
-      'assignments': 4,
-      'pendingGrades': 12,
-    },
-    {
-      'id': '4',
-      'name': 'Geometry - Grade 9',
-      'students': 26,
-      'room': 'Room 103',
-      'time': 'Tue, Thu • 13:00 - 14:30',
-      'color': Colors.purple,
-      'status': 'Active',
-      'assignments': 2,
-      'pendingGrades': 0,
-    },
-    {
-      'id': '5',
-      'name': 'Statistics - Grade 11',
-      'students': 22,
-      'room': 'Room 204',
-      'time': 'Mon, Wed • 15:30 - 17:00',
-      'color': Colors.red,
-      'status': 'Completed',
-      'assignments': 6,
-      'pendingGrades': 0,
-    },
+  static const _days = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
   ];
+
+  bool _loading = true;
+  String? _error;
+  List<_TeacherClass> _classes = [];
+
+  String get _teacherId => (widget.teacherId?.isNotEmpty == true)
+      ? widget.teacherId!
+      : (AuthSession.instance.userId ?? '');
+  String get _academicYear => widget.academicYear ?? '2025-26';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (_teacherId.isEmpty) {
+      setState(() {
+        _loading = false;
+        _error = 'No teacher session found. Please sign in again.';
+      });
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await TeacherPortalService.getMySchedule(
+        teacherId: _teacherId,
+        academicYear: _academicYear,
+      );
+      final weekly = (data['weekly_schedule'] as Map?) ?? {};
+      final map = <String, _TeacherClass>{};
+      for (final day in _days) {
+        final raw = (weekly[day] as List?) ?? const [];
+        for (final e in raw.whereType<Map>()) {
+          final p = e.cast<String, dynamic>();
+          final cls = (p['class_name'] ?? p['class'] ?? 'Unassigned').toString();
+          final c = map.putIfAbsent(cls, () => _TeacherClass(cls));
+          c.periods++;
+          c.days.add(day);
+          final subj = (p['subject_name'] ?? p['subject'] ?? '').toString();
+          if (subj.isNotEmpty) c.subjects.add(subj);
+          final room = (p['room_number'] ?? p['room'] ?? '').toString();
+          if (room.isNotEmpty) c.rooms.add(room);
+        }
+      }
+      final classes = map.values.toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+      if (!mounted) return;
+      setState(() {
+        _classes = classes;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  void _goSchedule() {
+    final qp = <String, String>{
+      if (AuthSession.instance.userId != null) 'userId': AuthSession.instance.userId!,
+      if (AuthSession.instance.tenantId != null) 'tenantId': AuthSession.instance.tenantId!,
+    };
+    context.go(Uri(path: AppConstants.teacherScheduleRoute, queryParameters: qp).toString());
+  }
 
   @override
   Widget build(BuildContext context) {
-    final filteredClasses = _classes.where((classItem) {
-      if (_selectedFilter == 'All') return true;
-      return classItem['status'] == _selectedFilter;
-    }).toList();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header Section
         Row(
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text('My Classes', style: AppTheme.headingMedium),
+                  const SizedBox(height: 2),
                   Text(
-                    'My Classes',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    'Manage all your classes and track student progress',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                    ),
+                    _loading
+                        ? 'Loading your classes…'
+                        : '${_classes.length} ${_classes.length == 1 ? 'class' : 'classes'} • $_academicYear',
+                    style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
                   ),
                 ],
               ),
             ),
-            ElevatedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.add),
-              label: const Text('New Class'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo[600],
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
+            TextButton.icon(
+              onPressed: _goSchedule,
+              icon: const Icon(Icons.schedule, size: AppTheme.iconSmall),
+              label: const Text('View schedule'),
+            ),
+            IconButton(
+              onPressed: _loading ? null : _load,
+              icon: const Icon(Icons.refresh),
+              color: AppTheme.greenPrimary,
+              tooltip: 'Refresh',
             ),
           ],
         ),
-        
-        const SizedBox(height: 24),
-        
-        // Filter Chips
-        Row(
-          children: [
-            Text(
-              'Filter:',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: ['All', 'Active', 'Completed'].map((filter) {
-                    final isSelected = _selectedFilter == filter;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(filter),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() {
-                            _selectedFilter = filter;
-                          });
-                        },
-                        backgroundColor: Colors.grey[200],
-                        selectedColor: Colors.indigo[600],
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey[700],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: 20),
-        
-        // Classes Grid
-        Expanded(
-          child: GridView.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: MediaQuery.of(context).size.width > 768 ? 2 : 1,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: MediaQuery.of(context).size.width > 768 ? 1.4 : 1.2,
-            ),
-            itemCount: filteredClasses.length,
-            itemBuilder: (context, index) {
-              final classItem = filteredClasses[index];
-              return _buildClassCard(classItem);
-            },
-          ),
-        ),
+        const SizedBox(height: 16),
+        Expanded(child: _body()),
       ],
     );
   }
 
-  Widget _buildClassCard(Map<String, dynamic> classItem) {
-    final Color color = classItem['color'] as Color;
-    final bool isCompleted = classItem['status'] == 'Completed';
-    
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            colors: [
-              color.withOpacity(0.1),
-              Colors.white,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+  Widget _body() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.greenPrimary),
+      );
+    }
+    if (_error != null) {
+      return _state(Icons.error_outline, AppTheme.error, 'Could not load classes', _error!);
+    }
+    if (_classes.isEmpty) {
+      return _state(Icons.class_outlined, AppTheme.neutral400, 'No classes assigned',
+          'You have no classes in your timetable for $_academicYear yet.');
+    }
+    return RefreshIndicator(
+      color: AppTheme.greenPrimary,
+      onRefresh: _load,
+      child: LayoutBuilder(builder: (context, c) {
+        final cols = c.maxWidth > 900 ? 3 : (c.maxWidth > 560 ? 2 : 1);
+        return GridView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: 178,
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          itemCount: _classes.length,
+          itemBuilder: (context, i) => _classCard(_classes[i]),
+        );
+      }),
+    );
+  }
+
+  Widget _classCard(_TeacherClass c) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.glassCardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.class_,
-                      color: color,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          classItem['name'],
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isCompleted ? Colors.grey[300] : color.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            classItem['status'],
-                            style: TextStyle(
-                              color: isCompleted ? Colors.grey[700] : color,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton(
-                    icon: Icon(Icons.more_vert, color: Colors.grey[600]),
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'view',
-                        child: Text('View Details'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Text('Edit Class'),
-                      ),
-                      const PopupMenuItem(
-                        value: 'attendance',
-                        child: Text('Take Attendance'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Class Info
-              Row(
-                children: [
-                  Icon(Icons.people, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${classItem['students']} students',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Icon(Icons.room, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 6),
-                  Text(
-                    classItem['room'],
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 8),
-              
-              Row(
-                children: [
-                  Icon(Icons.schedule, size: 16, color: Colors.grey[600]),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      classItem['time'],
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
-              const Spacer(),
-              
-              // Action Stats
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: AppTheme.borderRadius12,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildStatItem(
-                      '${classItem['assignments']}',
-                      'Assignments',
-                      Icons.assignment,
-                      Colors.blue,
-                    ),
-                    Container(width: 1, height: 30, color: Colors.grey[300]),
-                    _buildStatItem(
-                      '${classItem['pendingGrades']}',
-                      'Pending',
-                      Icons.grade,
-                      Colors.orange,
-                    ),
-                  ],
-                ),
+                child: const Icon(Icons.class_, color: Colors.white, size: AppTheme.iconMedium),
               ),
-              
-              const SizedBox(height: 16),
-              
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {},
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: color,
-                        side: BorderSide(color: color),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('View Details'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: color,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: const Text('Manage'),
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(c.name,
+                    style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 12),
+          if (c.subjects.isNotEmpty)
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: c.subjects
+                  .take(4)
+                  .map((s) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppTheme.green50,
+                          borderRadius: AppTheme.borderRadius8,
+                        ),
+                        child: Text(s,
+                            style: AppTheme.bodyMicro.copyWith(
+                                color: AppTheme.greenPrimary, fontWeight: FontWeight.w600)),
+                      ))
+                  .toList(),
+            ),
+          const Spacer(),
+          Row(
+            children: [
+              _meta(Icons.event, '${c.periods} periods/wk'),
+              const SizedBox(width: 14),
+              _meta(Icons.today, '${c.days.length} days'),
+              if (c.rooms.isNotEmpty) ...[
+                const SizedBox(width: 14),
+                Flexible(child: _meta(Icons.meeting_room, c.rooms.join(', '))),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStatItem(String value, String label, IconData icon, Color color) {
-    return Column(
+  Widget _meta(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            color: Colors.grey[600],
-          ),
+        Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(text,
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
         ),
       ],
+    );
+  }
+
+  Widget _state(IconData icon, Color color, String title, String subtitle) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: AppTheme.borderRadius16,
+              ),
+              child: Icon(icon, size: 40, color: color),
+            ),
+            const SizedBox(height: 16),
+            Text(title, style: AppTheme.headingSmall, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(subtitle,
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh, size: AppTheme.iconSmall),
+                label: const Text('Refresh')),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -321,7 +321,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
         content: SingleChildScrollView(
           child: Text(
             csvString,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            style: AppTheme.bodyMicro.copyWith(fontFamily: 'monospace'),
           ),
         ),
         actions: [
@@ -362,12 +362,11 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                 children: [
                   const Icon(Icons.upload_file, color: Colors.white, size: 24),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Bulk Import Students',
-                      style: TextStyle(
+                      style: AppTheme.headingSmall.copyWith(
                         color: Colors.white,
-                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -405,8 +404,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                               const SizedBox(width: 8),
                               Text(
                                 'CSV Format Instructions',
-                                style: TextStyle(
-                                  fontSize: 16,
+                                style: AppTheme.bodyMedium.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.info,
                                 ),
@@ -420,7 +418,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                             '• Optional columns: email, phone, date_of_birth, address, etc.\n'
                             '• Date format should be YYYY-MM-DD\n'
                             '• Grade level should be between 1-12',
-                            style: TextStyle(fontSize: 14, color: AppTheme.info),
+                            style: AppTheme.bodySmall.copyWith(color: AppTheme.info),
                           ),
                           const SizedBox(height: 12),
                           TextButton.icon(
@@ -465,10 +463,8 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                                         const SizedBox(height: 8),
                                         Text(
                                           'Upload CSV',
-                                          style: TextStyle(
+                                          style: AppTheme.labelSmall.copyWith(
                                             color: AppTheme.neutral600,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
                                       ],
@@ -480,7 +476,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                             const SizedBox(height: 16),
                             Text(
                               _isLoading ? 'Processing file...' : 'Click to select CSV file',
-                              style: TextStyle(color: AppTheme.neutral600, fontSize: 16),
+                              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
                             ),
                           ],
                         ),
@@ -507,15 +503,14 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                                     children: [
                                       Text(
                                         'File Processed Successfully',
-                                        style: TextStyle(
-                                          fontSize: 16,
+                                        style: AppTheme.bodyMedium.copyWith(
                                           fontWeight: FontWeight.bold,
                                           color: AppTheme.success,
                                         ),
                                       ),
                                       Text(
                                         _fileName ?? '',
-                                        style: TextStyle(fontSize: 14, color: AppTheme.success),
+                                        style: AppTheme.bodySmall.copyWith(color: AppTheme.success),
                                       ),
                                     ],
                                   ),
@@ -556,8 +551,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                             children: [
                               Text(
                                 'Errors Found:',
-                                style: TextStyle(
-                                  fontSize: 16,
+                                style: AppTheme.bodyMedium.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: AppTheme.error,
                                 ),
@@ -572,11 +566,11 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                                               child: Row(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  Text('• ', style: TextStyle(color: AppTheme.error)),
+                                                  Text('• ', style: AppTheme.bodyMicro.copyWith(color: AppTheme.error)),
                                                   Expanded(
                                                     child: Text(
                                                       error,
-                                                      style: TextStyle(fontSize: 12, color: AppTheme.error),
+                                                      style: AppTheme.bodyMicro.copyWith(color: AppTheme.error),
                                                     ),
                                                   ),
                                                 ],
@@ -627,7 +621,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                     child: TextButton(
                       onPressed: _isLoading ? null : () => Navigator.pop(context),
                       style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                      child: Text('Cancel', style: TextStyle(fontSize: 16, color: AppTheme.neutral600)),
+                      child: Text('Cancel', style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600)),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -651,10 +645,10 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                                 ),
                                 const SizedBox(width: 12),
-                                const Text('Importing...', style: TextStyle(fontSize: 16)),
+                                Text('Importing...', style: AppTheme.bodyMedium),
                               ],
                             )
-                          : const Text('Import Students', style: TextStyle(fontSize: 16)),
+                          : Text('Import Students', style: AppTheme.bodyMedium),
                     ),
                   ),
                 ],
@@ -678,10 +672,10 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
         children: [
           Text(
             value,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+            style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.bold, color: color),
           ),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: color), textAlign: TextAlign.center),
+          Text(label, style: AppTheme.bodyMicro.copyWith(color: color), textAlign: TextAlign.center),
         ],
       ),
     );

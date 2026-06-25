@@ -44,9 +44,8 @@ class StudentDetailsDialog extends StatelessWidget {
                     backgroundColor: Colors.white.withOpacity(0.2),
                     child: Text(
                       student.firstName.isNotEmpty ? student.firstName[0].toUpperCase() : 'S',
-                      style: TextStyle(
+                      style: AppTheme.labelLarge.copyWith(
                         color: Colors.white,
-                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -58,17 +57,15 @@ class StudentDetailsDialog extends StatelessWidget {
                       children: [
                         Text(
                           student.fullName,
-                          style: TextStyle(
+                          style: AppTheme.headingSmall.copyWith(
                             color: Colors.white,
-                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           student.gradeText,
-                          style: TextStyle(
+                          style: AppTheme.bodyMedium.copyWith(
                             color: Colors.white70,
-                            fontSize: 16,
                           ),
                         ),
                       ],
@@ -184,7 +181,7 @@ class StudentDetailsDialog extends StatelessWidget {
                       ),
                       child: Text(
                         'Close',
-                        style: TextStyle(fontSize: 16, color: AppTheme.neutral600),
+                        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
                       ),
                     ),
                   ),
@@ -203,7 +200,7 @@ class StudentDetailsDialog extends StatelessWidget {
                           borderRadius: AppTheme.borderRadius12,
                         ),
                       ),
-                      child: Text('Edit Student', style: TextStyle(fontSize: 16)),
+                      child: Text('Edit Student', style: AppTheme.bodyMedium),
                     ),
                   ),
                 ],
@@ -221,8 +218,7 @@ class StudentDetailsDialog extends StatelessWidget {
       children: [
         Text(
           title,
-          style: TextStyle(
-            fontSize: 18,
+          style: AppTheme.labelLarge.copyWith(
             fontWeight: FontWeight.bold,
             color: AppTheme.neutral800,
           ),
@@ -254,8 +250,7 @@ class StudentDetailsDialog extends StatelessWidget {
             width: 120,
             child: Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTheme.labelSmall.copyWith(
                 fontWeight: FontWeight.w600,
                 color: AppTheme.neutral600,
               ),
@@ -264,8 +259,7 @@ class StudentDetailsDialog extends StatelessWidget {
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTheme.bodySmall.copyWith(
                 color: AppTheme.neutral800,
               ),
             ),

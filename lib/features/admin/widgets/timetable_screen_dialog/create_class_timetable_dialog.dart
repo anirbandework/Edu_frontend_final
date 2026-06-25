@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/app_theme.dart';
 import '../../../../core/models/timetable_models.dart';
 import '../../../../services/timetable_service.dart';
 import '../../../../services/class_service.dart';
@@ -238,7 +239,7 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(errorMsg),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.error,
           duration: const Duration(seconds: 5),
         ));
       }
@@ -267,8 +268,8 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
                       Container(
                         padding: const EdgeInsets.all(8),
                         margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-                        child: Text(error!, style: TextStyle(color: Colors.red.shade700)),
+                        decoration: BoxDecoration(color: AppTheme.error.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                        child: Text(error!, style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
                       ),
 
                     // Core selection
@@ -294,7 +295,7 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
                     const SizedBox(height: 12),
 
                     // Audit fields
-                    const Text('Audit', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text('Audit', style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -317,7 +318,7 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text('Time slots', style: TextStyle(fontWeight: FontWeight.w600)),
+                        Text('Time slots', style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
                         TextButton.icon(onPressed: _addSlot, icon: const Icon(Icons.add), label: const Text('Add slot')),
                       ],
                     ),
@@ -342,7 +343,7 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
                     const SizedBox(height: 12),
 
                     // Weekly schedule editor
-                    const Text('Weekly schedule', style: TextStyle(fontWeight: FontWeight.w600)),
+                    Text('Weekly schedule', style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     ...weekly.keys.map((day) {
                       final list = weekly[day]!;
@@ -353,7 +354,7 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
                           children: [
                             Row(
                               children: [
-                                Text(day[0].toUpperCase() + day.substring(1), style: const TextStyle(fontWeight: FontWeight.w600)),
+                                Text(day[0].toUpperCase() + day.substring(1), style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
                                 const SizedBox(width: 8),
                                 TextButton.icon(onPressed: () => _addWeeklyRow(day), icon: const Icon(Icons.add), label: const Text('Add')),
                               ],

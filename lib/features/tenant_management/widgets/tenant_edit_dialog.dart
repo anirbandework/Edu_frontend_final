@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/models/tenant.dart';
@@ -139,7 +140,7 @@ class _TenantEditDialogState extends State<TenantEditDialog>
     try {
       final response = await http.put(
         Uri.parse('${AppConstants.apiBaseUrl}/api/v1/tenants/${widget.tenant.id}'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(tenantData),
       );
 
@@ -163,7 +164,7 @@ class _TenantEditDialogState extends State<TenantEditDialog>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
           ),
         );
       }
@@ -200,9 +201,8 @@ class _TenantEditDialogState extends State<TenantEditDialog>
                       ),
                       Text(
                         widget.tenant.schoolName,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
+                        style: AppTheme.bodySmall.copyWith(
+                          color: AppTheme.neutral500,
                         ),
                       ),
                     ],
@@ -215,8 +215,8 @@ class _TenantEditDialogState extends State<TenantEditDialog>
                 ),
                 Text(
                   _isActive ? 'Active' : 'Inactive',
-                  style: TextStyle(
-                    color: _isActive ? AppTheme.primaryGreen : Colors.red,
+                  style: AppTheme.labelMedium.copyWith(
+                    color: _isActive ? AppTheme.primaryGreen : AppTheme.error,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -234,7 +234,7 @@ class _TenantEditDialogState extends State<TenantEditDialog>
             TabBar(
               controller: _tabController,
               labelColor: AppTheme.primaryGreen,
-              unselectedLabelColor: Colors.grey,
+              unselectedLabelColor: AppTheme.neutral500,
               indicatorColor: AppTheme.primaryGreen,
               tabs: const [
                 Tab(text: 'Basic Info'),

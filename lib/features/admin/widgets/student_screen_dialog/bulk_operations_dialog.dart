@@ -116,7 +116,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
           children: [
             Icon(Icons.check_circle, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Text(message, style: TextStyle(color: Colors.white, fontSize: 14)),
+            Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white)),
           ],
         ),
         backgroundColor: AppTheme.success,
@@ -132,7 +132,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
           children: [
             Icon(Icons.error_outline, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Expanded(child: Text(message, style: TextStyle(color: Colors.white, fontSize: 14))),
+            Expanded(child: Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white))),
           ],
         ),
         backgroundColor: AppTheme.error,
@@ -198,15 +198,14 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                       children: [
                         Text(
                           'Bulk Operations',
-                          style: TextStyle(
+                          style: AppTheme.headingSmall.copyWith(
                             color: Colors.white,
-                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           '${widget.selectedStudentIds.length} students selected',
-                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                          style: AppTheme.bodySmall.copyWith(color: Colors.white70),
                         ),
                       ],
                     ),
@@ -228,8 +227,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                   // Operation Selection
                   Text(
                     'Select Operation',
-                    style: TextStyle(
-                      fontSize: 16,
+                    style: AppTheme.labelMedium.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppTheme.neutral800,
                     ),
@@ -237,7 +235,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: _selectedOperation,
-                    style: TextStyle(fontSize: 16, color: AppTheme.neutral800),
+                    style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
                     decoration: InputDecoration(
                       border: OutlineInputBorder(
                         borderRadius: AppTheme.borderRadius12,
@@ -266,8 +264,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                     ),
                     child: Text(
                       _getOperationDescription(),
-                      style: TextStyle(
-                        fontSize: 14,
+                      style: AppTheme.bodySmall.copyWith(
                         color: AppTheme.info,
                       ),
                     ),
@@ -303,7 +300,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                       ),
                       child: Text(
                         'Cancel',
-                        style: TextStyle(fontSize: 16, color: AppTheme.neutral600),
+                        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
                       ),
                     ),
                   ),
@@ -334,10 +331,10 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Text('Processing...', style: TextStyle(fontSize: 16)),
+                                Text('Processing...', style: AppTheme.bodyMedium),
                               ],
                             )
-                          : Text('Execute', style: TextStyle(fontSize: 16)),
+                          : Text('Execute', style: AppTheme.bodyMedium),
                     ),
                   ),
                 ],
@@ -363,8 +360,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
     return [
       Text(
         'New Status',
-        style: TextStyle(
-          fontSize: 16,
+        style: AppTheme.labelMedium.copyWith(
           fontWeight: FontWeight.w600,
           color: AppTheme.neutral700,
         ),
@@ -372,7 +368,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
       const SizedBox(height: 8),
       DropdownButtonFormField<String>(
         value: _newStatus,
-        style: TextStyle(fontSize: 16, color: AppTheme.neutral800),
+        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
         decoration: InputDecoration(
           border: OutlineInputBorder(
             borderRadius: AppTheme.borderRadius12,
@@ -395,8 +391,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
     return [
       Text(
         'New Section',
-        style: TextStyle(
-          fontSize: 16,
+        style: AppTheme.labelMedium.copyWith(
           fontWeight: FontWeight.w600,
           color: AppTheme.neutral700,
         ),
@@ -404,7 +399,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
       const SizedBox(height: 8),
       DropdownButtonFormField<String>(
         value: _newSection,
-        style: TextStyle(fontSize: 16, color: AppTheme.neutral800),
+        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
         decoration: InputDecoration(
           border: OutlineInputBorder(
             borderRadius: AppTheme.borderRadius12,
@@ -427,8 +422,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
     return [
       Text(
         'Current Grade',
-        style: TextStyle(
-          fontSize: 16,
+        style: AppTheme.labelMedium.copyWith(
           fontWeight: FontWeight.w600,
           color: AppTheme.neutral700,
         ),
@@ -436,7 +430,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
       const SizedBox(height: 8),
       DropdownButtonFormField<int>(
         value: _currentGrade,
-        style: TextStyle(fontSize: 16, color: AppTheme.neutral800),
+        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
         decoration: InputDecoration(
           border: OutlineInputBorder(
             borderRadius: AppTheme.borderRadius12,
@@ -455,15 +449,14 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
       const SizedBox(height: 16),
       Text(
         'Academic Year',
-        style: TextStyle(
-          fontSize: 16,
+        style: AppTheme.labelMedium.copyWith(
           fontWeight: FontWeight.w600,
           color: AppTheme.neutral700,
         ),
       ),
       const SizedBox(height: 8),
       TextFormField(
-        style: TextStyle(fontSize: 16),
+        style: AppTheme.bodyMedium,
         decoration: InputDecoration(
           hintText: 'e.g., 2024-2025',
           border: OutlineInputBorder(
@@ -493,8 +486,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             const SizedBox(height: 8),
             Text(
               'Warning!',
-              style: TextStyle(
-                fontSize: 16,
+              style: AppTheme.labelMedium.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppTheme.error,
               ),
@@ -502,8 +494,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             const SizedBox(height: 8),
             Text(
               'This will soft delete ${widget.selectedStudentIds.length} students. They can be restored later.',
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTheme.bodySmall.copyWith(
                 color: AppTheme.error,
               ),
               textAlign: TextAlign.center,

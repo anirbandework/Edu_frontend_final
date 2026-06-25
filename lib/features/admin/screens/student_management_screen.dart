@@ -151,7 +151,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
       _currentPage++;
     } catch (e) {
       if (!mounted) return;
-      _error = 'Failed to load students: $e';
+      _error = _friendlyErrorMessage(e);
     } finally {
       if (mounted) {
         setState(() {
@@ -216,9 +216,27 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
       }
     } catch (e) {
       if (mounted) {
-        _showErrorSnackBar('Error: $e');
+        _showErrorSnackBar(_friendlyErrorMessage(e));
       }
     }
+  }
+
+  // ==================================================
+  // Error message mapping
+  // ==================================================
+  String _friendlyErrorMessage(Object error) {
+    final raw = error.toString().toLowerCase();
+    if (raw.contains('socketexception') ||
+        raw.contains('failed host lookup') ||
+        raw.contains('network') ||
+        raw.contains('connection') ||
+        raw.contains('timeout') ||
+        raw.contains('timed out') ||
+        raw.contains('handshake') ||
+        raw.contains('unreachable')) {
+      return "Couldn't reach the server. Check your connection and try again.";
+    }
+    return 'Something went wrong. Please try again.';
   }
 
   // ==================================================
@@ -236,7 +254,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                style: AppTheme.bodySmall.copyWith(color: Colors.white),
               ),
             ),
           ],
@@ -261,7 +279,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
+                style: AppTheme.bodySmall.copyWith(color: Colors.white),
               ),
             ),
           ],
@@ -328,18 +346,14 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Student Management',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: AppTheme.headingSmall.copyWith(color: Colors.white),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${_filteredStudents.length} students found',
-                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  style: AppTheme.bodySmall.copyWith(color: Colors.white70),
                 ),
               ],
             ),
@@ -360,14 +374,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.upload_file, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.upload_file, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
                     Text(
                       'Bulk Import',
-                      style: TextStyle(
+                      style: AppTheme.labelSmall.copyWith(
                         color: Colors.white,
-                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -391,14 +404,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.add, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.add, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
                     Text(
                       'Add Student',
-                      style: TextStyle(
+                      style: AppTheme.labelSmall.copyWith(
                         color: Colors.white,
-                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -509,7 +521,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppTheme.neutral600)),
+            style: AppTheme.bodyMicro.copyWith(fontWeight: FontWeight.w500, color: AppTheme.neutral600)),
         const SizedBox(height: 4),
         Container(
           width: double.infinity,
@@ -524,19 +536,19 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
               value: value,
               isExpanded: true,
               isDense: true,
-              style: TextStyle(fontSize: 13, color: AppTheme.neutral800),
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral800),
               icon: const Icon(Icons.keyboard_arrow_down, size: 18),
               onChanged: onChanged,
               items: [
                 if (label != 'Status' && label != 'Sort By')
                   DropdownMenuItem<T>(
                     value: null,
-                    child: Text('All ${label}s', style: const TextStyle(fontSize: 13)),
+                    child: Text('All ${label}s', style: AppTheme.bodySmall),
                   ),
                 ...items.map(
                   (item) => DropdownMenuItem<T>(
                     value: item,
-                    child: Text(itemBuilder(item), style: const TextStyle(fontSize: 13)),
+                    child: Text(itemBuilder(item), style: AppTheme.bodySmall),
                   ),
                 ),
               ],
@@ -556,10 +568,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
       ),
       child: TextField(
         controller: _searchController,
-        style: const TextStyle(fontSize: 15),
+        style: AppTheme.bodyMedium,
         decoration: InputDecoration(
           hintText: 'Search by name, student ID, roll number, or email...',
-          hintStyle: TextStyle(color: AppTheme.neutral400, fontSize: 14),
+          hintStyle: AppTheme.bodySmall.copyWith(color: AppTheme.neutral400),
           prefixIcon: Icon(Icons.search, color: AppTheme.greenPrimary, size: 20),
           filled: true,
           fillColor: AppTheme.neutral50,
@@ -595,12 +607,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
           const SizedBox(width: 8),
           Text(
             '${_selectedStudents.length} students selected',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.greenPrimary),
+            style: AppTheme.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppTheme.greenPrimary),
           ),
           const Spacer(),
           TextButton(
             onPressed: () => setState(() => _selectedStudents.clear()),
-            child: const Text('Clear', style: TextStyle(fontSize: 13)),
+            child: Text('Clear', style: AppTheme.bodySmall),
           ),
           const SizedBox(width: 8),
           ElevatedButton(
@@ -609,7 +621,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
               backgroundColor: AppTheme.greenPrimary,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Actions', style: TextStyle(fontSize: 13, color: Colors.white)),
+            child: Text('Actions', style: AppTheme.bodySmall.copyWith(color: Colors.white)),
           ),
         ],
       ),
@@ -637,7 +649,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             child: const CircularProgressIndicator(color: AppTheme.greenPrimary, strokeWidth: 3),
           ),
           const SizedBox(height: 16),
-          Text('Loading students...', style: TextStyle(color: AppTheme.neutral600, fontSize: 16)),
+          Text('Loading students...', style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600)),
         ],
       ),
     );
@@ -666,13 +678,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             const SizedBox(height: 16),
             Text(
               'Failed to load students',
-              style: TextStyle(color: AppTheme.error, fontSize: 18, fontWeight: FontWeight.w600),
+              style: AppTheme.labelLarge.copyWith(color: AppTheme.error, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               _error ?? 'Unknown error',
-              style: TextStyle(color: AppTheme.neutral600, fontSize: 14),
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -684,10 +696,10 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.refresh, size: 18, color: Colors.white),
-                  SizedBox(width: 8),
-                  Text('Try Again', style: TextStyle(color: Colors.white, fontSize: 14)),
+                children: [
+                  const Icon(Icons.refresh, size: 18, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text('Try Again', style: AppTheme.bodySmall.copyWith(color: Colors.white)),
                 ],
               ),
             ),
@@ -717,7 +729,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             const SizedBox(height: 16),
             Text(
               'No students found',
-              style: TextStyle(color: AppTheme.neutral600, fontSize: 18, fontWeight: FontWeight.w600),
+              style: AppTheme.labelLarge.copyWith(color: AppTheme.neutral600, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -725,7 +737,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
               _searchController.text.isNotEmpty || _selectedGrade != null || _selectedSection != null
                   ? 'Try adjusting your search or filters.'
                   : 'Add your first student to get started.',
-              style: TextStyle(color: AppTheme.neutral500, fontSize: 14),
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -740,7 +752,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                   });
                   _loadStudents(refresh: true);
                 },
-                child: const Text('Clear Filters', style: TextStyle(fontSize: 14)),
+                child: Text('Clear Filters', style: AppTheme.bodySmall),
               )
             else
               Row(
@@ -753,13 +765,13 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     ),
                     child:
-                        const Text('Add Student', style: TextStyle(color: Colors.white, fontSize: 14)),
+                        Text('Add Student', style: AppTheme.bodySmall.copyWith(color: Colors.white)),
                   ),
                   const SizedBox(width: 12),
                   TextButton.icon(
                     onPressed: _showBulkImportDialog,
                     icon: const Icon(Icons.upload_file, size: 18),
-                    label: const Text('Bulk Import', style: TextStyle(fontSize: 14)),
+                    label: Text('Bulk Import', style: AppTheme.bodySmall),
                   ),
                 ],
               ),
@@ -794,7 +806,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             child: CircularProgressIndicator(color: AppTheme.greenPrimary, strokeWidth: 2),
           ),
           const SizedBox(width: 12),
-          Text('Loading more...', style: TextStyle(color: AppTheme.neutral600, fontSize: 14)),
+          Text('Loading more...', style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral600)),
         ],
       ),
     );
@@ -855,8 +867,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                         isInactive ? AppTheme.neutral300 : AppTheme.greenPrimary.withOpacity(0.1),
                     child: Text(
                       student.firstName.isNotEmpty ? student.firstName[0].toUpperCase() : 'S',
-                      style: TextStyle(
-                        fontSize: 18,
+                      style: AppTheme.bodyLarge.copyWith(
                         fontWeight: FontWeight.bold,
                         color: isInactive ? AppTheme.neutral600 : AppTheme.greenPrimary,
                       ),
@@ -872,8 +883,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                             Expanded(
                               child: Text(
                                 student.fullName,
-                                style: TextStyle(
-                                  fontSize: 16,
+                                style: AppTheme.bodyMedium.copyWith(
                                   fontWeight: FontWeight.bold,
                                   color: isInactive ? AppTheme.neutral600 : AppTheme.neutral900,
                                 ),
@@ -889,23 +899,22 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                           children: [
                             Text(
                               student.gradeText,
-                              style: TextStyle(
+                              style: AppTheme.bodySmall.copyWith(
                                 color: AppTheme.neutral600,
-                                fontSize: 13,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                             if (student.rollNumber != null) ...[
                               const SizedBox(width: 12),
                               Text('Roll: ${student.rollNumber}',
-                                  style: TextStyle(color: AppTheme.neutral500, fontSize: 12)),
+                                  style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral500)),
                             ],
                           ],
                         ),
                         if (student.studentId.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text('ID: ${student.studentId}',
-                              style: TextStyle(color: AppTheme.neutral500, fontSize: 12)),
+                              style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral500)),
                         ],
                         const SizedBox(height: 8),
                         Row(
@@ -964,7 +973,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
       ),
       child: Text(
         student.statusText,
-        style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600),
+        style: AppTheme.bodyMicro.copyWith(color: statusColor, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -982,7 +991,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
         children: [
           Icon(icon, color: color, size: 14),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: color)),
+          Text(label, style: AppTheme.bodyMicro.copyWith(fontWeight: FontWeight.w500, color: color)),
         ],
       ),
     );
@@ -996,9 +1005,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
         switch (value) {
           case 'details':
             _showStudentDetails(student);
-            break;
-          case 'edit':
-            _showEditStudentDialog(student);
             break;
           case 'delete':
             final confirm = await _showDeleteConfirmation(student);
@@ -1015,17 +1021,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             children: [
               Icon(Icons.visibility, size: 18, color: AppTheme.info),
               const SizedBox(width: 12),
-              const Text('View Details', style: TextStyle(fontSize: 14)),
-            ],
-          ),
-        ),
-        PopupMenuItem(
-          value: 'edit',
-          child: Row(
-            children: [
-              Icon(Icons.edit, size: 18, color: AppTheme.warning),
-              const SizedBox(width: 12),
-              const Text('Edit', style: TextStyle(fontSize: 14)),
+              Text('View Details', style: AppTheme.bodySmall),
             ],
           ),
         ),
@@ -1036,7 +1032,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             children: [
               Icon(Icons.delete_forever, size: 18, color: AppTheme.error),
               const SizedBox(width: 12),
-              Text('Delete', style: TextStyle(fontSize: 14, color: AppTheme.error)),
+              Text('Delete', style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
             ],
           ),
         ),
@@ -1057,12 +1053,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             const SizedBox(height: 16),
             Text(
               'Delete Student',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppTheme.error),
+              style: AppTheme.labelLarge.copyWith(color: AppTheme.error, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
             Text(
               'Are you sure you want to delete ${student.fullName}?\n\nThis action cannot be undone.',
-              style: TextStyle(fontSize: 15, color: AppTheme.neutral700),
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral700),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -1071,7 +1067,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancel', style: TextStyle(fontSize: 14)),
+                    child: Text('Cancel', style: AppTheme.bodySmall),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1082,9 +1078,9 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
                       backgroundColor: AppTheme.error,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Delete',
-                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                      style: AppTheme.bodySmall.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
@@ -1124,10 +1120,6 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
         },
       ),
     );
-  }
-
-  void _showEditStudentDialog(Student student) {
-    _showErrorSnackBar('Edit Student dialog coming soon');
   }
 
   void _showStudentDetails(Student student) {

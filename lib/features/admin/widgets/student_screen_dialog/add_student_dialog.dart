@@ -129,7 +129,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
           children: [
             Icon(Icons.check_circle, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Text(message, style: TextStyle(color: Colors.white, fontSize: 14)),
+            Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white)),
           ],
         ),
         backgroundColor: AppTheme.success,
@@ -145,7 +145,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
           children: [
             Icon(Icons.error_outline, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Expanded(child: Text(message, style: TextStyle(color: Colors.white, fontSize: 14))),
+            Expanded(child: Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white))),
           ],
         ),
         backgroundColor: AppTheme.error,
@@ -187,9 +187,8 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                   Expanded(
                     child: Text(
                       'Add New Student',
-                      style: TextStyle(
+                      style: AppTheme.headingSmall.copyWith(
                         color: Colors.white,
-                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -214,8 +213,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Basic Information Section
                       Text(
                         'Basic Information',
-                        style: TextStyle(
-                          fontSize: 18,
+                        style: AppTheme.bodyLarge.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppTheme.neutral800,
                         ),
@@ -228,10 +226,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                           Expanded(
                             child: TextFormField(
                               controller: _firstNameController,
-                              style: TextStyle(fontSize: 16),
+                              style: AppTheme.bodyMedium,
                               decoration: InputDecoration(
                                 labelText: 'First Name *',
-                                labelStyle: TextStyle(fontSize: 14),
+                                labelStyle: AppTheme.bodySmall,
                                 border: OutlineInputBorder(
                                   borderRadius: AppTheme.borderRadius12,
                                 ),
@@ -248,10 +246,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                           Expanded(
                             child: TextFormField(
                               controller: _lastNameController,
-                              style: TextStyle(fontSize: 16),
+                              style: AppTheme.bodyMedium,
                               decoration: InputDecoration(
                                 labelText: 'Last Name *',
-                                labelStyle: TextStyle(fontSize: 14),
+                                labelStyle: AppTheme.bodySmall,
                                 border: OutlineInputBorder(
                                   borderRadius: AppTheme.borderRadius12,
                                 ),
@@ -274,10 +272,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                           Expanded(
                             child: TextFormField(
                               controller: _studentIdController,
-                              style: TextStyle(fontSize: 16),
+                              style: AppTheme.bodyMedium,
                               decoration: InputDecoration(
                                 labelText: 'Student ID *',
-                                labelStyle: TextStyle(fontSize: 14),
+                                labelStyle: AppTheme.bodySmall,
                                 border: OutlineInputBorder(
                                   borderRadius: AppTheme.borderRadius12,
                                 ),
@@ -294,10 +292,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                           Expanded(
                             child: TextFormField(
                               controller: _rollNumberController,
-                              style: TextStyle(fontSize: 16),
+                              style: AppTheme.bodyMedium,
                               decoration: InputDecoration(
                                 labelText: 'Roll Number',
-                                labelStyle: TextStyle(fontSize: 14),
+                                labelStyle: AppTheme.bodySmall,
                                 border: OutlineInputBorder(
                                   borderRadius: AppTheme.borderRadius12,
                                 ),
@@ -314,10 +312,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                           Expanded(
                             child: DropdownButtonFormField<int>(
                               value: _gradeLevel,
-                              style: TextStyle(fontSize: 16, color: AppTheme.neutral800),
+                              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
                               decoration: InputDecoration(
                                 labelText: 'Grade *',
-                                labelStyle: TextStyle(fontSize: 14),
+                                labelStyle: AppTheme.bodySmall,
                                 border: OutlineInputBorder(
                                   borderRadius: AppTheme.borderRadius12,
                                 ),
@@ -337,10 +335,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               value: _section,
-                              style: TextStyle(fontSize: 16, color: AppTheme.neutral800),
+                              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
                               decoration: InputDecoration(
                                 labelText: 'Section *',
-                                labelStyle: TextStyle(fontSize: 14),
+                                labelStyle: AppTheme.bodySmall,
                                 border: OutlineInputBorder(
                                   borderRadius: AppTheme.borderRadius12,
                                 ),
@@ -366,7 +364,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                         child: InputDecorator(
                           decoration: InputDecoration(
                             labelText: 'Date of Birth',
-                            labelStyle: TextStyle(fontSize: 14),
+                            labelStyle: AppTheme.bodySmall,
                             border: OutlineInputBorder(
                               borderRadius: AppTheme.borderRadius12,
                             ),
@@ -376,8 +374,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                             _dateOfBirth != null 
                                 ? '${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'
                                 : 'Select date of birth',
-                            style: TextStyle(
-                              fontSize: 16,
+                            style: AppTheme.bodyMedium.copyWith(
                               color: _dateOfBirth != null ? AppTheme.neutral800 : AppTheme.neutral400,
                             ),
                           ),
@@ -388,8 +385,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Contact Information Section
                       Text(
                         'Contact Information',
-                        style: TextStyle(
-                          fontSize: 18,
+                        style: AppTheme.bodyLarge.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppTheme.neutral800,
                         ),
@@ -399,11 +395,11 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Email
                       TextFormField(
                         controller: _emailController,
-                        style: TextStyle(fontSize: 16),
+                        style: AppTheme.bodyMedium,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: 'Email',
-                          labelStyle: TextStyle(fontSize: 14),
+                          labelStyle: AppTheme.bodySmall,
                           border: OutlineInputBorder(
                             borderRadius: AppTheme.borderRadius12,
                           ),
@@ -423,11 +419,11 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Phone
                       TextFormField(
                         controller: _phoneController,
-                        style: TextStyle(fontSize: 16),
+                        style: AppTheme.bodyMedium,
                         keyboardType: TextInputType.phone,
                         decoration: InputDecoration(
                           labelText: 'Phone',
-                          labelStyle: TextStyle(fontSize: 14),
+                          labelStyle: AppTheme.bodySmall,
                           border: OutlineInputBorder(
                             borderRadius: AppTheme.borderRadius12,
                           ),
@@ -439,11 +435,11 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Address
                       TextFormField(
                         controller: _addressController,
-                        style: TextStyle(fontSize: 16),
+                        style: AppTheme.bodyMedium,
                         maxLines: 3,
                         decoration: InputDecoration(
                           labelText: 'Address',
-                          labelStyle: TextStyle(fontSize: 14),
+                          labelStyle: AppTheme.bodySmall,
                           border: OutlineInputBorder(
                             borderRadius: AppTheme.borderRadius12,
                           ),
@@ -455,8 +451,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Academic Information Section
                       Text(
                         'Academic Information',
-                        style: TextStyle(
-                          fontSize: 18,
+                        style: AppTheme.bodyLarge.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppTheme.neutral800,
                         ),
@@ -466,10 +461,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Admission Number
                       TextFormField(
                         controller: _admissionNumberController,
-                        style: TextStyle(fontSize: 16),
+                        style: AppTheme.bodyMedium,
                         decoration: InputDecoration(
                           labelText: 'Admission Number',
-                          labelStyle: TextStyle(fontSize: 14),
+                          labelStyle: AppTheme.bodySmall,
                           border: OutlineInputBorder(
                             borderRadius: AppTheme.borderRadius12,
                           ),
@@ -480,10 +475,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       // Academic Year
                       TextFormField(
                         controller: _academicYearController,
-                        style: TextStyle(fontSize: 16),
+                        style: AppTheme.bodyMedium,
                         decoration: InputDecoration(
                           labelText: 'Academic Year',
-                          labelStyle: TextStyle(fontSize: 14),
+                          labelStyle: AppTheme.bodySmall,
                           hintText: 'e.g., 2024-2025',
                           border: OutlineInputBorder(
                             borderRadius: AppTheme.borderRadius12,
@@ -512,7 +507,7 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                       ),
                       child: Text(
                         'Cancel',
-                        style: TextStyle(fontSize: 16, color: AppTheme.neutral600),
+                        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
                       ),
                     ),
                   ),
@@ -541,10 +536,10 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Text('Creating...', style: TextStyle(fontSize: 16)),
+                                Text('Creating...', style: AppTheme.bodyMedium),
                               ],
                             )
-                          : Text('Create Student', style: TextStyle(fontSize: 16)),
+                          : Text('Create Student', style: AppTheme.bodyMedium),
                     ),
                   ),
                 ],

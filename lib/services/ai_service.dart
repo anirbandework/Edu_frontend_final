@@ -3,9 +3,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class AIService {
-  static const String _apiKey = 'YOUR KEY'; // Replace with your API key
-  static const String _baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
-  
+  // SECURITY: never embed a provider API key in the client. LLM calls must be
+  // proxied through the backend, which holds the key server-side and applies
+  // per-user auth + rate limits. Until that proxy endpoint is wired, this
+  // assistant uses safe local canned responses (no external key, no key leak).
+  // TODO: POST {message} to a backend /api/ai/chat proxy with the bearer token.
+
   static const String _systemPrompt = '''
 You are EduAssist AI, a helpful assistant for the EduAssist school management platform. 
 
@@ -30,37 +33,10 @@ Keep responses helpful, concise, and focused on EduAssist. Be friendly and profe
 ''';
 
   static Future<String> getChatResponse(String userMessage) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl?key=$_apiKey'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'contents': [{
-            'parts': [{
-              'text': '$_systemPrompt\n\nUser: $userMessage'
-            }]
-          }],
-          'generationConfig': {
-            'temperature': 0.7,
-            'topK': 40,
-            'topP': 0.95,
-            'maxOutputTokens': 1024,
-          }
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['candidates'][0]['content']['parts'][0]['text'];
-      } else {
-        throw Exception('Failed to get AI response: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('AI Service Error: $e');
-      return _getDefaultResponse(userMessage);
-    }
+    // No external provider key in the client. Use safe local responses for now;
+    // route through a backend proxy (with the bearer token) when available.
+    // _systemPrompt is retained for that future server-side proxy call.
+    return _getDefaultResponse(userMessage);
   }
 
   static String _getDefaultResponse(String userMessage) {

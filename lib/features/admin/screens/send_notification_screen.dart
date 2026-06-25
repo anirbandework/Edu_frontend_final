@@ -88,7 +88,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              context.go(AppConstants.schoolSelectionRoute);
+              context.go(AppConstants.loginRoute);
             },
             child: const Text('Login Again'),
           ),
@@ -154,21 +154,20 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
           Icon(
             Icons.error_outline,
             size: 64,
-            color: Colors.red[400],
+            color: AppTheme.error,
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Missing Required Information',
-            style: TextStyle(
-              fontSize: 20,
+            style: AppTheme.headingSmall.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'User ID and Tenant ID are required to send notifications',
-            style: TextStyle(
-              color: Colors.grey[600],
+            style: AppTheme.bodyMedium.copyWith(
+              color: AppTheme.neutral600,
             ),
             textAlign: TextAlign.center,
           ),
@@ -193,7 +192,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
             // Debug Info Card (remove in production)
             if (widget.senderId.isNotEmpty && widget.tenantId.isNotEmpty)
               Card(
-                color: Colors.blue[50],
+                color: AppTheme.info.withOpacity(0.1),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -201,9 +200,9 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
                     children: [
                       Text(
                         'Debug Information',
-                        style: TextStyle(
+                        style: AppTheme.labelMedium.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue[800],
+                          color: AppTheme.info,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -626,8 +625,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppTheme.primaryGreen,
           foregroundColor: Colors.white,
-          textStyle: const TextStyle(
-            fontSize: 16,
+          textStyle: AppTheme.labelMedium.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -718,54 +716,40 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     });
 
     try {
-      final notificationData = {
-        'tenant_id': widget.tenantId,
-        'title': _titleController.text.trim(),
-        'message': _messageController.text.trim(),
-        'short_message': _shortMessageController.text.trim().isNotEmpty
-            ? _shortMessageController.text.trim()
-            : null,
-        'notification_type': _selectedType.value,
-        'priority': _selectedPriority.value,
-        'recipient_type': _selectedRecipientType.value,
-        'recipient_config': _buildRecipientConfig(),
-        'delivery_channels': _selectedChannels.map((e) => e.value).toList(),
-        'scheduled_at': _scheduledDateTime?.toIso8601String(),
-        'expires_at': _expiresDateTime?.toIso8601String(),
-        'action_url': _actionUrlController.text.trim().isNotEmpty
-            ? _actionUrlController.text.trim()
-            : null,
-        'action_text': _actionTextController.text.trim().isNotEmpty
-            ? _actionTextController.text.trim()
-            : null,
-      };
-
-      // For now, simulate the API call
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // In real implementation, uncomment this:
-      // await NotificationService.sendNotification(
-      //   senderId: widget.senderId,
-      //   notificationData: notificationData,
-      // );
-
-      _showSuccessSnackBar(
-        _isScheduled
-            ? 'Notification scheduled successfully!'
-            : 'Notification sent successfully!',
+      final res = await NotificationService.sendNotification(
+        senderId: widget.senderId,
+        senderType: widget.senderType,
+        tenantId: widget.tenantId,
+        title: _titleController.text.trim(),
+        message: _messageController.text.trim(),
+        notificationType: _selectedType.value,
+        recipientType: _selectedRecipientType.value,
+        recipientConfig: _buildRecipientConfig(),
+        priority: _selectedPriority.value,
+        deliveryChannels: _selectedChannels.map((e) => e.value).toList(),
       );
 
-      // Navigate back
-      context.pop();
+      final delivered = res['total_recipients'] ?? res['delivered_count'];
+      _showSuccessSnackBar(delivered != null
+          ? 'Notification sent to $delivered recipients'
+          : 'Notification sent successfully!');
+
+      if (mounted) context.pop();
     } catch (e) {
       _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
     } finally {
-      setState(() {
-        _isSending = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
   }
 
+  /// Recipient targeting config. all_students/all_teachers/broadcast need no
+  /// config (server resolves the whole audience). grade/class_level/individual
+  /// would need a picker (grade number / class_id / user_ids) — not yet in the
+  /// UI, so those resolve to the broad audience for now.
   Map<String, dynamic> _buildRecipientConfig() {
     return {};
   }
@@ -774,7 +758,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: AppTheme.error,
       ),
     );
   }
@@ -783,7 +767,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
+        backgroundColor: AppTheme.success,
       ),
     );
   }
@@ -838,13 +822,13 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   Color _getPriorityColor(NotificationPriority priority) {
     switch (priority) {
       case NotificationPriority.low:
-        return Colors.grey;
+        return AppTheme.neutral500;
       case NotificationPriority.normal:
-        return Colors.blue;
+        return AppTheme.info;
       case NotificationPriority.high:
-        return Colors.orange;
+        return AppTheme.warning;
       case NotificationPriority.urgent:
-        return Colors.red;
+        return AppTheme.error;
     }
   }
 

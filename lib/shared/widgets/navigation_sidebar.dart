@@ -4,11 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/constants/app_theme.dart';
+import '../../core/auth/permission_store.dart';
+import '../../core/auth/auth_session.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/utils/school_session.dart';
 import '../../services/student_service.dart';
 import '../../services/teacher_service.dart';
 import '../../services/school_authority_service.dart';
+import '../../services/notification_service.dart';
 
 class NavigationItem {
   final String id;
@@ -58,11 +61,18 @@ class _NavigationSidebarState extends State<NavigationSidebar>
   Map<String, dynamic>? _userData;
   bool _isLoadingUserData = false;
 
+  // Rebuild the (dynamic, permission-driven) staff sidebar whenever permissions
+  // load or change — otherwise a staff user can see only "Home" until a navigation.
+  void _onPermissionsChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     _loadNotificationCount();
     _loadUserData();
+    PermissionStore.instance.addListener(_onPermissionsChanged);
 
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 200),
@@ -98,27 +108,41 @@ class _NavigationSidebarState extends State<NavigationSidebar>
 
   @override
   void dispose() {
+    PermissionStore.instance.removeListener(_onPermissionsChanged);
     _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _loadNotificationCount() async {
-    if (widget.userId != null && widget.tenantId != null) {
-      try {
-        final count = widget.userRole == 'student'
-            ? 5
-            : widget.userRole == 'teacher'
-            ? 3
-            : 2;
-
-        if (mounted) {
-          setState(() {
-            _unreadNotificationsCount = count;
-          });
-        }
-      } catch (e) {
-        // Handle error silently
+    if (widget.userId == null || widget.tenantId == null) return;
+    // Map the UI role to the backend user_type; super-admin has no inbox.
+    String? userType;
+    switch (widget.userRole.toLowerCase()) {
+      case 'student':
+        userType = 'student';
+        break;
+      case 'teacher':
+        userType = 'teacher';
+        break;
+      case 'admin':
+      case 'school_authority':
+        userType = 'school_authority';
+        break;
+    }
+    if (userType == null) return;
+    try {
+      final unread = await NotificationService.getNotificationsForUser(
+        userId: widget.userId!,
+        userType: userType,
+        tenantId: widget.tenantId!,
+        unreadOnly: true,
+        limit: 100,
+      );
+      if (mounted) {
+        setState(() => _unreadNotificationsCount = unread.length);
       }
+    } catch (_) {
+      // Non-fatal: leave the badge at its current value.
     }
   }
 
@@ -162,7 +186,13 @@ class _NavigationSidebarState extends State<NavigationSidebar>
   }
 
   List<NavigationItem> _getNavigationItems() {
-    switch (widget.userRole.toLowerCase()) {
+    // A dynamic-staff session may render inside another role's ShellRoute when it
+    // opens a granted page (e.g. /school_authority/students). Honour the live
+    // session role so staff always get THEIR dynamic sidebar (+ Home), never the
+    // host shell's static menu.
+    final effectiveRole =
+        (AuthSession.instance.role == 'staff') ? 'staff' : widget.userRole.toLowerCase();
+    switch (effectiveRole) {
       case 'student':
         return [
           NavigationItem(
@@ -186,8 +216,6 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             label: 'Assignments',
             icon: Icons.assignment,
             path: AppConstants.studentAssignmentsRoute,
-            badge: '3',
-            badgeColor: AppTheme.warning,
           ),
           NavigationItem(
             id: 'grades',
@@ -206,6 +234,12 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             label: 'Timetable',
             icon: Icons.schedule,
             path: AppConstants.studentTimetableRoute,
+          ),
+          NavigationItem(
+            id: 'chat',
+            label: 'Messages',
+            icon: Icons.forum,
+            path: AppConstants.studentChatRoute,
           ),
           NavigationItem(
             id: 'profile',
@@ -246,16 +280,34 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             path: AppConstants.teacherClassesRoute,
           ),
           NavigationItem(
+            id: 'timetable',
+            label: 'My Schedule',
+            icon: Icons.schedule,
+            path: AppConstants.teacherScheduleRoute,
+          ),
+          NavigationItem(
             id: 'students',
             label: 'Students',
             icon: Icons.people,
             path: AppConstants.teacherStudentsRoute,
           ),
           NavigationItem(
+            id: 'quizzes',
+            label: 'Quizzes',
+            icon: Icons.quiz,
+            path: AppConstants.teacherQuizzesRoute,
+          ),
+          NavigationItem(
             id: 'assignments',
             label: 'Assignments',
-            icon: Icons.assignment,
+            icon: Icons.assignment_turned_in,
             path: AppConstants.teacherAssignmentsRoute,
+          ),
+          NavigationItem(
+            id: 'chat',
+            label: 'Messages',
+            icon: Icons.forum,
+            path: AppConstants.teacherChatRoute,
           ),
           NavigationItem(
             id: 'attendance',
@@ -270,10 +322,10 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             path: AppConstants.teacherGradesRoute,
           ),
           NavigationItem(
-            id: 'reports',
-            label: 'Reports',
-            icon: Icons.analytics,
-            path: AppConstants.teacherReportsRoute,
+            id: 'exams',
+            label: 'Exams',
+            icon: Icons.assignment,
+            path: AppConstants.teacherExamsRoute,
           ),
           NavigationItem(
             id: 'profile',
@@ -316,23 +368,34 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             path: '/school_authority/classes',
           ),
           NavigationItem(
-            id: 'notification-analytics',
-            label: 'Analytics',
-            icon: Icons.insights,
-            path: AppConstants.adminNotificationAnalyticsRoute,
-          ),
-          NavigationItem(
-            id: 'teachers',
-            label: 'Teachers',
-            icon: Icons.person_2,
-            path: AppConstants.adminTeachersRoute,
-          ),
-          // UPDATED: Student Management link
-          NavigationItem(
             id: 'students',
             label: 'Students',
             icon: Icons.people,
             path: '/school_authority/students',
+          ),
+          NavigationItem(
+            id: 'exams',
+            label: 'Exams',
+            icon: Icons.assignment,
+            path: AppConstants.adminExamsRoute,
+          ),
+          NavigationItem(
+            id: 'enrollment',
+            label: 'Enrolment',
+            icon: Icons.group_add,
+            path: AppConstants.adminEnrollmentRoute,
+          ),
+          NavigationItem(
+            id: 'rbac-management',
+            label: 'Roles & Access',
+            icon: Icons.admin_panel_settings,
+            path: '/admin/roles',
+          ),
+          NavigationItem(
+            id: 'staff',
+            label: 'Staff & Users',
+            icon: Icons.badge,
+            path: AppConstants.adminStaffRoute,
           ),
 
           NavigationItem(
@@ -340,24 +403,6 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             label: 'Attendance',
             icon: Icons.how_to_reg,
             path: AppConstants.adminAttendanceRoute, // add this constant
-          ),
-          NavigationItem(
-            id: 'analytics',
-            label: 'Reports',
-            icon: Icons.analytics,
-            path: AppConstants.adminAnalyticsRoute,
-          ),
-          NavigationItem(
-            id: 'reports',
-            label: 'Assessment',
-            icon: Icons.assessment,
-            path: AppConstants.adminReportsRoute,
-          ),
-          NavigationItem(
-            id: 'settings',
-            label: 'Settings',
-            icon: Icons.settings,
-            path: AppConstants.adminSettingsRoute,
           ),
           NavigationItem(
             id: 'timetable',
@@ -384,18 +429,68 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             path: AppConstants.tenantManagementRoute,
           ),
           NavigationItem(
-            id: 'global-analytics',
-            label: 'Analytics',
-            icon: Icons.analytics,
-            path: AppConstants.globalAnalyticsRoute,
+            id: 'admins',
+            label: 'Admins',
+            icon: Icons.person_add_alt_1,
+            path: AppConstants.superAdminAdminsRoute,
           ),
           NavigationItem(
-            id: 'system-settings',
-            label: 'Settings',
-            icon: Icons.settings,
-            path: AppConstants.systemSettingsRoute,
+            id: 'module-access',
+            label: 'Module Access',
+            icon: Icons.tune,
+            path: AppConstants.superAdminModuleAccessRoute,
+          ),
+          NavigationItem(
+            id: 'analytics',
+            label: 'Analytics',
+            icon: Icons.insights,
+            path: AppConstants.superAdminAnalyticsRoute,
+          ),
+          NavigationItem(
+            id: 'feedback',
+            label: 'Feedback',
+            icon: Icons.feedback,
+            path: AppConstants.superAdminFeedbackRoute,
+          ),
+          NavigationItem(
+            id: 'profile',
+            label: 'Profile',
+            icon: Icons.person,
+            path: AppConstants.superAdminProfileRoute,
           ),
         ];
+
+      case 'staff':
+        // Unified dynamic-role user: the sidebar IS their granted page set.
+        final dyn = <NavigationItem>[
+          NavigationItem(
+            id: 'staff-home',
+            label: 'Home',
+            icon: Icons.dashboard,
+            path: AppConstants.staffDashboardRoute,
+          ),
+        ];
+        for (final m in PermissionStore.instance.modules) {
+          // 'profile' is appended below with the real staff route; 'dashboard'
+          // is the Home tile above.
+          if (!m.enabled || m.key == 'dashboard' || m.key == 'profile' || m.path.isEmpty) {
+            continue;
+          }
+          dyn.add(NavigationItem(
+            id: m.key,
+            label: m.name.isEmpty ? m.key : m.name,
+            icon: _staffNavIcons[m.key] ?? Icons.widgets,
+            path: m.path,
+          ));
+        }
+        // Profile is universal — always present for staff too.
+        dyn.add(NavigationItem(
+          id: 'profile',
+          label: 'Profile',
+          icon: Icons.person,
+          path: AppConstants.staffProfileRoute,
+        ));
+        return dyn;
 
       default:
         return [];
@@ -468,9 +563,60 @@ class _NavigationSidebarState extends State<NavigationSidebar>
     return uri.replace(queryParameters: params).toString();
   }
 
+  // Map a nav item id to its RBAC module key (null = always show).
+  static const Map<String, String> _navModule = {
+    'dashboard': 'dashboard',
+    'notifications': 'notifications',
+    'send-notification': 'send_notification',
+    'classes': 'classes',
+    'students': 'students',
+    'attendance': 'attendance',
+    'timetable': 'timetable',
+    'enrollment': 'enrollment',
+    'exams': 'exams',
+    'assignments': 'assignments',
+    'grades': 'grades',
+    'quizzes': 'quizzes',
+    'chat': 'chat',
+    'profile': 'profile',
+    'rbac-management': 'rbac_management',
+    'staff': 'staff',
+  };
+
+  // Icons for the dynamic staff sidebar (keyed by catalog module key).
+  static const Map<String, IconData> _staffNavIcons = {
+    'profile': Icons.person,
+    'notifications': Icons.notifications,
+    'students': Icons.people,
+    'teachers': Icons.person_2,
+    'classes': Icons.class_,
+    'timetable': Icons.schedule,
+    'attendance': Icons.how_to_reg,
+    'send_notification': Icons.send,
+    'assessments': Icons.assessment,
+    'exams': Icons.assignment,
+    'analytics': Icons.insights,
+    'settings': Icons.settings,
+    'invite': Icons.person_add_alt_1,
+    'rbac_management': Icons.admin_panel_settings,
+    'staff': Icons.badge,
+    'my_classes': Icons.class_,
+    'assignments': Icons.assignment_turned_in,
+    'grades': Icons.grade,
+  };
+
+  // Items that are ALWAYS shown, regardless of RBAC (every user has them).
+  static const Set<String> _alwaysShow = {'profile', 'staff-home'};
+
   @override
   Widget build(BuildContext context) {
-    final items = _getNavigationItems();
+    // Gate by RBAC: hide items whose module the user's role has disabled —
+    // except the always-on items (Profile is universal, never permission-gated).
+    final items = _getNavigationItems()
+        .where((it) =>
+            _alwaysShow.contains(it.id) ||
+            PermissionStore.instance.canModule(_navModule[it.id]))
+        .toList();
     final currentLocation = GoRouterState.of(context).uri.toString();
     final screenSize = MediaQuery.of(context).size;
     final sidebarWidth = context.isMobile ? 240.0 : 260.0;
@@ -618,11 +764,10 @@ class _NavigationSidebarState extends State<NavigationSidebar>
                       ),
                       child: Text(
                         badge,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 5,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontFamily: AppTheme.bauhausFontFamily,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -655,7 +800,8 @@ class _NavigationSidebarState extends State<NavigationSidebar>
       itemBuilder: (context, index) {
         final item = items[index];
         final targetUrl = _buildUrlWithParams(item.path);
-        final isActive = currentLocation.startsWith(Uri.parse(targetUrl).path);
+        final isActive =
+            Uri.parse(currentLocation).path == Uri.parse(targetUrl).path;
 
         return Container(
           height: 36,
@@ -705,11 +851,10 @@ class _NavigationSidebarState extends State<NavigationSidebar>
                               _unreadNotificationsCount > 9
                                   ? '9+'
                                   : _unreadNotificationsCount.toString(),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 6,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: AppTheme.bauhausFontFamily,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -744,11 +889,10 @@ class _NavigationSidebarState extends State<NavigationSidebar>
                       ),
                       child: Text(
                         item.badge!,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 7,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontFamily: AppTheme.bauhausFontFamily,
                         ),
                       ),
                     ),
@@ -856,11 +1000,10 @@ class _NavigationSidebarState extends State<NavigationSidebar>
                               _unreadNotificationsCount > 9
                                   ? '9+'
                                   : _unreadNotificationsCount.toString(),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 6,
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
-                                fontFamily: AppTheme.bauhausFontFamily,
                               ),
                               textAlign: TextAlign.center,
                             ),
@@ -885,10 +1028,9 @@ class _NavigationSidebarState extends State<NavigationSidebar>
                       ),
                       Text(
                         _getRoleDisplayName(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 8,
                           color: Colors.white70,
-                          fontFamily: AppTheme.bauhausFontFamily,
                         ),
                       ),
                       Container(
@@ -914,10 +1056,9 @@ class _NavigationSidebarState extends State<NavigationSidebar>
                                 _isGlobalUser()
                                     ? 'Global System'
                                     : SchoolSession.schoolName ?? 'School',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 7,
                                   color: Colors.white,
-                                  fontFamily: AppTheme.interFontFamily,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -946,11 +1087,10 @@ class _NavigationSidebarState extends State<NavigationSidebar>
                           const SizedBox(width: 4),
                           Text(
                             'Logout',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 8,
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
-                              fontFamily: AppTheme.bauhausFontFamily,
                             ),
                           ),
                         ],
@@ -988,10 +1128,9 @@ class _NavigationSidebarState extends State<NavigationSidebar>
               const SizedBox(width: 4),
               Text(
                 'v1.0.0',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 8,
                   color: AppTheme.neutral500,
-                  fontFamily: AppTheme.interFontFamily,
                 ),
               ),
             ],

@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 
@@ -81,8 +82,70 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
     super.dispose();
   }
 
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppTheme.error,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  /// Turn a FastAPI error detail (a string, or a 422 list of {loc, msg}) into a
+  /// readable message instead of dumping raw JSON at the user.
+  String _formatDetail(dynamic detail) {
+    if (detail is String) return detail;
+    if (detail is List) {
+      final parts = detail.map((e) {
+        if (e is Map) {
+          final loc = (e['loc'] is List && (e['loc'] as List).isNotEmpty)
+              ? (e['loc'] as List).last.toString()
+              : '';
+          final msg = (e['msg'] ?? '').toString();
+          return loc.isEmpty ? msg : '$loc: $msg';
+        }
+        return e.toString();
+      }).where((s) => s.isNotEmpty);
+      if (parts.isNotEmpty) return parts.join('\n');
+    }
+    return detail?.toString() ?? 'Failed to create school';
+  }
+
   Future<void> _createTenant() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validate the visible Form fields (Basic Info required fields).
+    final formOk = _formKey.currentState?.validate() ?? false;
+
+    // Cross-tab required checks — Form validators on inactive tabs don't fire
+    // reliably, so enforce the compulsory numeric/list fields explicitly and
+    // jump the user to the tab that needs attention.
+    final maxCap = int.tryParse(_maximumCapacityController.text.trim());
+    if (maxCap == null || maxCap <= 0) {
+      _tabController.animateTo(2);
+      _showError('Maximum capacity is required and must be greater than 0.');
+      return;
+    }
+    if (_selectedGradeLevels.isEmpty) {
+      _tabController.animateTo(1);
+      setState(() {}); // surface the inline "required" hint
+      _showError('Select at least one grade level offered.');
+      return;
+    }
+    int? establishedYear;
+    final yearText = _establishedYearController.text.trim();
+    if (yearText.isNotEmpty) {
+      establishedYear = int.tryParse(yearText);
+      final thisYear = DateTime.now().year;
+      if (establishedYear == null || establishedYear < 1800 || establishedYear > thisYear) {
+        _tabController.animateTo(1);
+        _showError('Established year must be between 1800 and $thisYear (or leave it blank).');
+        return;
+      }
+    }
+    if (!formOk) {
+      _tabController.animateTo(0); // the required Basic-Info fields are here
+      _showError('Please fill all required fields.');
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -94,12 +157,13 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
       'principal_name': _principalNameController.text.trim(),
       'school_type': _schoolType,
       'language_of_instruction': _languageOfInstruction,
-      'established_year': int.tryParse(_establishedYearController.text) ?? 0,
+      // Only send established_year when provided (backend requires >= 1800).
+      if (establishedYear != null) 'established_year': establishedYear,
       'accreditation': _accreditationController.text.trim(),
       'academic_year_start': _academicYearStart?.toIso8601String(),
       'academic_year_end': _academicYearEnd?.toIso8601String(),
       'grade_levels': _selectedGradeLevels,
-      'maximum_capacity': int.tryParse(_maximumCapacityController.text) ?? 0,
+      'maximum_capacity': maxCap,
       'current_enrollment': int.tryParse(_currentEnrollmentController.text) ?? 0,
       'total_students': int.tryParse(_totalStudentsController.text) ?? 0,
       'total_teachers': int.tryParse(_totalTeachersController.text) ?? 0,
@@ -110,9 +174,11 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
     };
 
     try {
+      // Admin self-service create (the /api/v1/tenants router is super-admin
+      // only). This endpoint stamps the school's owner = the creating admin.
       final response = await http.post(
-        Uri.parse('${AppConstants.apiBaseUrl}/api/v1/tenants/'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('${AppConstants.apiBaseUrl}/api/auth/schools'),
+        headers: AuthSession.instance.headers(),
         body: json.encode(tenantData),
       );
 
@@ -129,17 +195,10 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['detail'] ?? 'Failed to create school');
+        _showError(_formatDetail(errorData['detail']));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showError(e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -181,7 +240,7 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
             TabBar(
               controller: _tabController,
               labelColor: AppTheme.primaryGreen,
-              unselectedLabelColor: Colors.grey,
+              unselectedLabelColor: AppTheme.neutral500,
               indicatorColor: AppTheme.primaryGreen,
               tabs: const [
                 Tab(text: 'Basic Info'),
@@ -370,11 +429,20 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
                 child: TextFormField(
                   controller: _establishedYearController,
                   decoration: const InputDecoration(
-                    labelText: 'Established Year',
-                    hintText: '1995',
+                    labelText: 'Established Year (optional)',
+                    hintText: 'e.g. 1995',
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
+                  validator: (value) {
+                    final t = (value ?? '').trim();
+                    if (t.isEmpty) return null; // optional
+                    final y = int.tryParse(t);
+                    if (y == null || y < 1800 || y > DateTime.now().year) {
+                      return '1800–${DateTime.now().year}';
+                    }
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 16),
@@ -450,9 +518,18 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
           const SizedBox(height: 16),
           
           Text(
-            'Grade Levels Offered',
+            'Grade Levels Offered *',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _selectedGradeLevels.isEmpty
+                ? 'Select at least one grade level'
+                : '${_selectedGradeLevels.length} selected',
+            style: AppTheme.bodySmall.copyWith(
+              color: _selectedGradeLevels.isEmpty ? AppTheme.error : AppTheme.neutral500,
             ),
           ),
           const SizedBox(height: 8),
@@ -502,11 +579,16 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
                 child: TextFormField(
                   controller: _maximumCapacityController,
                   decoration: const InputDecoration(
-                    labelText: 'Maximum Capacity',
+                    labelText: 'Maximum Capacity *',
                     hintText: '1000',
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
+                  validator: (value) {
+                    final n = int.tryParse((value ?? '').trim());
+                    if (n == null || n <= 0) return 'Required, must be > 0';
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 16),

@@ -74,7 +74,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
       if (mounted) {
         setState(() {
-          _teacherData = teacherData;
+          _teacherData = _normalizeTeacher(teacherData);
           _isLoading = false;
         });
         
@@ -178,7 +178,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            _error!,
+            'We couldn\'t load your dashboard right now. Please check your connection and try again.',
             style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral600),
             textAlign: TextAlign.center,
           ),
@@ -286,15 +286,6 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                         _buildTeacherInfo(department, subjects),
                         style: AppTheme.bodyMicro.copyWith(color: Colors.white70),
                       ),
-                    // Display teacher ID for debugging (remove in production)
-                    if (TeacherSession.teacherId != null)
-                      Text(
-                        'ID: ${TeacherSession.teacherId!.length > 8 ? TeacherSession.teacherId!.substring(0, 8) + '...' : TeacherSession.teacherId!}',
-                        style: AppTheme.bodyMicro.copyWith(
-                          color: Colors.white60,
-                          fontSize: 7,
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -339,19 +330,19 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
       children: [
         _buildInfoCard(
           'Email',
-          email.length > 20 ? '${email.substring(0, 17)}...' : email,
+          email,
           Icons.email,
           AppTheme.info,
         ),
         _buildInfoCard(
           'Phone',
-          phone.length > 15 ? '${phone.substring(0, 12)}...' : phone,
+          phone,
           Icons.phone,
           AppTheme.success,
         ),
         _buildInfoCard(
           'Employee ID',
-          employeeId.length > 15 ? '${employeeId.substring(0, 12)}...' : employeeId,
+          employeeId,
           Icons.badge,
           AppTheme.warning,
         ),
@@ -473,13 +464,11 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
                     ),
                     child: Text(
                       value.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 8,
+                      style: AppTheme.bodyMicro.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: value.toLowerCase() == 'active' 
+                        color: value.toLowerCase() == 'active'
                             ? AppTheme.success
                             : AppTheme.error,
-                        fontFamily: AppTheme.bauhausFontFamily,
                       ),
                     ),
                   )
@@ -522,7 +511,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 4,
+            crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 4,
             crossAxisSpacing: 6,
             mainAxisSpacing: 6,
             childAspectRatio: 0.8,
@@ -603,6 +592,30 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
 
   void _navigateToAttendance() {
     context.go('${AppConstants.teacherAttendanceRoute}?userId=${TeacherSession.teacherId}&tenantId=${TeacherSession.tenantId}');
+  }
+
+  /// GET /teachers/{id} nests contact details under
+  /// personal_info.contact_info and identity under teacher_id, but this
+  /// dashboard reads flat keys. Hoist the known nested values to the top level
+  /// so email/phone/employee-id render instead of showing 'Not provided'.
+  Map<String, dynamic> _normalizeTeacher(Map<String, dynamic>? data) {
+    if (data == null) return {};
+    final m = Map<String, dynamic>.from(data);
+    Map<String, dynamic> asMap(dynamic v) =>
+        v is Map ? v.cast<String, dynamic>() : <String, dynamic>{};
+    final personal = asMap(m['personal_info']);
+    final pContact = asMap(personal['contact_info']);
+    final contact = pContact.isNotEmpty ? pContact : asMap(m['contact_info']);
+    final employment = asMap(m['employment']);
+
+    m['email'] ??= contact['primary_email'] ?? contact['email'];
+    m['phone'] ??= contact['primary_phone'] ?? contact['phone'];
+    m['employee_id'] ??= m['teacher_id'] ?? employment['employee_id'];
+    m['position'] ??= employment['designation'] ?? employment['position'];
+    m['department'] ??= employment['department'];
+    m['joining_date'] ??=
+        employment['joining_date'] ?? employment['date_of_joining'];
+    return m;
   }
 
   // Helper method to safely get string values from API response

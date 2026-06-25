@@ -1,6 +1,7 @@
 // lib/services/student_management_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../core/auth/auth_session.dart';
 import '../core/constants/app_constants.dart';
 import '../core/models/student.dart';
 import '../core/utils/school_session.dart';
@@ -26,7 +27,9 @@ class StudentManagementService {
     if (section != null && section.isNotEmpty) queryParams['section'] = section;
 
     final uri = Uri.parse(_baseUrl).replace(queryParameters: queryParams);
-    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    final response = await http
+        .get(uri, headers: AuthSession.instance.headers(json: false))
+        .timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
@@ -39,7 +42,7 @@ class StudentManagementService {
   static Future<Student> createStudent(Map<String, dynamic> studentData) async {
     final response = await http.post(
       Uri.parse(_baseUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: json.encode(studentData),
     );
 
@@ -52,7 +55,8 @@ class StudentManagementService {
 
   // Get specific student by ID
   static Future<Student> getStudent(String studentId) async {
-    final response = await http.get(Uri.parse('$_baseUrl/$studentId'));
+    final response = await http.get(Uri.parse('$_baseUrl/$studentId'),
+        headers: AuthSession.instance.headers(json: false));
 
     if (response.statusCode == 200) {
       return Student.fromJson(json.decode(response.body));
@@ -65,7 +69,7 @@ class StudentManagementService {
   static Future<Student> updateStudent(String studentId, Map<String, dynamic> updateData) async {
     final response = await http.put(
       Uri.parse('$_baseUrl/$studentId'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: json.encode(updateData),
     );
 
@@ -78,7 +82,8 @@ class StudentManagementService {
 
   // Delete student (soft delete)
   static Future<String> deleteStudent(String studentId) async {
-    final response = await http.delete(Uri.parse('$_baseUrl/$studentId'));
+    final response = await http.delete(Uri.parse('$_baseUrl/$studentId'),
+        headers: AuthSession.instance.headers(json: false));
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
@@ -89,7 +94,8 @@ class StudentManagementService {
 
   // Get students by tenant
   static Future<List<Student>> getStudentsByTenant(String tenantId) async {
-    final response = await http.get(Uri.parse('$_baseUrl/tenant/$tenantId'));
+    final response = await http.get(Uri.parse('$_baseUrl/tenant/$tenantId'),
+        headers: AuthSession.instance.headers(json: false));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -107,7 +113,8 @@ class StudentManagementService {
     final queryParams = tenantId != null ? {'tenant_id': tenantId} : <String, String>{};
     final uri = Uri.parse('$_baseUrl/grade/$gradeLevel').replace(queryParameters: queryParams);
     
-    final response = await http.get(uri);
+    final response = await http.get(uri,
+        headers: AuthSession.instance.headers(json: false));
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -122,7 +129,8 @@ class StudentManagementService {
 
   // Get student statistics
   static Future<Map<String, dynamic>> getStudentStatistics(String tenantId) async {
-    final response = await http.get(Uri.parse('$_baseUrl/statistics/$tenantId'));
+    final response = await http.get(Uri.parse('$_baseUrl/statistics/$tenantId'),
+        headers: AuthSession.instance.headers(json: false));
 
     if (response.statusCode == 200) {
       return json.decode(response.body);
@@ -148,7 +156,8 @@ class StudentManagementService {
     if (section != null && section.isNotEmpty) queryParams['section'] = section;
 
     final uri = Uri.parse('$_baseUrl/export/$tenantId').replace(queryParameters: queryParams);
-    final response = await http.get(uri);
+    final response = await http.get(uri,
+        headers: AuthSession.instance.headers(json: false));
 
     if (response.statusCode == 200) {
       return response.body;

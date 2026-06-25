@@ -1,4 +1,5 @@
 // lib/features/notifications/screens/notifications_screen.dart
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
@@ -27,6 +28,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   late TabController _tabController;
   List<AppNotification> _allNotifications = [];
   List<AppNotification> _unreadNotifications = [];
+  List<AppNotification> _archivedNotifications = [];
   bool _isLoading = true;
   String? _error;
   bool _useMockData = false; // CHANGED: Default to false for real API
@@ -34,8 +36,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadNotifications();
+    _loadArchived();
   }
 
   @override
@@ -123,7 +126,11 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Tab(
               text: 'Unread (${_unreadNotifications.length})',
             ),
+            Tab(
+              text: 'Archived (${_archivedNotifications.length})',
+            ),
           ],
+          isScrollable: true,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           indicatorColor: Colors.white,
@@ -141,7 +148,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(_useMockData ? 'Using mock data' : 'Using real API'),
-                    backgroundColor: Colors.blue,
+                    backgroundColor: AppTheme.info,
                   ),
                 );
               } else if (value == 'refresh') {
@@ -149,16 +156,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               }
             },
             itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'toggle_data',
-                child: Row(
-                  children: [
-                    Icon(_useMockData ? Icons.api : Icons.dashboard),
-                    const SizedBox(width: 8),
-                    Text(_useMockData ? 'Use Real API' : 'Use Mock Data'),
-                  ],
+              if (kDebugMode)
+                PopupMenuItem(
+                  value: 'toggle_data',
+                  child: Row(
+                    children: [
+                      Icon(_useMockData ? Icons.api : Icons.dashboard),
+                      const SizedBox(width: 8),
+                      Text(_useMockData ? 'Use Real API' : 'Use Mock Data'),
+                    ],
+                  ),
                 ),
-              ),
               const PopupMenuItem(
                 value: 'refresh',
                 child: Row(
@@ -199,6 +207,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                   children: [
                     _buildNotificationsList(_allNotifications),
                     _buildNotificationsList(_unreadNotifications),
+                    _buildNotificationsList(_archivedNotifications, archived: true),
                   ],
                 ),
     );
@@ -209,12 +218,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+          Icon(Icons.error_outline, size: 64, color: AppTheme.error),
           const SizedBox(height: 16),
           Text(
             'Error loading notifications',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.red[600],
+              color: AppTheme.error,
             ),
           ),
           const SizedBox(height: 8),
@@ -222,35 +231,37 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             margin: const EdgeInsets.symmetric(horizontal: 32),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red[50],
+              color: AppTheme.error.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red[200]!),
+              border: Border.all(color: AppTheme.error.withOpacity(0.3)),
             ),
             child: Text(
               _error!,
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.red[800]),
+              style: AppTheme.bodySmall.copyWith(color: AppTheme.error),
             ),
           ),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _useMockData = true;
-                  });
-                  _loadNotifications();
-                },
-                icon: const Icon(Icons.dashboard),
-                label: const Text('Use Demo Data'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  foregroundColor: Colors.white,
+              if (kDebugMode) ...[
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _useMockData = true;
+                    });
+                    _loadNotifications();
+                  },
+                  icon: const Icon(Icons.dashboard),
+                  label: const Text('Use Demo Data'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.info,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
+                const SizedBox(width: 16),
+              ],
               ElevatedButton.icon(
                 onPressed: _loadNotifications,
                 icon: const Icon(Icons.refresh),
@@ -267,7 +278,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     );
   }
 
-  Widget _buildNotificationsList(List<AppNotification> notifications) {
+  Widget _buildNotificationsList(List<AppNotification> notifications,
+      {bool archived = false}) {
     if (notifications.isEmpty) {
       return Center(
         child: Column(
@@ -276,19 +288,19 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Icon(
               Icons.notifications_none,
               size: 80,
-              color: Colors.grey[400],
+              color: AppTheme.neutral400,
             ),
             const SizedBox(height: 16),
             Text(
               'No notifications',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.grey[600],
+                color: AppTheme.neutral600,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               'You\'re all caught up! 🎉',
-              style: TextStyle(color: Colors.grey[500]),
+              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500),
             ),
           ],
         ),
@@ -302,10 +314,91 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         itemCount: notifications.length,
         itemBuilder: (context, index) {
           final notification = notifications[index];
-          return _buildNotificationCard(notification);
+          return Dismissible(
+            key: ValueKey(notification.id),
+            background: _swipeBg(
+                archived ? Icons.unarchive : Icons.archive,
+                archived ? 'Unarchive' : 'Archive',
+                AppTheme.info,
+                Alignment.centerLeft),
+            secondaryBackground:
+                _swipeBg(Icons.delete, 'Delete', AppTheme.error, Alignment.centerRight),
+            confirmDismiss: (dir) =>
+                _onSwipe(notification, dir, archived),
+            child: _buildNotificationCard(notification),
+          );
         },
       ),
     );
+  }
+
+  Widget _swipeBg(IconData icon, String label, Color color, Alignment align) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+          color: color, borderRadius: BorderRadius.circular(12)),
+      alignment: align,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(label,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  /// Returns true to let the tile dismiss (after the server action succeeds).
+  Future<bool> _onSwipe(
+      AppNotification n, DismissDirection dir, bool archived) async {
+    try {
+      if (dir == DismissDirection.endToStart) {
+        await NotificationService.deleteNotification(
+            notificationId: n.id, userId: widget.userId);
+        _toast('Notification deleted', AppTheme.success);
+      } else if (archived) {
+        await NotificationService.unarchive(
+            notificationId: n.id, userId: widget.userId);
+        _toast('Moved back to inbox', AppTheme.success);
+      } else {
+        await NotificationService.archive(
+            notificationId: n.id, userId: widget.userId);
+        _toast('Notification archived', AppTheme.success);
+      }
+      // Refresh both inbox and archive so counts/lists stay correct.
+      _loadNotifications();
+      _loadArchived();
+      return true;
+    } catch (e) {
+      _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
+      return false;
+    }
+  }
+
+  void _toast(String msg, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: color,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Future<void> _loadArchived() async {
+    if (widget.userId.isEmpty || widget.tenantId.isEmpty) return;
+    try {
+      final archived = await NotificationService.getArchived(
+        userId: widget.userId,
+        userType: widget.userType,
+        tenantId: widget.tenantId,
+      );
+      if (mounted) setState(() => _archivedNotifications = archived);
+    } catch (_) {
+      // Non-fatal; leave archived list as-is.
+    }
   }
 
   Widget _buildNotificationCard(AppNotification notification) {
@@ -354,8 +447,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                             Expanded(
                               child: Text(
                                 notification.title,
-                                style: TextStyle(
-                                  fontSize: 16,
+                                style: AppTheme.bodyMedium.copyWith(
                                   fontWeight: notification.isRead
                                       ? FontWeight.w500
                                       : FontWeight.bold,
@@ -374,9 +466,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                                 ),
                                 child: Text(
                                   notification.priority.value.toUpperCase(),
-                                  style: const TextStyle(
+                                  style: AppTheme.bodySmall.copyWith(
                                     color: Colors.white,
-                                    fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
@@ -388,9 +479,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                           children: [
                             Text(
                               _formatDateTime(notification.createdAt),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
+                              style: AppTheme.bodyMicro.copyWith(
+                                color: AppTheme.neutral600,
                               ),
                             ),
                             if (notification.category != null) ...[
@@ -398,14 +488,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: Colors.grey[200],
+                                  color: AppTheme.neutral200,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   notification.category!,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[700],
+                                  style: AppTheme.bodySmall.copyWith(
+                                    color: AppTheme.neutral700,
                                   ),
                                 ),
                               ),
@@ -434,9 +523,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               // Message
               Text(
                 notification.message,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: notification.isRead ? Colors.grey[700] : Colors.black87,
+                style: AppTheme.bodySmall.copyWith(
+                  color: notification.isRead ? AppTheme.neutral700 : AppTheme.neutral900,
                 ),
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
@@ -452,14 +540,13 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.blue[100],
+                        color: AppTheme.info.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '#$tag',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.blue[700],
+                        style: AppTheme.bodySmall.copyWith(
+                          color: AppTheme.info,
                         ),
                       ),
                     );
@@ -514,34 +601,34 @@ class _NotificationsScreenState extends State<NotificationsScreen>
   Color _getTypeColor(NotificationType type) {
     switch (type) {
       case NotificationType.announcement:
-        return Colors.blue;
+        return AppTheme.info;
       case NotificationType.assignment:
-        return Colors.orange;
+        return AppTheme.warning;
       case NotificationType.grade:
-        return Colors.green;
+        return AppTheme.greenLight;
       case NotificationType.attendance:
         return Colors.purple;
       case NotificationType.event:
         return Colors.teal;
       case NotificationType.reminder:
-        return Colors.amber;
+        return AppTheme.warning;
       case NotificationType.alert:
-        return Colors.red;
+        return AppTheme.error;
       case NotificationType.general:
-        return Colors.grey;
+        return AppTheme.neutral500;
     }
   }
 
   Color _getPriorityColor(NotificationPriority priority) {
     switch (priority) {
       case NotificationPriority.low:
-        return Colors.grey;
+        return AppTheme.neutral500;
       case NotificationPriority.normal:
-        return Colors.blue;
+        return AppTheme.info;
       case NotificationPriority.high:
-        return Colors.orange;
+        return AppTheme.warning;
       case NotificationPriority.urgent:
-        return Colors.red;
+        return AppTheme.error;
     }
   }
 
@@ -568,7 +655,17 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           userId: widget.userId,
         );
       } catch (e) {
-        print('Error marking notification as read: $e');
+        if (kDebugMode) {
+          print('Error marking notification as read: $e');
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Couldn't update read status"),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
       }
     }
 
@@ -601,26 +698,11 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Text(notification.actionText ?? 'Action'),
           ],
         ),
-        content: Text('Navigate to: ${notification.actionUrl}'),
+        content: const Text('Opens the related item.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Would navigate to: ${notification.actionUrl}'),
-                  backgroundColor: Colors.blue,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryGreen,
-            ),
-            child: const Text('Go'),
+            child: const Text('Close'),
           ),
         ],
       ),
@@ -641,7 +723,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Expanded(
               child: Text(
                 notification.title,
-                style: const TextStyle(fontSize: 18),
+                style: AppTheme.bodyLarge,
               ),
             ),
           ],
@@ -655,7 +737,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
+                  color: AppTheme.neutral100,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -663,23 +745,20 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                   children: [
                     Text(
                       'Sent: ${_formatDateTime(notification.createdAt)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
+                      style: AppTheme.bodyMicro.copyWith(
+                        color: AppTheme.neutral600,
                       ),
                     ),
                     if (notification.isRead && notification.readAt != null)
                       Text(
                         'Read: ${_formatDateTime(notification.readAt!)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
+                        style: AppTheme.bodyMicro.copyWith(
+                          color: AppTheme.neutral600,
                         ),
                       ),
                     Text(
                       'Priority: ${notification.priority.value.toUpperCase()}',
-                      style: TextStyle(
-                        fontSize: 12,
+                      style: AppTheme.bodyMicro.copyWith(
                         color: _getPriorityColor(notification.priority),
                         fontWeight: FontWeight.bold,
                       ),
@@ -693,16 +772,15 @@ class _NotificationsScreenState extends State<NotificationsScreen>
               // Message
               Text(
                 notification.message,
-                style: const TextStyle(fontSize: 14),
+                style: AppTheme.bodySmall,
               ),
-              
+
               if (notification.category != null) ...[
                 const SizedBox(height: 16),
                 Text(
                   'Category: ${notification.category}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
+                  style: AppTheme.bodyMicro.copyWith(
+                    color: AppTheme.neutral600,
                   ),
                 ),
               ],
@@ -714,8 +792,8 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                   children: notification.tags!.map((tag) {
                     return Chip(
                       label: Text('#$tag'),
-                      backgroundColor: Colors.blue[100],
-                      labelStyle: const TextStyle(fontSize: 10),
+                      backgroundColor: AppTheme.info.withOpacity(0.15),
+                      labelStyle: AppTheme.bodySmall,
                     );
                   }).toList(),
                 ),
@@ -746,6 +824,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     if (_unreadNotifications.isEmpty) return;
 
     try {
+      // Persist server-side first: mark each unread notification as read.
+      final unreadIds =
+          _allNotifications.where((n) => !n.isRead).map((n) => n.id).toList();
+      await Future.wait(unreadIds.map((id) => NotificationService.markAsRead(
+            notificationId: id,
+            userId: widget.userId,
+          )));
+
       setState(() {
         for (int i = 0; i < _allNotifications.length; i++) {
           if (!_allNotifications[i].isRead) {
@@ -757,18 +843,18 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         }
         _unreadNotifications.clear();
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('All notifications marked as read'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.success,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.error,
         ),
       );
     }
