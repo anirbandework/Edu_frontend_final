@@ -1,9 +1,12 @@
-// lib/features/admin/widgets/bulk_operations_dialog.dart
+// lib/features/tenant_management/widgets/bulk_operations_dialog.dart
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 enum BulkOperationType {
   updateStatus,
@@ -30,17 +33,17 @@ class BulkOperationsDialog extends StatefulWidget {
 class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
   BulkOperationType? _selectedOperation;
   bool _isLoading = false;
-  
+
   // Status Update
   bool _newStatus = true;
-  
+
   // Capacity Update
   final _capacityController = TextEditingController();
-  
+
   // Financial Update
   final _tuitionController = TextEditingController();
   final _feeController = TextEditingController();
-  
+
   // Statistics Update
   final _studentsController = TextEditingController();
   final _teachersController = TextEditingController();
@@ -74,7 +77,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             'is_active': _newStatus,
           };
           break;
-          
+
         case BulkOperationType.updateCapacity:
           if (_capacityController.text.isEmpty) {
             throw Exception('Capacity value is required');
@@ -87,20 +90,20 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             }).toList(),
           };
           break;
-          
+
         case BulkOperationType.updateFinancial:
           endpoint = 'bulk/update-financial';
           requestBody = {
             'financial_updates': widget.selectedTenantIds.map((id) => {
               'tenant_id': id,
-              if (_tuitionController.text.isNotEmpty) 
+              if (_tuitionController.text.isNotEmpty)
                 'annual_tuition': double.parse(_tuitionController.text),
               if (_feeController.text.isNotEmpty)
                 'registration_fee': double.parse(_feeController.text),
             }).toList(),
           };
           break;
-          
+
         case BulkOperationType.updateStatistics:
           endpoint = 'bulk/update-statistics';
           requestBody = {
@@ -115,7 +118,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             }).toList(),
           };
           break;
-          
+
         case BulkOperationType.delete:
           endpoint = 'bulk/delete';
           requestBody = {
@@ -126,7 +129,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
 
       final response = await http.post(
         Uri.parse('${AppConstants.apiBaseUrl}/api/v1/tenants/$endpoint'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(requestBody),
       );
 
@@ -136,8 +139,10 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Bulk operation completed successfully on ${widget.selectedTenantIds.length} schools'),
-              backgroundColor: AppTheme.primaryGreen,
+              content: Text(
+                  'Bulk operation completed successfully on ${widget.selectedTenantIds.length} schools'),
+              backgroundColor: AppTheme.greenPrimary,
+              behavior: SnackBarBehavior.floating,
             ),
           );
         }
@@ -150,7 +155,8 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -161,149 +167,161 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final maxW = math.min(size.width - 24, 520.0);
+    final isDelete = _selectedOperation == BulkOperationType.delete;
+
     return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.6,
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW,
+          maxHeight: size.height - 80,
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Row(
-              children: [
-                Icon(Icons.settings, color: AppTheme.primaryGreen, size: 28),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bulk Operations',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryGreen,
-                        ),
-                      ),
-                      Text(
-                        '${widget.selectedTenantIds.length} schools selected',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 8, 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppTheme.greenPrimary.withValues(alpha: 0.10),
+                      borderRadius: AppTheme.borderRadius12,
+                    ),
+                    child: const Icon(Icons.settings,
+                        color: AppTheme.greenPrimary, size: 22),
                   ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Operation Selection
-            Text(
-              'Select Operation',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+                  const SizedBox(width: Sa.gap),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Bulk Operations',
+                          style: Sa.cardTitle.copyWith(fontSize: 17),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.selectedTenantIds.length} schools selected',
+                          style: Sa.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed:
+                        _isLoading ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: AppTheme.neutral600),
+                    tooltip: 'Close',
+                  ),
+                ],
               ),
             ),
-            
-            const SizedBox(height: 16),
-            
-            Expanded(
+
+            const Divider(height: 1, color: AppTheme.neutral200),
+
+            // Scrollable body
+            Flexible(
               child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const Text('Select Operation', style: Sa.cardTitle),
+                    const SizedBox(height: Sa.gap),
                     _buildOperationCard(
                       BulkOperationType.updateStatus,
                       'Update Status',
                       'Activate or deactivate selected schools',
-                      Icons.toggle_on,
-                      Colors.blue,
+                      Icons.toggle_on_outlined,
                     ),
                     _buildOperationCard(
                       BulkOperationType.updateCapacity,
                       'Update Capacity',
                       'Set maximum capacity for selected schools',
-                      Icons.people,
-                      Colors.green,
+                      Icons.people_outline,
                     ),
                     _buildOperationCard(
                       BulkOperationType.updateFinancial,
                       'Update Financial Info',
                       'Update tuition and fees for selected schools',
-                      Icons.attach_money,
-                      Colors.orange,
+                      Icons.currency_rupee,
                     ),
                     _buildOperationCard(
                       BulkOperationType.updateStatistics,
                       'Update Statistics',
                       'Update student, teacher, and staff counts',
-                      Icons.analytics,
-                      Colors.purple,
+                      Icons.analytics_outlined,
                     ),
                     _buildOperationCard(
                       BulkOperationType.delete,
                       'Delete Schools',
                       'Permanently delete selected schools',
-                      Icons.delete,
-                      Colors.red,
+                      Icons.delete_outline,
+                      destructive: true,
                     ),
+                    if (_selectedOperation != null) ...[
+                      const SizedBox(height: Sa.gapLg),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppTheme.neutral50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppTheme.neutral200),
+                        ),
+                        child: _buildOperationForm(),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Operation Form
-            if (_selectedOperation != null) ...[
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: _buildOperationForm(),
-              ),
-              
-              const SizedBox(height: 24),
-            ],
-            
+
+            const Divider(height: 1, color: AppTheme.neutral200),
+
             // Actions
-            Row(
-              children: [
-                TextButton(
-                  onPressed: _isLoading ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const Spacer(),
-                if (_selectedOperation != null)
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _performBulkOperation,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _selectedOperation == BulkOperationType.delete 
-                          ? Colors.red 
-                          : AppTheme.primaryGreen,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 16, 12),
+              child: Row(
+                children: [
+                  TextButton(
+                    onPressed:
+                        _isLoading ? null : () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.neutral600,
+                      minimumSize: const Size(0, 48),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(_selectedOperation == BulkOperationType.delete 
-                            ? 'Delete Schools' 
-                            : 'Apply Changes'),
+                    child: const Text('Cancel'),
                   ),
-              ],
+                  const Spacer(),
+                  if (_selectedOperation != null)
+                    SaPrimaryButton(
+                      label: isDelete ? 'Delete Schools' : 'Apply Changes',
+                      icon: isDelete ? Icons.delete_outline : Icons.check,
+                      busy: _isLoading,
+                      color: isDelete
+                          ? AppTheme.error
+                          : AppTheme.greenPrimary,
+                      onPressed:
+                          _isLoading ? null : _performBulkOperation,
+                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -311,59 +329,75 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
     );
   }
 
-  Widget _buildOperationCard(BulkOperationType operation, String title, String description, IconData icon, Color color) {
+  Widget _buildOperationCard(
+    BulkOperationType operation,
+    String title,
+    String description,
+    IconData icon, {
+    bool destructive = false,
+  }) {
     final isSelected = _selectedOperation == operation;
-    
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: isSelected ? 4 : 1,
-      shape: RoundedRectangleBorder(
+    final Color accent =
+        destructive ? AppTheme.error : AppTheme.greenPrimary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sa.gap),
+      child: Material(
+        color: isSelected ? accent.withValues(alpha: 0.06) : Sa.surface,
         borderRadius: BorderRadius.circular(12),
-        side: isSelected 
-            ? BorderSide(color: color, width: 2) 
-            : BorderSide.none,
-      ),
-      child: InkWell(
-        onTap: () => setState(() => _selectedOperation = operation),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
+        child: InkWell(
+          onTap: () => setState(() => _selectedOperation = operation),
+          borderRadius: BorderRadius.circular(12),
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? accent : AppTheme.neutral200,
+                width: isSelected ? 2 : 1,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? color : Colors.black87,
-                      ),
-                    ),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
+            ),
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: accent, size: 22),
                 ),
-              ),
-              if (isSelected)
-                Icon(Icons.check_circle, color: color),
-            ],
+                const SizedBox(width: Sa.gap),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Sa.value.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? accent : AppTheme.neutral800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: Sa.label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: Sa.gapXs),
+                  Icon(Icons.check_circle, color: accent, size: 22),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -376,30 +410,30 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('New Status', style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
+            const Text('New Status', style: Sa.value),
+            const SizedBox(height: Sa.gapXs),
             Row(
               children: [
                 Radio<bool>(
                   value: true,
                   groupValue: _newStatus,
                   onChanged: (value) => setState(() => _newStatus = value!),
-                  activeColor: AppTheme.primaryGreen,
+                  activeColor: AppTheme.greenPrimary,
                 ),
-                const Text('Active'),
-                const SizedBox(width: 16),
+                const Text('Active', style: Sa.body),
+                const SizedBox(width: Sa.gapLg),
                 Radio<bool>(
                   value: false,
                   groupValue: _newStatus,
                   onChanged: (value) => setState(() => _newStatus = value!),
-                  activeColor: AppTheme.primaryGreen,
+                  activeColor: AppTheme.greenPrimary,
                 ),
-                const Text('Inactive'),
+                const Text('Inactive', style: Sa.body),
               ],
             ),
           ],
         );
-        
+
       case BulkOperationType.updateCapacity:
         return TextField(
           controller: _capacityController,
@@ -410,7 +444,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
           ),
           keyboardType: TextInputType.number,
         );
-        
+
       case BulkOperationType.updateFinancial:
         return Column(
           children: [
@@ -423,7 +457,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
               ),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Sa.gapLg),
             TextField(
               controller: _feeController,
               decoration: const InputDecoration(
@@ -435,7 +469,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             ),
           ],
         );
-        
+
       case BulkOperationType.updateStatistics:
         return Column(
           children: [
@@ -448,7 +482,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
               ),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Sa.gapLg),
             TextField(
               controller: _teachersController,
               decoration: const InputDecoration(
@@ -458,7 +492,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
               ),
               keyboardType: TextInputType.number,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: Sa.gapLg),
             TextField(
               controller: _staffController,
               decoration: const InputDecoration(
@@ -470,34 +504,38 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             ),
           ],
         );
-        
+
       case BulkOperationType.delete:
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.red[50],
+            color: AppTheme.error.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.red[200]!),
+            border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red[700]),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Warning: This action cannot be undone!',
-                    style: TextStyle(
-                      color: Colors.red[700],
-                      fontWeight: FontWeight.bold,
+                  const Icon(Icons.warning_amber_rounded,
+                      color: AppTheme.error, size: 20),
+                  const SizedBox(width: Sa.gapXs),
+                  Expanded(
+                    child: Text(
+                      'Warning: This action cannot be undone!',
+                      style: Sa.value.copyWith(
+                        color: AppTheme.error,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: Sa.gapXs),
               Text(
                 'This will permanently delete ${widget.selectedTenantIds.length} schools and all their associated data.',
-                style: TextStyle(color: Colors.red[600]),
+                style: Sa.body.copyWith(color: AppTheme.error),
               ),
             ],
           ),

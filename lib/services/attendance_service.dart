@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/models/attendance_models.dart';
+import '../core/auth/auth_session.dart';
 
 class AttendanceService {
   final String baseUrl;
@@ -21,42 +22,39 @@ class AttendanceService {
         'marked_by': markedBy,
         'marked_by_type': userTypeTo(markedByType),
       }),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode(payload.toMarkBody()),
     );
     _check(res);
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
+  // The backend has a SINGLE mark endpoint (/attendance/mark) that takes the
+  // user_type in the body; there are no /mark/student|teacher|authority routes.
+  // These helpers post to /mark and inject the right user_type. marked_by /
+  // marked_by_type are derived from the JWT server-side (query params nominal).
   Future<Map<String, dynamic>> markStudent({
     required String markedBy,
     required UserType markedByType,
     required Map<String, dynamic> body,
-  }) async {
-    final res = await _client.post(
-      _u('/api/v1/school_authority/attendance/mark/student', {
-        'marked_by': markedBy,
-        'marked_by_type': userTypeTo(markedByType),
-      }),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-    _check(res);
-    return jsonDecode(res.body);
-  }
+  }) =>
+      _markOne(markedBy, markedByType, body, 'student');
 
-  Future<Map<String, dynamic>> markTeacher({
-    required String markedBy,
-    required UserType markedByType,
-    required Map<String, dynamic> body,
-  }) async {
+  Future<Map<String, dynamic>> _markOne(
+    String markedBy,
+    UserType markedByType,
+    Map<String, dynamic> body,
+    String userType,
+  ) async {
+    final b = Map<String, dynamic>.from(body);
+    b['user_type'] ??= userType;
     final res = await _client.post(
-      _u('/api/v1/school_authority/attendance/mark/teacher', {
+      _u('/api/v1/school_authority/attendance/mark', {
         'marked_by': markedBy,
         'marked_by_type': userTypeTo(markedByType),
       }),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
+      headers: AuthSession.instance.headers(),
+      body: jsonEncode(b),
     );
     _check(res);
     return jsonDecode(res.body);
@@ -65,17 +63,8 @@ class AttendanceService {
   Future<Map<String, dynamic>> markAuthority({
     required String markedBy,
     required Map<String, dynamic> body,
-  }) async {
-    final res = await _client.post(
-      _u('/api/v1/school_authority/attendance/mark/authority', {
-        'marked_by': markedBy,
-      }),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode(body),
-    );
-    _check(res);
-    return jsonDecode(res.body);
-  }
+  }) =>
+      _markOne(markedBy, UserType.school_authority, body, 'school_authority');
 
   Future<Map<String, dynamic>> bulkMark({
     required String tenantId,
@@ -83,7 +72,7 @@ class AttendanceService {
   }) async {
     final res = await _client.post(
       _u('/api/v1/school_authority/attendance/bulk/mark'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode({'tenant_id': tenantId, 'attendance_records': records}),
     );
     _check(res);
@@ -97,7 +86,7 @@ class AttendanceService {
   }) async {
     final res = await _client.post(
       _u('/api/v1/school_authority/attendance/bulk/update-status'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode({
         'attendance_ids': attendanceIds,
         'new_status': newStatus,
@@ -115,7 +104,7 @@ class AttendanceService {
   }) async {
     final res = await _client.post(
       _u('/api/v1/school_authority/attendance/bulk/approve-absences'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode({
         'attendance_ids': attendanceIds,
         'approved_by': approvedBy,
@@ -143,7 +132,7 @@ class AttendanceService {
       if (endDate != null) 'end_date': _d(endDate),
       if (attendanceType != null) 'attendance_type': typeTo(attendanceType),
     };
-    final res = await _client.get(_u('/api/v1/school_authority/attendance/user/$userId', q));
+    final res = await _client.get(_u('/api/v1/school_authority/attendance/user/$userId', q), headers: AuthSession.instance.headers(json: false));
     _check(res);
     final data = jsonDecode(res.body) as List;
     return data.map((e) => AttendanceRecord.fromJson(e)).toList();
@@ -160,7 +149,7 @@ class AttendanceService {
       if (startDate != null) 'start_date': _d(startDate),
       if (endDate != null) 'end_date': _d(endDate),
     };
-    final res = await _client.get(_u('/api/v1/school_authority/attendance/dashboard/$tenantId', q));
+    final res = await _client.get(_u('/api/v1/school_authority/attendance/dashboard/$tenantId', q), headers: AuthSession.instance.headers(json: false));
     _check(res);
     return jsonDecode(res.body);
   }
@@ -174,7 +163,7 @@ class AttendanceService {
       'threshold_percentage': '$thresholdPercentage',
       if (userType != null) 'user_type': userTypeTo(userType),
     };
-    final res = await _client.get(_u('/api/v1/school_authority/attendance/low-attendance/$tenantId', q));
+    final res = await _client.get(_u('/api/v1/school_authority/attendance/low-attendance/$tenantId', q), headers: AuthSession.instance.headers(json: false));
     _check(res);
     return jsonDecode(res.body);
   }
@@ -185,14 +174,14 @@ class AttendanceService {
     int? periodNumber,
   }) async {
     final q = { if (periodNumber != null) 'period_number': '$periodNumber' };
-    final res = await _client.get(_u('/api/v1/school_authority/attendance/class/$classId/date/${_d(attendanceDate)}', q));
+    final res = await _client.get(_u('/api/v1/school_authority/attendance/class/$classId/date/${_d(attendanceDate)}', q), headers: AuthSession.instance.headers(json: false));
     _check(res);
     final data = jsonDecode(res.body) as List;
     return data.map((e) => AttendanceRecord.fromJson(e)).toList();
   }
 
   Future<AttendanceRecord> getById(String attendanceId) async {
-    final res = await _client.get(_u('/api/v1/school_authority/attendance/$attendanceId'));
+    final res = await _client.get(_u('/api/v1/school_authority/attendance/$attendanceId'), headers: AuthSession.instance.headers(json: false));
     _check(res);
     return AttendanceRecord.fromJson(jsonDecode(res.body));
   }

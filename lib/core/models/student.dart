@@ -60,7 +60,13 @@ class Student {
 
   factory Student.fromJson(Map<String, dynamic> json) {
     return Student(
-      id: json['id'] ?? '',
+      // A "student" is now a row in the members table. `id` is the member UUID
+      // (the backend also returns the same value as `member_id`), and `student_id`
+      // is the member's staff_id HRID (e.g. "STU001"). grade_level/section come
+      // back out of members.profile and are transitional — the authoritative
+      // grade/section is the student's enrolment class. Response keys are
+      // unchanged, so this mapping stays identical to the legacy contract.
+      id: json['id'] ?? json['member_id'] ?? '',
       tenantId: json['tenant_id'],
       studentId: json['student_id'] ?? '',
       firstName: json['first_name'] ?? '',

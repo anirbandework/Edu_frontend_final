@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/constants/app_constants.dart';
+import '../core/auth/auth_session.dart';
 
 class StudentBulkOperationsService {
   static const String _baseUrl = '${AppConstants.apiBaseUrl}/api/v1/school_authority/students/bulk';
@@ -13,7 +14,7 @@ class StudentBulkOperationsService {
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/import'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: json.encode({
         'tenant_id': tenantId,
         'students': students,
@@ -34,7 +35,7 @@ class StudentBulkOperationsService {
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/update-grades'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: json.encode({
         'tenant_id': tenantId,
         'grade_updates': gradeUpdates,
@@ -56,7 +57,7 @@ class StudentBulkOperationsService {
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/promote'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: json.encode({
         'tenant_id': tenantId,
         'current_grade': currentGrade,
@@ -79,7 +80,7 @@ class StudentBulkOperationsService {
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/update-status'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: json.encode({
         'tenant_id': tenantId,
         'student_ids': studentIds,
@@ -101,7 +102,7 @@ class StudentBulkOperationsService {
   }) async {
     final response = await http.post(
       Uri.parse('$_baseUrl/update-sections'),
-      headers: {'Content-Type': 'application/json'},
+      headers: AuthSession.instance.headers(),
       body: json.encode({
         'tenant_id': tenantId,
         'section_updates': sectionUpdates,
@@ -116,23 +117,4 @@ class StudentBulkOperationsService {
   }
 
   // Bulk delete students
-  static Future<Map<String, dynamic>> deleteStudents({
-    required String tenantId,
-    required List<String> studentIds,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/delete'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'tenant_id': tenantId,
-        'student_ids': studentIds,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to delete students: ${response.statusCode}');
-    }
   }
-}

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../core/constants/app_theme.dart';
-import '../../../core/utils/responsive.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 import '../../../services/class_service.dart';
 import '../../../services/timetable_service.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/models/class_model.dart';
 import '../widgets/class_screen_dialog/add_edit_class_dialog.dart';
 import '../widgets/class_screen_dialog/bulk_import_dialog.dart';
@@ -38,6 +37,8 @@ class _ClassScreenState extends State<ClassScreen> {
   int page = 1;
   int pageSize = 20;
   bool loading = false;
+  bool _isSubmitting = false;
+  String? _error;
   List<ClassModel> items = [];
   int total = 0;
 
@@ -61,7 +62,10 @@ class _ClassScreenState extends State<ClassScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+      _error = null;
+    });
     try {
       final res = await api.getPaginated(
         page: page,
@@ -73,7 +77,11 @@ class _ClassScreenState extends State<ClassScreen> {
         isActive: filterActive,
       );
       items = ClassModel.listFromPaginated(res);
-      total = (res is Map && res['total'] is int) ? res['total'] as int : items.length;
+      total = (res['total'] is int) ? res['total'] as int : items.length;
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'We could not load classes. Please try again.');
+      }
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -102,9 +110,34 @@ class _ClassScreenState extends State<ClassScreen> {
     }
   }
 
-  Future<void> _delete(String id) async {
-    await api.delete(id);
-    _resetAndReload();
+  Future<void> _delete(ClassModel m) async {
+    if (_isSubmitting) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete class'),
+        content: Text('Delete ${m.className}? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _isSubmitting = true);
+    try {
+      await api.delete(m.id);
+      _resetAndReload();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _updateCount(ClassModel m) async {
@@ -283,244 +316,424 @@ class _ClassScreenState extends State<ClassScreen> {
     );
   }
 
-  Widget _filters(BuildContext context) {
-    return Card(
-      elevation: 1,
-      shape: const RoundedRectangleBorder(borderRadius: AppTheme.borderRadius12),
-      child: Padding(
-        padding: EdgeInsets.all(context.responsive(ResponsiveSize.cardPadding)),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Flexible(
-                  child: TextField(
-                    decoration: const InputDecoration(labelText: 'Academic Year', hintText: '2025-26'),
-                    onChanged: (v) => filterYear = v.isEmpty ? null : v,
+  void _openFilters() {
+    String? tmpYear = filterYear;
+    String? tmpSection = filterSection;
+    int? tmpGrade = filterGrade;
+    bool? tmpActive = filterActive;
+    final yearCtrl = TextEditingController(text: tmpYear ?? '');
+    final sectionCtrl = TextEditingController(text: tmpSection ?? '');
+    final gradeCtrl =
+        TextEditingController(text: tmpGrade != null ? '$tmpGrade' : '');
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Filter classes', style: Sa.cardTitle),
+                  const SizedBox(height: Sa.gapLg),
+                  TextField(
+                    controller: yearCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Academic Year', hintText: '2025-26'),
+                    onChanged: (v) => tmpYear = v.isEmpty ? null : v,
                   ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: TextField(
+                  const SizedBox(height: Sa.gap),
+                  TextField(
+                    controller: sectionCtrl,
                     decoration: const InputDecoration(labelText: 'Section'),
-                    onChanged: (v) => filterSection = v.isEmpty ? null : v,
+                    onChanged: (v) => tmpSection = v.isEmpty ? null : v,
                   ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 120,
-                  child: TextField(
+                  const SizedBox(height: Sa.gap),
+                  TextField(
+                    controller: gradeCtrl,
                     decoration: const InputDecoration(labelText: 'Grade'),
                     keyboardType: TextInputType.number,
-                    onChanged: (v) => filterGrade = v.isEmpty ? null : int.tryParse(v),
+                    onChanged: (v) =>
+                        tmpGrade = v.isEmpty ? null : int.tryParse(v),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: DropdownButtonFormField<bool?>(
+                  const SizedBox(height: Sa.gap),
+                  DropdownButtonFormField<bool?>(
                     isExpanded: true,
+                    initialValue: tmpActive,
                     decoration: const InputDecoration(labelText: 'Status'),
                     items: const [
                       DropdownMenuItem<bool?>(value: null, child: Text('All')),
-                      DropdownMenuItem<bool?>(value: true, child: Text('Active')),
-                      DropdownMenuItem<bool?>(value: false, child: Text('Inactive')),
+                      DropdownMenuItem<bool?>(
+                          value: true, child: Text('Active')),
+                      DropdownMenuItem<bool?>(
+                          value: false, child: Text('Inactive')),
                     ],
-                    onChanged: (v) => filterActive = v,
+                    onChanged: (v) => setSheet(() => tmpActive = v),
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(onPressed: _resetAndReload, child: const Text('Apply')),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () {
-                    filterYear = null;
-                    filterSection = null;
-                    filterGrade = null;
-                    filterActive = null;
-                    _resetAndReload();
-                  },
-                  child: const Text('Reset'),
-                ),
-              ],
+                  const SizedBox(height: Sa.gapLg),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            filterYear = null;
+                            filterSection = null;
+                            filterGrade = null;
+                            filterActive = null;
+                            _resetAndReload();
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.neutral600,
+                            minimumSize: const Size(0, 48),
+                            side: const BorderSide(color: Sa.stroke),
+                            shape: const RoundedRectangleBorder(
+                                borderRadius: AppTheme.borderRadius12),
+                          ),
+                          child: const Text('Reset'),
+                        ),
+                      ),
+                      const SizedBox(width: Sa.gap),
+                      Expanded(
+                        child: SaPrimaryButton(
+                          label: 'Apply',
+                          icon: Icons.filter_alt_outlined,
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            filterYear = tmpYear;
+                            filterSection = tmpSection;
+                            filterGrade = tmpGrade;
+                            filterActive = tmpActive;
+                            _resetAndReload();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _toolbar(BuildContext context) {
-    return Row(
-      children: [
-        ElevatedButton.icon(
-          icon: const Icon(Icons.add),
-          label: const Text('New Class'),
-          onPressed: () => _createOrEdit(),
+  void _openActions() {
+    final hasSelection = selectedIds.isNotEmpty;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                child: Text(
+                  hasSelection
+                      ? '${selectedIds.length} selected'
+                      : 'Class actions',
+                  style: Sa.cardTitle,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.file_upload,
+                    color: AppTheme.greenPrimary),
+                title: const Text('Bulk Import CSV'),
+                onTap: _isSubmitting
+                    ? null
+                    : () {
+                        Navigator.pop(ctx);
+                        _bulkImport();
+                      },
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.roofing, color: AppTheme.greenPrimary),
+                title: const Text('Rollover'),
+                onTap: _isSubmitting
+                    ? null
+                    : () {
+                        Navigator.pop(ctx);
+                        _rollover();
+                      },
+              ),
+              ListTile(
+                leading:
+                    const Icon(Icons.schedule, color: AppTheme.greenPrimary),
+                title: const Text('Create Class Timetable'),
+                subtitle: const Text('Select exactly one class'),
+                enabled: selectedIds.length == 1,
+                onTap: selectedIds.length == 1
+                    ? () {
+                        Navigator.pop(ctx);
+                        _createClassTimetableForSelected();
+                      }
+                    : null,
+              ),
+              if (hasSelection) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.people_outline,
+                      color: AppTheme.greenPrimary),
+                  title: const Text('Update Capacity'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _bulkCapacity();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.meeting_room_outlined,
+                      color: AppTheme.greenPrimary),
+                  title: const Text('Assign Classrooms'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _assignClassrooms();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.toggle_on_outlined,
+                      color: AppTheme.greenPrimary),
+                  title: const Text('Toggle Status'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _bulkStatus();
+                  },
+                ),
+                ListTile(
+                  leading:
+                      const Icon(Icons.delete_outline, color: AppTheme.error),
+                  title: const Text('Delete selected',
+                      style: TextStyle(color: AppTheme.error)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _bulkDelete();
+                  },
+                ),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(width: 8),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.file_upload),
-          label: const Text('Bulk Import CSV'),
-          onPressed: _bulkImport,
-        ),
-        const SizedBox(width: 8),
-        OutlinedButton.icon(
-          icon: const Icon(Icons.roofing),
-          label: const Text('Rollover'),
-          onPressed: _rollover,
-        ),
-        const SizedBox(width: 8),
-        // NEW: Create Class Timetable
-        OutlinedButton.icon(
-          icon: const Icon(Icons.schedule),
-          label: const Text('Create Class Timetable'),
-          onPressed: selectedIds.length == 1 ? _createClassTimetableForSelected : null,
-        ),
-        const Spacer(),
-        if (selectedIds.isNotEmpty) ...[
-          Text('${selectedIds.length} selected'),
-          const SizedBox(width: 8),
-          OutlinedButton(onPressed: _bulkCapacity, child: const Text('Update Capacity')),
-          const SizedBox(width: 8),
-          OutlinedButton(onPressed: _assignClassrooms, child: const Text('Assign Classrooms')),
-          const SizedBox(width: 8),
-          OutlinedButton(onPressed: _bulkStatus, child: const Text('Toggle Status')),
-          const SizedBox(width: 8),
-          TextButton(onPressed: _bulkDelete, child: const Text('Delete')),
-        ],
-      ],
+      ),
     );
   }
 
-  DataRow _row(ClassModel m) {
+  Widget _classCard(ClassModel m) {
     final selected = selectedIds.contains(m.id);
-    return DataRow(
-      selected: selected,
-      onSelectChanged: (v) {
-        setState(() {
-          if (v == true) {
-            selectedIds.add(m.id);
-          } else {
-            selectedIds.remove(m.id);
-          }
-        });
-      },
-      cells: [
-        DataCell(Text(m.className)),
-        DataCell(Text('${m.gradeLevel}-${m.section}')),
-        DataCell(Text(m.academicYear)),
-        DataCell(Text(m.classroom ?? '-')),
-        DataCell(Text('${m.currentStudents}/${m.maximumStudents}')),
-        DataCell(Text(m.isActive ? 'Active' : 'Inactive')),
-        DataCell(Row(
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SaCardHeader(
+            icon: Icons.class_outlined,
+            title: m.className,
+            trailing: SaStatusPill(
+              text: m.isActive ? 'Active' : 'Inactive',
+              color: m.isActive ? AppTheme.greenPrimary : AppTheme.neutral400,
+              icon: m.isActive
+                  ? Icons.check_circle_outline
+                  : Icons.remove_circle_outline,
+            ),
+          ),
+          const SizedBox(height: Sa.gap),
+          SaInfoRow(label: 'Grade / Section', value: '${m.gradeLevel}-${m.section}'),
+          SaInfoRow(label: 'Academic Year', value: m.academicYear),
+          SaInfoRow(label: 'Classroom', value: m.classroom ?? '—'),
+          SaInfoRow(
+              label: 'Students',
+              value: '${m.currentStudents}/${m.maximumStudents}'),
+          const SizedBox(height: Sa.gapXs),
+          Row(
+            children: [
+              Tooltip(
+                message: 'Select',
+                child: Checkbox(
+                  value: selected,
+                  activeColor: AppTheme.greenPrimary,
+                  onChanged: (v) {
+                    setState(() {
+                      if (v == true) {
+                        selectedIds.add(m.id);
+                      } else {
+                        selectedIds.remove(m.id);
+                      }
+                    });
+                  },
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'View',
+                icon: const Icon(Icons.visibility_outlined,
+                    color: AppTheme.greenPrimary),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                onPressed: () => _showDetails(m),
+              ),
+              IconButton(
+                tooltip: 'Update count',
+                icon: const Icon(Icons.group_outlined,
+                    color: AppTheme.greenPrimary),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                onPressed: () => _updateCount(m),
+              ),
+              IconButton(
+                tooltip: 'Edit',
+                icon: const Icon(Icons.edit_outlined,
+                    color: AppTheme.neutral600),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                onPressed: () => _createOrEdit(m),
+              ),
+              IconButton(
+                tooltip: 'Delete',
+                icon: const Icon(Icons.delete_outline, color: AppTheme.error),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+                onPressed: _isSubmitting ? null : () => _delete(m),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pagination() {
+    return SaCard(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Flexible(
+            child: Text('Total: $total',
+                style: Sa.label, overflow: TextOverflow.ellipsis),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: 'Previous',
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            onPressed: page > 1
+                ? () {
+                    setState(() => page--);
+                    _load();
+                  }
+                : null,
+            icon: const Icon(Icons.chevron_left),
+          ),
+          Text('Page $page', style: Sa.value),
+          IconButton(
+            tooltip: 'Next',
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            onPressed: (page * pageSize) < total
+                ? () {
+                    setState(() => page++);
+                    _load();
+                  }
+                : null,
+            icon: const Icon(Icons.chevron_right),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (loading) return const SaLoading(message: 'Loading classes…');
+    if (_error != null) {
+      return SaStateView.error(message: _error!, onRetry: _load);
+    }
+    if (items.isEmpty) {
+      return SaStateView(
+        icon: Icons.class_outlined,
+        title: 'No classes found',
+        subtitle: 'Create a class to get started.',
+        action: SaPrimaryButton(
+          label: 'New Class',
+          icon: Icons.add,
+          onPressed: _isSubmitting ? null : () => _createOrEdit(),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+      children: [
+        Row(
           children: [
-            IconButton(icon: const Icon(Icons.visibility), onPressed: () => _showDetails(m)),
-            IconButton(icon: const Icon(Icons.group), onPressed: () => _updateCount(m)),
-            IconButton(icon: const Icon(Icons.edit), onPressed: () => _createOrEdit(m)),
-            IconButton(icon: const Icon(Icons.delete), onPressed: () => _delete(m.id)),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.filter_alt_outlined, size: 18),
+                label: const Text('Filter'),
+                onPressed: _openFilters,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Sa.accent,
+                  minimumSize: const Size(0, 46),
+                  side: const BorderSide(color: Sa.accent, width: 1.5),
+                  shape: const RoundedRectangleBorder(
+                      borderRadius: AppTheme.borderRadius12),
+                ),
+              ),
+            ),
+            const SizedBox(width: Sa.gap),
+            Expanded(
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.more_horiz, size: 18),
+                label: Text(selectedIds.isNotEmpty
+                    ? 'Actions (${selectedIds.length})'
+                    : 'Actions'),
+                onPressed: _openActions,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Sa.accent,
+                  minimumSize: const Size(0, 46),
+                  side: const BorderSide(color: Sa.accent, width: 1.5),
+                  shape: const RoundedRectangleBorder(
+                      borderRadius: AppTheme.borderRadius12),
+                ),
+              ),
+            ),
           ],
-        )),
+        ),
+        const SizedBox(height: Sa.gap),
+        ...items.map((m) => Padding(
+              padding: const EdgeInsets.only(bottom: Sa.gap),
+              child: _classCard(m),
+            )),
+        _pagination(),
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false, // web stability
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final h = constraints.hasBoundedHeight ? constraints.maxHeight : MediaQuery.of(context).size.height;
-          return SizedBox(
-            height: h,
-            child: Container(
-              decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-              child: SafeArea(
-                child: ResponsiveContainer(
-                  maxWidth: context.responsive(ResponsiveSize.maxContentWidth),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Classes', style: Theme.of(context).textTheme.headlineLarge!.copyWith(color: Colors.white)),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(context.responsive(ResponsiveSize.cardPadding)),
-                            child: Column(
-                              children: [
-                                _toolbar(context),
-                                const SizedBox(height: 12),
-                                _filters(context),
-                                const Divider(),
-                                if (loading) const LinearProgressIndicator(),
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(minWidth: 600),
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.vertical,
-                                        child: DataTable(
-                                          columns: const [
-                                            DataColumn(label: Text('Name')),
-                                            DataColumn(label: Text('Grade-Section')),
-                                            DataColumn(label: Text('Year')),
-                                            DataColumn(label: Text('Room')),
-                                            DataColumn(label: Text('Students')),
-                                            DataColumn(label: Text('Status')),
-                                            DataColumn(label: Text('Actions')),
-                                          ],
-                                          rows: items.map(_row).toList(),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Text('Total: $total'),
-                                    const Spacer(),
-                                    IconButton(
-                                      onPressed: page > 1
-                                          ? () {
-                                              setState(() => page--);
-                                              _load();
-                                            }
-                                          : null,
-                                      icon: const Icon(Icons.chevron_left),
-                                    ),
-                                    Text('Page $page'),
-                                    IconButton(
-                                      onPressed: (page * pageSize) < total
-                                          ? () {
-                                              setState(() => page++);
-                                              _load();
-                                            }
-                                          : null,
-                                      icon: const Icon(Icons.chevron_right),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
+    // NO Scaffold / AppBar — the shell provides them.
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Classes',
+          subtitle: 'Manage classes, capacity & timetables',
+          icon: Icons.class_outlined,
+          trailing: SaHeaderAction(
+            icon: Icons.add,
+            tooltip: 'New class',
+            onPressed: _isSubmitting ? null : () => _createOrEdit(),
+          ),
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppTheme.greenPrimary,
-        onPressed: () => _createOrEdit(),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      child: _body(),
     );
   }
 }

@@ -46,7 +46,7 @@ class _EduAssistAppState extends ConsumerState<EduAssistApp> {
       // Wrap router output with a top-level Scaffold so SnackBars
       // always have a visible surface even if a route tree lacks one.
       builder: (context, child) {
-        final media = MediaQuery.of(context).copyWith(textScaleFactor: 1.0);
+        final media = MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0));
 
         final stacked = Stack(
           children: [

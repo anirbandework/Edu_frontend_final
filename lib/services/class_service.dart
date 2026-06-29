@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:io' show File, HttpException;
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:file_picker/file_picker.dart';
+import '../core/auth/auth_session.dart';
 
 class ClassApi {
   final String baseUrl;
@@ -24,6 +25,7 @@ class ClassApi {
     h.addAll(defaultHeaders);
     h['Content-Type'] = 'application/json';
     h['Accept'] = h['Accept'] ?? 'application/json';
+    h.addAll(AuthSession.instance.headers());
     return h;
   }
 
@@ -47,6 +49,7 @@ class ClassApi {
       if (isActive != null) 'is_active': isActive,
     };
     final headers = Map<String, String>.from(defaultHeaders)..remove('Content-Type');
+    headers.addAll(AuthSession.instance.headers(json: false));
     final res = await http.get(_u('/api/v1/school_authority/classes/', query), headers: headers);
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -62,14 +65,14 @@ class ClassApi {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
-    throw HttpException('Failed to load class');
+    throw const HttpException('Failed to load class');
   }
 
   Future<Map<String, dynamic>> create(Map<String, dynamic> payload) async {
     final cur = payload['current_students'] as int? ?? 0;
     final max = payload['maximum_students'] as int? ?? 0;
     if (cur > max) {
-      throw HttpException('Create failed: current_students cannot exceed maximum_students');
+      throw const HttpException('Create failed: current_students cannot exceed maximum_students');
     }
 
     final res = await http.post(
@@ -95,7 +98,7 @@ class ClassApi {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
     debugPrint('Update class failed ${res.statusCode}: ${res.body}');
-    throw HttpException('Update failed');
+    throw const HttpException('Update failed');
   }
 
   Future<void> delete(String id) async {
@@ -105,7 +108,7 @@ class ClassApi {
     );
     if (res.statusCode < 200 || res.statusCode >= 300) {
       debugPrint('Delete class failed ${res.statusCode}: ${res.body}');
-      throw HttpException('Delete failed');
+      throw const HttpException('Delete failed');
     }
   }
 
@@ -117,7 +120,7 @@ class ClassApi {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
-    throw HttpException('Stats failed');
+    throw const HttpException('Stats failed');
   }
 
   Future<Map<String, dynamic>> updateStudentCount(String id, int newCount) async {
@@ -130,7 +133,7 @@ class ClassApi {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
     debugPrint('Update student count failed ${res.statusCode}: ${res.body}');
-    throw HttpException('Student count failed');
+    throw const HttpException('Student count failed');
   }
 
   // Native path version for servers that accept multipart/form-data
@@ -145,6 +148,7 @@ class ClassApi {
     defaultHeaders.forEach((k, v) {
       if (k.toLowerCase() != 'content-type') req.headers[k] = v;
     });
+    req.headers.addAll(AuthSession.instance.headers(json: false));
     final res = await req.send();
     final body = await res.stream.bytesToString();
     if (res.statusCode >= 200 && res.statusCode < 300) {
@@ -246,7 +250,7 @@ class ClassApi {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
     debugPrint('Bulk update capacity failed ${res.statusCode}: ${res.body}');
-    throw HttpException('Bulk capacity failed');
+    throw const HttpException('Bulk capacity failed');
   }
 
   Future<Map<String, dynamic>> bulkUpdateStatus({
@@ -267,7 +271,7 @@ class ClassApi {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
     debugPrint('Bulk update status failed ${res.statusCode}: ${res.body}');
-    throw HttpException('Bulk status failed');
+    throw const HttpException('Bulk status failed');
   }
 
   Future<Map<String, dynamic>> assignClassrooms({
@@ -283,7 +287,7 @@ class ClassApi {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
     debugPrint('Assign classrooms failed ${res.statusCode}: ${res.body}');
-    throw HttpException('Assign classrooms failed');
+    throw const HttpException('Assign classrooms failed');
   }
 
   Future<Map<String, dynamic>> rollover({
@@ -306,7 +310,7 @@ class ClassApi {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
     debugPrint('Rollover failed ${res.statusCode}: ${res.body}');
-    throw HttpException('Rollover failed');
+    throw const HttpException('Rollover failed');
   }
 
   Future<Map<String, dynamic>> bulkDelete({
@@ -322,6 +326,6 @@ class ClassApi {
       return jsonDecode(res.body) as Map<String, dynamic>;
     }
     debugPrint('Bulk delete failed ${res.statusCode}: ${res.body}');
-    throw HttpException('Bulk delete failed');
+    throw const HttpException('Bulk delete failed');
   }
 }

@@ -3,9 +3,24 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/constants/app_constants.dart';
 import '../core/models/tenant.dart';
+import '../core/auth/auth_session.dart';
 
 class TenantService {
   static const String _baseUrl = AppConstants.apiBaseUrl;
+
+  /// Public (no auth) minimal active-school list for the login picker.
+  static Future<List<Tenant>> getPublicSchools() async {
+    final response = await http
+        .get(Uri.parse('$_baseUrl/api/auth/schools'))
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode == 200) {
+      final list = json.decode(response.body) as List<dynamic>;
+      return list
+          .map((e) => Tenant.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    throw Exception('Failed to load schools (${response.statusCode})');
+  }
 
   /// Fetch paginated list of tenants
   static Future<Map<String, dynamic>> getTenants({
@@ -22,7 +37,9 @@ class TenantService {
         },
       );
       
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(uri, headers: AuthSession.instance.headers(json: false))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final dynamic decodedResponse = json.decode(response.body);
@@ -68,7 +85,9 @@ class TenantService {
   static Future<Tenant> getTenantById(String tenantId) async {
     try {
       final uri = Uri.parse('$_baseUrl/api/v1/tenants/$tenantId');
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(uri, headers: AuthSession.instance.headers(json: false))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final tenantData = json.decode(response.body);
@@ -88,7 +107,7 @@ class TenantService {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/v1/tenants/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(tenantData),
       ).timeout(const Duration(seconds: 15));
 
@@ -109,7 +128,7 @@ class TenantService {
     try {
       final response = await http.put(
         Uri.parse('$_baseUrl/api/v1/tenants/$tenantId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: AuthSession.instance.headers(),
         body: json.encode(tenantData),
       ).timeout(const Duration(seconds: 15));
 
@@ -132,7 +151,9 @@ class TenantService {
         queryParameters: hardDelete ? {'hard_delete': 'true'} : null,
       );
       
-      final response = await http.delete(uri).timeout(const Duration(seconds: 10));
+      final response = await http
+          .delete(uri, headers: AuthSession.instance.headers(json: false))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
         throw Exception('Failed to delete tenant');
@@ -147,6 +168,7 @@ class TenantService {
     try {
       final response = await http.patch(
         Uri.parse('$_baseUrl/api/v1/tenants/$tenantId/reactivate'),
+        headers: AuthSession.instance.headers(json: false),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -165,6 +187,7 @@ class TenantService {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/api/v1/tenants/$tenantId/stats'),
+        headers: AuthSession.instance.headers(json: false),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {

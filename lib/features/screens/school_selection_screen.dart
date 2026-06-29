@@ -4,13 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_theme.dart';
 import '../../core/models/tenant.dart';
-import '../../core/utils/responsive.dart';
-import '../../core/utils/school_session.dart';
 import '../../shared/widgets/search_bar_widget.dart';
+import '../../shared/widgets/login_card.dart';
+import '../../core/auth/auth_session.dart';
 import '../../services/tenant_management_service.dart';
-import '../../services/student_service.dart';
-import '../../services/teacher_service.dart';
-import '../../services/school_authority_service.dart';
+import '../super_admin/widgets/sa_widgets.dart';
 
 class SchoolSelectionScreen extends StatefulWidget {
   const SchoolSelectionScreen({super.key});
@@ -56,7 +54,7 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -64,7 +62,7 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
       parent: animationController!,
       curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
     ));
-    
+
     slideAnimation = Tween<Offset>(
       begin: const Offset(0.0, 0.05),
       end: Offset.zero,
@@ -72,13 +70,13 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
       parent: animationController!,
       curve: const Interval(0.2, 1.0, curve: Curves.easeOut),
     ));
-    
+
     animationController!.forward();
   }
 
   Future<void> loadSchools([bool refresh = false]) async {
     if (!mounted) return;
-    
+
     if (refresh) {
       currentPage = 1;
       hasMoreData = true;
@@ -95,26 +93,15 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
     });
 
     try {
-      final result = await TenantService.getTenants(
-        page: currentPage,
-        size: pageSize,
-        includeInactive: includeInactive,
-      );
-      
+      final newSchools = await TenantService.getPublicSchools();
+
       if (!mounted) return;
 
-      final List<Tenant> newSchools = result['tenants'];
-      hasMoreData = result['hasMoreData'];
+      schools = newSchools;
+      hasMoreData = false; // public endpoint returns all active schools at once
 
-      if (refresh) {
-        schools = newSchools;
-      } else {
-        schools.addAll(newSchools);
-      }
-      
       filteredSchools = schools;
-      currentPage++;
-      
+
       if (searchController.text.isNotEmpty) {
         filterSchools();
       }
@@ -138,7 +125,7 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
 
   void filterSchools() {
     if (!mounted) return;
-    
+
     final query = searchController.text.toLowerCase();
     setState(() {
       filteredSchools = schools.where((school) {
@@ -159,155 +146,129 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
   @override
   Widget build(BuildContext context) {
     if (animationController == null || fadeAnimation == null || slideAnimation == null) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: AppTheme.backgroundPrimary,
-        body: const Center(child: CircularProgressIndicator()),
+        body: SaLoading(),
       );
     }
 
     return Scaffold(
       backgroundColor: AppTheme.backgroundPrimary,
-      appBar: buildAppBar(),
-      body: FadeTransition(
-        opacity: fadeAnimation!,
-        child: SlideTransition(
-          position: slideAnimation!,
-          child: Column(
-            children: [
-              buildSearchSection(),
-              if (includeInactive) buildInactiveInfo(),
-              Expanded(
-                child: isLoading
-                    ? buildLoadingState()
-                    : error != null
-                        ? buildErrorState()
-                        : filteredSchools.isEmpty
-                            ? buildEmptyState()
-                            : buildSchoolsList(),
-              ),
-            ],
+      body: SafeArea(
+        child: FadeTransition(
+          opacity: fadeAnimation!,
+          child: SlideTransition(
+            position: slideAnimation!,
+            child: Column(
+              children: [
+                buildHeader(),
+                buildSearchSection(),
+                if (includeInactive) buildInactiveInfo(),
+                Expanded(
+                  child: isLoading
+                      ? const SaLoading(message: 'Loading schools…')
+                      : error != null
+                          ? buildErrorState()
+                          : filteredSchools.isEmpty
+                              ? buildEmptyState()
+                              : buildSchoolsList(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  PreferredSizeWidget buildAppBar() {
-    return AppBar(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      flexibleSpace: Container(
-        decoration: const BoxDecoration(
-          gradient: AppTheme.primaryGradient,
+  Widget buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+      child: SaGradientHeader(
+        title: 'Select School',
+        subtitle: 'Choose your school to continue',
+        icon: Icons.school_outlined,
+        leading: _headerButton(
+          icon: Icons.arrow_back_rounded,
+          tooltip: 'Back',
+          onTap: () => context.go(AppConstants.homeRoute),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _headerButton(
+              icon: includeInactive ? Icons.visibility : Icons.visibility_off,
+              tooltip: includeInactive
+                  ? 'Hide Inactive Schools'
+                  : 'Show Inactive Schools',
+              onTap: toggleIncludeInactive,
+            ),
+            const SizedBox(width: Sa.gapXs),
+            _headerButton(
+              icon: Icons.login_rounded,
+              tooltip: 'Sign in',
+              onTap: _openDirectLogin,
+            ),
+          ],
         ),
       ),
-      toolbarHeight: 40, // Reduced from 48
-      leading: IconButton(
-        icon: Icon(
-          Icons.arrow_back,
-          color: Colors.white,
-          size: 18, // Reduced
-        ),
-        onPressed: () => context.go(AppConstants.homeRoute),
-      ),
-      title: Text(
-        'Select School',
-        style: AppTheme.headingSmall.copyWith(
-          color: Colors.white,
-          fontSize: 16, // Reduced
-        ),
-      ),
-      actions: [
-        IconButton(
-          icon: Icon(
-            includeInactive ? Icons.visibility : Icons.visibility_off,
-            color: Colors.white,
-            size: 18, // Reduced
+    );
+  }
+
+  Widget _headerButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.18),
+      borderRadius: AppTheme.borderRadius12,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppTheme.borderRadius12,
+        child: Tooltip(
+          message: tooltip,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(icon, color: Colors.white, size: 22),
           ),
-          onPressed: toggleIncludeInactive,
-          tooltip: includeInactive ? 'Hide Inactive Schools' : 'Show Inactive Schools',
         ),
-        IconButton(
-          icon: Icon(
-            Icons.refresh,
-            color: Colors.white,
-            size: 18, // Reduced
-          ),
-          onPressed: () => loadSchools(true),
-        ),
-        const SizedBox(width: 8), // Reduced
-      ],
+      ),
     );
   }
 
   Widget buildSearchSection() {
-    return Container(
-      padding: const EdgeInsets.all(8), // Reduced
-      decoration: const BoxDecoration(
-        gradient: AppTheme.glassGreenGradient,
-        border: Border(
-          bottom: BorderSide(color: AppTheme.neutral200, width: 0.5),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
       child: SearchBarWidget(
         controller: searchController,
-        hintText: 'Search schools by name, address, or principal...',
+        hintText: 'Search by name, address, or principal…',
       ),
     );
   }
 
   Widget buildInactiveInfo() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduced
-      padding: const EdgeInsets.all(8), // Reduced
-      decoration: AppTheme.getGlassDecoration(
-        color: AppTheme.warning.withOpacity(0.1),
-        border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
+      margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.neutral100,
+        borderRadius: BorderRadius.circular(Sa.radius),
+        border: Border.all(color: Sa.stroke),
       ),
-      child: Row(
+      child: const Row(
         children: [
           Icon(
-            Icons.info_outline,
-            color: AppTheme.warning,
-            size: 14, // Reduced
+            Icons.visibility_outlined,
+            color: AppTheme.neutral600,
+            size: 16,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: Sa.gapXs),
           Expanded(
             child: Text(
               'Showing active and inactive schools',
-              style: AppTheme.bodySmall.copyWith(
-                color: AppTheme.warning,
-                fontSize: 11, // Reduced
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16), // Reduced
-            decoration: BoxDecoration(
-              color: AppTheme.greenPrimary.withOpacity(0.1),
-              borderRadius: AppTheme.borderRadius12,
-            ),
-            child: const CircularProgressIndicator(
-              color: AppTheme.greenPrimary,
-              strokeWidth: 2,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Loading schools...',
-            style: AppTheme.bodyMedium.copyWith(
-              color: AppTheme.neutral600,
-              fontSize: 12, // Reduced
+              style: Sa.label,
             ),
           ),
         ],
@@ -316,157 +277,46 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
   }
 
   Widget buildErrorState() {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(16), // Reduced
-        padding: const EdgeInsets.all(16), // Reduced
-        decoration: AppTheme.getGlassDecoration(
-          color: AppTheme.error.withOpacity(0.1),
-          border: Border.all(color: AppTheme.error.withOpacity(0.3)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12), // Reduced
-              decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
-                borderRadius: AppTheme.borderRadius12,
-              ),
-              child: Icon(
-                Icons.error_outline,
-                size: 28, // Reduced
-                color: AppTheme.error,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Oops! Something went wrong',
-              style: AppTheme.headingSmall.copyWith(
-                color: AppTheme.error,
-                fontSize: 14, // Reduced
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              error!,
-              style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.neutral600,
-                fontSize: 11, // Reduced
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: AppTheme.borderRadius8,
-                boxShadow: [AppTheme.cardShadow],
-              ),
-              child: ElevatedButton(
-                onPressed: () => loadSchools(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Reduced
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.refresh, size: 14), // Reduced
-                    const SizedBox(width: 6),
-                    Text(
-                      'Try Again',
-                      style: AppTheme.labelMedium.copyWith(
-                        color: Colors.white,
-                        fontSize: 11, // Reduced
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return SaStateView.error(
+      message: error ?? 'Unable to load schools.',
+      onRetry: () => loadSchools(true),
     );
   }
 
   Widget buildEmptyState() {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(16), // Reduced
-        padding: const EdgeInsets.all(16), // Reduced
-        decoration: AppTheme.getGlassDecoration(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16), // Reduced
-              decoration: BoxDecoration(
-                color: AppTheme.neutral100,
-                borderRadius: AppTheme.borderRadius12,
+    return SaStateView(
+      icon: Icons.school_outlined,
+      title: 'No schools found',
+      subtitle: searchController.text.isNotEmpty
+          ? 'Try adjusting your search terms or clear the search to see all schools.'
+          : includeInactive
+              ? 'No schools are currently available.'
+              : 'Try including inactive schools to see more results.',
+      action: searchController.text.isNotEmpty
+          ? OutlinedButton.icon(
+              onPressed: () {
+                searchController.clear();
+                filterSchools();
+              },
+              icon: const Icon(Icons.clear_rounded, size: 18),
+              label: const Text('Clear search'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Sa.accent,
+                minimumSize: const Size(0, 46),
+                side: const BorderSide(color: Sa.accent, width: 1.5),
+                shape: const RoundedRectangleBorder(
+                    borderRadius: AppTheme.borderRadius12),
               ),
-              child: Icon(
-                Icons.school_outlined,
-                size: 32, // Reduced
-                color: AppTheme.neutral400,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'No schools found',
-              style: AppTheme.headingSmall.copyWith(
-                color: AppTheme.neutral600,
-                fontSize: 14, // Reduced
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              searchController.text.isNotEmpty
-                  ? 'Try adjusting your search terms or clear the search to see all schools.'
-                  : includeInactive
-                      ? 'No schools are currently available.'
-                      : 'Try including inactive schools to see more results.',
-              style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.neutral500,
-                fontSize: 11, // Reduced
-              ),
-              textAlign: TextAlign.center,
-            ),
-            if (searchController.text.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              TextButton(
-                onPressed: () {
-                  searchController.clear();
-                  filterSchools();
-                },
-                style: AppTheme.textButtonStyle.copyWith(
-                  padding: MaterialStateProperty.all(
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Reduced
-                  ),
-                ),
-                child: Text(
-                  'Clear Search',
-                  style: AppTheme.labelMedium.copyWith(
-                    color: AppTheme.greenPrimary,
-                    fontSize: 11, // Reduced
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+            )
+          : null,
     );
   }
 
   Widget buildSchoolsList() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6), // Reduced
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
       itemCount: filteredSchools.length + (hasMoreData ? 1 : 0),
+      separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
       itemBuilder: (context, index) {
         if (index == filteredSchools.length) {
           return buildLoadMoreWidget();
@@ -479,53 +329,24 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
 
   Widget buildLoadMoreWidget() {
     if (isLoadingMore) {
-      return Container(
-        padding: const EdgeInsets.all(12), // Reduced
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 16, // Reduced
-              height: 16, // Reduced
-              child: const CircularProgressIndicator(
-                color: AppTheme.greenPrimary,
-                strokeWidth: 2,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Loading more schools...',
-              style: AppTheme.bodyMedium.copyWith(
-                color: AppTheme.neutral600,
-                fontSize: 11, // Reduced
-              ),
-            ),
-          ],
-        ),
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SaLoading(message: 'Loading more schools…'),
       );
     }
 
-    return Container(
-      margin: const EdgeInsets.all(8), // Reduced
-      child: OutlinedButton(
+    return Padding(
+      padding: const EdgeInsets.only(top: Sa.gap),
+      child: OutlinedButton.icon(
         onPressed: loadMoreSchools,
-        style: AppTheme.outlineButtonStyle.copyWith(
-          padding: MaterialStateProperty.all(
-            const EdgeInsets.symmetric(vertical: 10), // Reduced
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.expand_more, size: 16), // Reduced
-            const SizedBox(width: 6),
-            Text(
-              'Load More Schools',
-              style: AppTheme.labelMedium.copyWith(
-                fontSize: 11, // Reduced
-              ),
-            ),
-          ],
+        icon: const Icon(Icons.expand_more_rounded, size: 18),
+        label: const Text('Load more schools'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Sa.accent,
+          minimumSize: const Size(0, 48),
+          side: const BorderSide(color: Sa.accent, width: 1.5),
+          shape: const RoundedRectangleBorder(
+              borderRadius: AppTheme.borderRadius12),
         ),
       ),
     );
@@ -534,164 +355,131 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
   Widget buildSchoolCard(Tenant school, int index) {
     final bool isInactive = !school.isActive;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6), // Reduced
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: isInactive ? null : () => selectSchool(school),
-          borderRadius: AppTheme.borderRadius8,
-          child: Container(
-            padding: const EdgeInsets.all(10), // Reduced
-            decoration: AppTheme.getGlassDecoration(
-              color: isInactive 
-                  ? AppTheme.neutral50.withOpacity(0.5)
-                  : AppTheme.surfacePrimary,
-              border: Border.all(
-                color: isInactive ? AppTheme.neutral300 : AppTheme.neutral200,
-                width: 0.5,
+    return SaCard(
+      onTap: isInactive
+          ? () => _showInactiveSchoolMessage()
+          : () => selectSchool(school),
+      padding: const EdgeInsets.all(14),
+      child: Opacity(
+        opacity: isInactive ? 0.7 : 1.0,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isInactive
+                    ? AppTheme.neutral100
+                    : Sa.accent.withValues(alpha: 0.12),
+                borderRadius: AppTheme.borderRadius12,
+              ),
+              child: Icon(
+                Icons.school_rounded,
+                size: 24,
+                color: isInactive ? AppTheme.neutral500 : Sa.accent,
               ),
             ),
-            child: Opacity(
-              opacity: isInactive ? 0.6 : 1.0,
-              child: Row(
+            const SizedBox(width: Sa.gap),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 36, // Reduced
-                    height: 36, // Reduced
-                    decoration: AppTheme.getGlassDecoration(
-                      color: isInactive ? AppTheme.neutral300 : AppTheme.green50,
-                      borderRadius: AppTheme.borderRadius8,
-                    ),
-                    child: Icon(
-                      Icons.school,
-                      size: 20, // Reduced
-                      color: isInactive ? AppTheme.neutral600 : AppTheme.greenPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 10), // Reduced
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                school.schoolName,
-                                style: AppTheme.labelMedium.copyWith(
-                                  fontSize: 13, // Reduced
-                                  fontWeight: FontWeight.bold,
-                                  color: isInactive ? AppTheme.neutral600 : AppTheme.neutral900,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isInactive)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), // Reduced
-                                decoration: BoxDecoration(
-                                  color: AppTheme.error.withOpacity(0.1),
-                                  borderRadius: AppTheme.borderRadius8,
-                                  border: Border.all(color: AppTheme.error.withOpacity(0.3)),
-                                ),
-                                child: Text(
-                                  'Inactive',
-                                  style: AppTheme.bodySmall.copyWith(
-                                    fontSize: 8, // Reduced
-                                    color: AppTheme.error,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4), // Reduced
-                        Text(
-                          school.address,
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.neutral600,
-                            fontSize: 10, // Reduced
-                          ),
-                          maxLines: 1,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          school.schoolName,
+                          style: Sa.cardTitle,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (school.principalName.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            'Principal: ${school.principalName}',
-                            style: AppTheme.bodySmall.copyWith(
-                              color: AppTheme.neutral500,
-                              fontSize: 9, // Reduced
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            buildStatChip(
-                              Icons.people,
-                              '${school.totalStudents} students',
-                              AppTheme.info,
-                            ),
-                            const SizedBox(width: 6),
-                            buildStatChip(
-                              Icons.category,
-                              school.schoolType,
-                              AppTheme.greenPrimary,
-                            ),
-                          ],
+                      ),
+                      if (isInactive) ...[
+                        const SizedBox(width: Sa.gapXs),
+                        const SaStatusPill(
+                          text: 'Inactive',
+                          color: AppTheme.error,
                         ),
                       ],
-                    ),
+                    ],
                   ),
-                  if (!isInactive) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.all(6), // Reduced
-                      decoration: BoxDecoration(
-                        color: AppTheme.green50,
-                        borderRadius: AppTheme.borderRadius8,
-                      ),
-                      child: Icon(
-                        Icons.arrow_forward_ios,
-                        size: 12, // Reduced
-                        color: AppTheme.greenPrimary,
-                      ),
+                  const SizedBox(height: 4),
+                  Text(
+                    school.address,
+                    style: Sa.label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (school.principalName.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Principal: ${school.principalName}',
+                      style: Sa.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
+                  const SizedBox(height: Sa.gapXs),
+                  Wrap(
+                    spacing: Sa.gapXs,
+                    runSpacing: Sa.gapXs,
+                    children: [
+                      buildStatChip(
+                        Icons.people_outline,
+                        '${school.totalStudents} students',
+                      ),
+                      buildStatChip(
+                        Icons.category_outlined,
+                        school.schoolType,
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ),
+            if (!isInactive) ...[
+              const SizedBox(width: Sa.gapXs),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Sa.accent.withValues(alpha: 0.10),
+                  borderRadius: AppTheme.borderRadius8,
+                ),
+                child: const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: Sa.accent,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 
-  Widget buildStatChip(IconData icon, String text, Color color) {
+  Widget buildStatChip(IconData icon, String text) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3), // Reduced
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: Sa.accent.withValues(alpha: 0.10),
         borderRadius: AppTheme.borderRadius8,
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 0.5,
-        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 10, color: color), // Reduced
-          const SizedBox(width: 3),
+          Icon(icon, size: 12, color: Sa.accent),
+          const SizedBox(width: 4),
           Text(
             text,
-            style: AppTheme.bodySmall.copyWith(
-              fontSize: 8, // Reduced
-              color: color,
-              fontWeight: FontWeight.w500,
+            style: const TextStyle(
+              fontFamily: AppTheme.interFontFamily,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Sa.accent,
             ),
           ),
         ],
@@ -699,157 +487,232 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
     );
   }
 
-  void selectSchool(Tenant school) {
+  void _showInactiveSchoolMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'This school is currently inactive. Contact your administrator.',
+        ),
+        backgroundColor: AppTheme.neutral800,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppTheme.borderRadius8,
+        ),
+        margin: EdgeInsets.all(8),
+      ),
+    );
+  }
+
+  /// Opens the phone+password login as a card IN PLACE (dialog), not a new page.
+  /// Direct sign-in: phone + password with no school pre-selected. The backend
+  /// authenticates by phone and derives the school from the user's record, so
+  /// this works for every role (and for admins who have no school yet).
+  void _openDirectLogin() {
     showDialog(
       context: context,
+      barrierDismissible: true,
       barrierColor: AppTheme.surfaceOverlay,
-      builder: (context) => Dialog(
+      builder: (ctx) => Dialog(
         backgroundColor: Colors.transparent,
-        child: Container(
-          width: context.isMobile ? context.screenWidth * 0.9 : 320, // Reduced
-          decoration: AppTheme.getGlassDecoration(
-            borderRadius: AppTheme.borderRadius12,
-          ),
-          padding: const EdgeInsets.all(16), // Reduced
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12), // Reduced
-                decoration: const BoxDecoration(
-                  gradient: AppTheme.glassGreenGradient,
-                  borderRadius: AppTheme.borderRadius12,
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.school,
-                      size: 24, // Reduced
-                      color: AppTheme.greenPrimary,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      school.schoolName,
-                      style: AppTheme.headingSmall.copyWith(
-                        fontSize: 14, // Reduced
-                        color: AppTheme.neutral900,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (school.schoolCode != null) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), // Reduced
-                        decoration: BoxDecoration(
-                          color: AppTheme.info.withOpacity(0.1),
-                          borderRadius: AppTheme.borderRadius8,
-                          border: Border.all(color: AppTheme.info.withOpacity(0.3)),
-                        ),
-                        child: Text(
-                          'School Code: ${school.schoolCode}',
-                          style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.info,
-                            fontSize: 9, // Reduced
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Select Your Role',
-                style: AppTheme.labelMedium.copyWith(
-                  fontSize: 12, // Reduced
-                  color: AppTheme.neutral800,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Column(
-                children: [
-                  buildRoleOption(
-                    'Student',
-                    Icons.person,
-                    AppTheme.info,
-                    () {
-                      Navigator.pop(context);
-                      showLoginDialog(school, 'student');
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  buildRoleOption(
-                    'Teacher',
-                    Icons.person_2,
-                    AppTheme.success,
-                    () {
-                      Navigator.pop(context);
-                      showLoginDialog(school, 'teacher');
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  buildRoleOption(
-                    'School Authority',
-                    Icons.admin_panel_settings,
-                    AppTheme.warning,
-                    () {
-                      Navigator.pop(context);
-                      showLoginDialog(school, 'admin');
-                    },
-                  ),
-                ],
-              ),
-            ],
+        insetPadding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: LoginCard(
+            roleLabel: 'Sign in',
+            onClose: () => Navigator.of(ctx).pop(),
+            onSuccess: () {
+              Navigator.of(ctx).pop();
+              context.go(AuthSession.instance.landingRoute());
+            },
           ),
         ),
       ),
     );
   }
 
-  Widget buildRoleOption(String role, IconData icon, Color color, VoidCallback onTap) {
+  void _openLoginCard(Tenant school, String roleLabel) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppTheme.surfaceOverlay,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: LoginCard(
+            schoolName: school.schoolName,
+            roleLabel: roleLabel,
+            tenantId: school.id,
+            onClose: () => Navigator.of(ctx).pop(),
+            onSuccess: () {
+              Navigator.of(ctx).pop();
+              context.go(AuthSession.instance.landingRoute());
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void selectSchool(Tenant school) {
+    final maxW = MediaQuery.of(context).size.width - 24;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppTheme.surfaceOverlay,
+      builder: (context) => Dialog(
+        insetPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        backgroundColor: Sa.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Sa.radius),
+        ),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: maxW > 360 ? 360 : maxW,
+            maxHeight: MediaQuery.of(context).size.height - 80,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.topRight,
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 20,
+                      color: AppTheme.neutral600,
+                    ),
+                    tooltip: 'Close',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Sa.accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(Sa.radius),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Sa.accent.withValues(alpha: 0.12),
+                          borderRadius: AppTheme.borderRadius12,
+                        ),
+                        child: const Icon(
+                          Icons.school_rounded,
+                          size: 26,
+                          color: Sa.accent,
+                        ),
+                      ),
+                      const SizedBox(height: Sa.gapXs),
+                      Text(
+                        school.schoolName,
+                        style: Sa.cardTitle.copyWith(fontSize: 16),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (school.schoolCode != null) ...[
+                        const SizedBox(height: Sa.gapXs),
+                        SaStatusPill(
+                          text: 'School Code: ${school.schoolCode}',
+                          icon: Icons.tag_rounded,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: Sa.gap),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Select Your Role',
+                    style: Sa.value,
+                  ),
+                ),
+                const SizedBox(height: Sa.gap),
+                buildRoleOption(
+                  'Student',
+                  Icons.person_outline_rounded,
+                  () {
+                    Navigator.pop(context);
+                    _openLoginCard(school, 'Student');
+                  },
+                ),
+                const SizedBox(height: Sa.gapXs),
+                buildRoleOption(
+                  'Teacher',
+                  Icons.cast_for_education_outlined,
+                  () {
+                    Navigator.pop(context);
+                    _openLoginCard(school, 'Teacher');
+                  },
+                ),
+                const SizedBox(height: Sa.gapXs),
+                buildRoleOption(
+                  'School Authority',
+                  Icons.admin_panel_settings_outlined,
+                  () {
+                    Navigator.pop(context);
+                    _openLoginCard(school, 'School Authority');
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildRoleOption(String role, IconData icon, VoidCallback onTap) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: AppTheme.borderRadius8,
+        borderRadius: AppTheme.borderRadius12,
         child: Container(
-          padding: const EdgeInsets.all(10), // Reduced
-          decoration: AppTheme.getGlassDecoration(
-            color: color.withOpacity(0.05),
-            border: Border.all(
-              color: color.withOpacity(0.2),
-              width: 0.5,
-            ),
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Sa.accent.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(Sa.radius),
+            border: Border.all(color: Sa.accent.withValues(alpha: 0.20)),
           ),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6), // Reduced
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: Sa.accent.withValues(alpha: 0.12),
                   borderRadius: AppTheme.borderRadius8,
                 ),
                 child: Icon(
                   icon,
-                  color: color,
-                  size: 16, // Reduced
+                  color: Sa.accent,
+                  size: 18,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: Sa.gap),
               Expanded(
                 child: Text(
                   role,
-                  style: AppTheme.labelMedium.copyWith(
-                    fontSize: 12, // Reduced
-                    color: AppTheme.neutral800,
-                  ),
+                  style: Sa.value,
                 ),
               ),
-              Icon(
-                Icons.arrow_forward_ios,
-                color: color,
-                size: 12, // Reduced
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Sa.accent,
+                size: 14,
               ),
             ],
           ),
@@ -858,486 +721,4 @@ class _SchoolSelectionScreenState extends State<SchoolSelectionScreen>
     );
   }
 
-  void showLoginDialog(Tenant school, String role) {
-    final TextEditingController idController = TextEditingController();
-    final ValueNotifier<bool> isLoadingNotifier = ValueNotifier(false);
-
-    showDialog(
-      context: context,
-      barrierColor: AppTheme.surfaceOverlay,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            child: Container(
-              width: context.isMobile ? context.screenWidth * 0.9 : 360, // Reduced
-              constraints: BoxConstraints(
-                maxHeight: context.screenHeight * 0.8,
-              ),
-              decoration: AppTheme.getGlassDecoration(
-                borderRadius: AppTheme.borderRadius12,
-              ),
-              padding: const EdgeInsets.all(16), // Reduced
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16), // Reduced
-                      decoration: BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
-                        borderRadius: AppTheme.borderRadius12,
-                        boxShadow: [AppTheme.cardShadow],
-                      ),
-                      child: Icon(
-                        getRoleIcon(role),
-                        size: 28, // Reduced
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Login as ${getRoleDisplayName(role)}',
-                      style: AppTheme.headingSmall.copyWith(
-                        fontSize: 14, // Reduced
-                        color: AppTheme.neutral900,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(10), // Reduced
-                      decoration: AppTheme.getGlassDecoration(
-                        color: AppTheme.green50,
-                        border: Border.all(
-                          color: AppTheme.greenPrimary.withOpacity(0.3),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            school.schoolName,
-                            style: AppTheme.labelMedium.copyWith(
-                              fontSize: 12, // Reduced
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.greenPrimary,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          if (school.schoolCode != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              'School Code: ${school.schoolCode}',
-                              style: AppTheme.bodySmall.copyWith(
-                                fontSize: 10, // Reduced
-                                color: AppTheme.neutral600,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: idController,
-                      style: AppTheme.bodyMedium.copyWith(
-                        fontSize: 12, // Reduced
-                      ),
-                      decoration: InputDecoration(
-                        labelText: '${getRoleDisplayName(role)} ID',
-                        hintText: getIdPlaceholder(role),
-                        labelStyle: AppTheme.labelSmall.copyWith(
-                          fontSize: 11, // Reduced
-                        ),
-                        hintStyle: AppTheme.bodySmall.copyWith(
-                          fontSize: 10, // Reduced
-                        ),
-                        prefixIcon: Container(
-                          margin: const EdgeInsets.all(8), // Reduced
-                          padding: const EdgeInsets.all(6), // Reduced
-                          decoration: BoxDecoration(
-                            color: AppTheme.greenPrimary.withOpacity(0.1),
-                            borderRadius: AppTheme.borderRadius8,
-                          ),
-                          child: Icon(
-                            getRoleIcon(role),
-                            color: AppTheme.greenPrimary,
-                            size: 14, // Reduced
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: AppTheme.neutral50,
-                        border: OutlineInputBorder(
-                          borderRadius: AppTheme.borderRadius8,
-                          borderSide: const BorderSide(color: AppTheme.neutral300, width: 0.5),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: AppTheme.borderRadius8,
-                          borderSide: const BorderSide(color: AppTheme.greenPrimary, width: 1),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, // Reduced
-                          vertical: 10, // Reduced
-                        ),
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (value) {
-                        if (value.trim().isNotEmpty && !isLoadingNotifier.value) {
-                          performLogin(context, setState, school, role, value.trim(), isLoadingNotifier);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(10), // Reduced
-                      decoration: AppTheme.getGlassDecoration(
-                        color: AppTheme.info.withOpacity(0.05),
-                        border: Border.all(
-                          color: AppTheme.info.withOpacity(0.3),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: AppTheme.info,
-                            size: 14, // Reduced
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'UUID Format Required',
-                                  style: AppTheme.labelMedium.copyWith(
-                                    fontSize: 10, // Reduced
-                                    color: AppTheme.info,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Example: a8076f03-3873-4ff5-beea-332fa4b20003',
-                                  style: AppTheme.bodySmall.copyWith(
-                                    fontSize: 8, // Reduced
-                                    color: AppTheme.neutral600,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: isLoadingNotifier,
-                      builder: (context, isLoading, child) {
-                        if (isLoading) {
-                          return Column(
-                            children: [
-                              const SizedBox(height: 12),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 16, // Reduced
-                                    height: 16, // Reduced
-                                    child: const CircularProgressIndicator(
-                                      color: AppTheme.greenPrimary,
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Verifying credentials...',
-                                    style: AppTheme.bodyMedium.copyWith(
-                                      color: AppTheme.neutral600,
-                                      fontSize: 11, // Reduced
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: isLoadingNotifier,
-                            builder: (context, isLoading, child) {
-                              return TextButton(
-                                onPressed: isLoading ? null : () => Navigator.pop(context),
-                                style: AppTheme.textButtonStyle.copyWith(
-                                  padding: MaterialStateProperty.all(
-                                    const EdgeInsets.symmetric(vertical: 10), // Reduced
-                                  ),
-                                ),
-                                child: Text(
-                                  'Cancel',
-                                  style: AppTheme.labelMedium.copyWith(
-                                    fontSize: 11, // Reduced
-                                    color: isLoading ? AppTheme.neutral400 : AppTheme.neutral600,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: isLoadingNotifier,
-                            builder: (context, isLoading, child) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  gradient: isLoading ? null : AppTheme.primaryGradient,
-                                  color: isLoading ? AppTheme.neutral300 : null,
-                                  borderRadius: AppTheme.borderRadius8,
-                                  boxShadow: isLoading ? null : [AppTheme.cardShadow],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: isLoading 
-                                      ? null 
-                                      : () => performLogin(
-                                          context, setState, school, role, 
-                                          idController.text.trim(), isLoadingNotifier
-                                        ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    padding: const EdgeInsets.symmetric(vertical: 10), // Reduced
-                                  ),
-                                  child: isLoading
-                                      ? SizedBox(
-                                          width: 16, // Reduced
-                                          height: 16, // Reduced
-                                          child: const CircularProgressIndicator(
-                                            color: AppTheme.neutral600,
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.login, size: 14), // Reduced
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'Login',
-                                              style: AppTheme.labelMedium.copyWith(
-                                                fontSize: 11, // Reduced
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  String getIdPlaceholder(String role) {
-    switch (role) {
-      case 'student':
-        return 'Enter your student UUID';
-      case 'teacher':
-        return 'Enter your teacher UUID';
-      case 'admin':
-        return 'Enter your authority UUID';
-      default:
-        return 'Enter your UUID';
-    }
-  }
-
-  Future<void> performLogin(
-    BuildContext dialogContext,
-    StateSetter setDialogState,
-    Tenant school,
-    String role,
-    String userId,
-    ValueNotifier<bool> isLoadingNotifier,
-  ) async {
-    if (userId.isEmpty) {
-      showErrorSnackBar('Please enter your ${getRoleDisplayName(role)} ID');
-      return;
-    }
-
-    final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
-    if (!uuidRegex.hasMatch(userId)) {
-      showErrorSnackBar('Please enter a valid UUID format');
-      return;
-    }
-
-    isLoadingNotifier.value = true;
-
-    try {
-      Map<String, dynamic> userData;
-      switch (role) {
-        case 'student':
-          userData = await StudentService.getStudentById(userId);
-          break;
-        case 'teacher':
-          userData = await TeacherService.getTeacherById(userId);
-          break;
-        case 'admin':
-          userData = await AuthorityService.getAuthorityById(userId);
-          break;
-        default:
-          throw Exception('Invalid role');
-      }
-
-      if (role != 'admin') {
-        final userTenantId = userData['tenant_id']?.toString();
-        if (userTenantId != null && userTenantId != school.id) {
-          showErrorSnackBar('This ${getRoleDisplayName(role)} does not belong to ${school.schoolName}');
-          return;
-        }
-      }
-
-      // Set school data to session BEFORE navigation
-      SchoolSession.setSchoolData(
-        schoolName: school.schoolName,
-        schoolId: school.id,
-        schoolCode: school.schoolCode,
-        tenantId: school.id,
-      );
-      
-      // Debug logs
-      print('DEBUG: Set school name to: ${school.schoolName}');
-      print('DEBUG: SchoolSession.schoolName is now: ${SchoolSession.schoolName}');
-
-      Navigator.pop(dialogContext);
-      navigateToRole(role, school, userId, userData);
-      showSuccessSnackBar('Welcome ${userData['first_name'] ?? userData['last_name'] ?? ''}!');
-    } catch (e) {
-      showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
-    } finally {
-      isLoadingNotifier.value = false;
-    }
-  }
-
-  void showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.error_outline,
-              color: Colors.white,
-              size: 14, // Reduced
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: AppTheme.bodyMedium.copyWith(
-                  color: Colors.white,
-                  fontSize: 11, // Reduced
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppTheme.error,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTheme.borderRadius8,
-        ),
-        margin: const EdgeInsets.all(8), // Reduced
-      ),
-    );
-  }
-
-  void showSuccessSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: Colors.white,
-              size: 14, // Reduced
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: AppTheme.bodyMedium.copyWith(
-                  color: Colors.white,
-                  fontSize: 11, // Reduced
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: AppTheme.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: AppTheme.borderRadius8,
-        ),
-        margin: const EdgeInsets.all(8), // Reduced
-      ),
-    );
-  }
-
-  String getRoleDisplayName(String role) {
-    switch (role) {
-      case 'student':
-        return 'Student';
-      case 'teacher':
-        return 'Teacher';
-      case 'admin':
-        return 'School Authority';
-      default:
-        return 'User';
-    }
-  }
-
-  IconData getRoleIcon(String role) {
-    switch (role) {
-      case 'student':
-        return Icons.person;
-      case 'teacher':
-        return Icons.person_2;
-      case 'admin':
-        return Icons.admin_panel_settings;
-      default:
-        return Icons.person;
-    }
-  }
-
-  void navigateToRole(String role, Tenant school, String userId, Map<String, dynamic> userData) {
-    switch (role) {
-      case 'student':
-        context.go('${AppConstants.studentDashboardRoute}?tenantId=${school.id}&userId=$userId');
-        break;
-      case 'teacher':
-        context.go('${AppConstants.teacherDashboardRoute}?tenantId=${school.id}&userId=$userId');
-        break;
-      case 'admin':
-        context.go('${AppConstants.adminDashboardRoute}?tenantId=${school.id}&userId=$userId');
-        break;
-    }
-  }
 }

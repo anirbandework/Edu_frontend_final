@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_theme.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/utils/school_session.dart';
+import 'school_switcher.dart';
+import 'feedback_dialog.dart';
 
 class NavigationHeader extends StatefulWidget {
   final VoidCallback onToggleSidebar;
@@ -65,6 +67,8 @@ class _NavigationHeaderState extends State<NavigationHeader>
         return 'Teacher Portal';
       case 'student':
         return 'Student Portal';
+      case 'super_admin':
+        return 'Super Admin';
       case 'global_admin':
         return 'Global Admin';
       case 'tenant_manager':
@@ -74,30 +78,9 @@ class _NavigationHeaderState extends State<NavigationHeader>
     }
   }
 
-  String _getUserInitials() {
-    final name = widget.userName ?? 'John Doe';
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.length >= 2 ? name.substring(0, 2).toUpperCase() : 'JD';
-  }
-
-  String _getRoleDisplayName() {
-    switch (widget.userRole.toLowerCase()) {
-      case 'global_admin': return 'GLOBAL';
-      case 'tenant_manager': return 'MANAGER';
-      case 'admin':
-      case 'school_authority': return 'ADMIN';
-      case 'teacher': return 'TEACHER';
-      case 'student': return 'STUDENT';
-      default: return widget.userRole.toUpperCase();
-    }
-  }
-
   bool _isGlobalUser() {
-    return widget.userRole.toLowerCase() == 'global_admin' || 
-           widget.userRole.toLowerCase() == 'tenant_manager';
+    final r = widget.userRole.toLowerCase();
+    return r == 'super_admin' || r == 'global_admin' || r == 'tenant_manager';
   }
 
   @override
@@ -125,14 +108,30 @@ class _NavigationHeaderState extends State<NavigationHeader>
                 _buildLogoSection(context),
                 
                 const Spacer(),
-                
-                // Notifications (Mobile)
-                if (context.isMobile && widget.notificationCount > 0)
-                  _buildNotificationButton(context),
-                
+
+                // Give feedback — available to every role.
+                Tooltip(
+                  message: 'Give feedback',
+                  child: InkWell(
+                    borderRadius: AppTheme.borderRadius8,
+                    onTap: () => showFeedbackDialog(context),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(Icons.feedback_outlined, color: Colors.white, size: 18),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 6),
+
+                // Admin school switcher (renders only for school_authority)
+                const SchoolSwitcher(),
+
+                const SizedBox(width: 6),
+
                 // School Info - Always show
                 _buildSchoolInfo(context),
-                
+
                 const SizedBox(width: 6),
                 
                 // COMMENTED OUT: User Profile Avatar Section
@@ -146,19 +145,22 @@ class _NavigationHeaderState extends State<NavigationHeader>
   }
 
   Widget _buildMenuButton(BuildContext context) {
-    return InkWell(
-      onTap: widget.onToggleSidebar,
-      borderRadius: AppTheme.borderRadius8,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: AppTheme.getMicroDecoration(
-          color: Colors.white.withOpacity(0.1),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
-        ),
-        child: Icon(
-          Icons.menu,
-          color: Colors.white,
-          size: 16,
+    return Tooltip(
+      message: 'Menu',
+      child: InkWell(
+        onTap: widget.onToggleSidebar,
+        borderRadius: AppTheme.borderRadius8,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: AppTheme.getMicroDecoration(
+            color: Colors.white.withValues(alpha: 0.1),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          ),
+          child: const Icon(
+            Icons.menu,
+            color: Colors.white,
+            size: 16,
+          ),
         ),
       ),
     );
@@ -201,73 +203,17 @@ class _NavigationHeaderState extends State<NavigationHeader>
     );
   }
 
-  Widget _buildNotificationButton(BuildContext context) {
-    return InkWell(
-      onTap: () {
-        // Navigate to notifications
-      },
-      borderRadius: AppTheme.borderRadius8,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: AppTheme.getMicroDecoration(
-          color: Colors.white.withOpacity(0.1),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
-        ),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(
-              Icons.notifications,
-              color: Colors.white,
-              size: 16,
-            ),
-            if (widget.notificationCount > 0)
-              Positioned(
-                right: -3,
-                top: -3,
-                child: Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: AppTheme.error,
-                    borderRadius: AppTheme.borderRadius8,
-                    border: Border.all(color: Colors.white, width: 1),
-                  ),
-                  child: Text(
-                    widget.notificationCount > 9 ? '9+' : widget.notificationCount.toString(),
-                    style: TextStyle(
-                      fontSize: 6,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: AppTheme.bauhausFontFamily,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildSchoolInfo(BuildContext context) {
-    // Get school name from session with debug logging
     final sessionSchoolName = SchoolSession.schoolName;
     final widgetSchoolName = widget.schoolName;
-    
-    // Debug logging
-    print('DEBUG: SchoolSession.schoolName = $sessionSchoolName');
-    print('DEBUG: widget.schoolName = $widgetSchoolName');
-    print('DEBUG: SchoolSession.hasSchoolData = ${SchoolSession.hasSchoolData}');
-    
-    final schoolName = sessionSchoolName ?? widgetSchoolName ?? 'No School Selected';
+
+    final schoolName = sessionSchoolName ?? widgetSchoolName ?? '—';
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: AppTheme.getMicroDecoration(
-        color: Colors.white.withOpacity(0.1),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        color: Colors.white.withValues(alpha: 0.1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -275,7 +221,7 @@ class _NavigationHeaderState extends State<NavigationHeader>
           Container(
             padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: AppTheme.borderRadius8,
             ),
             child: Icon(
@@ -314,8 +260,8 @@ class _NavigationHeaderState extends State<NavigationHeader>
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: AppTheme.getMicroDecoration(
-        color: Colors.white.withOpacity(0.1),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        color: Colors.white.withValues(alpha: 0.1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -377,15 +323,6 @@ class _NavigationHeaderState extends State<NavigationHeader>
     );
   }
   */
-
-  String _shortenUserName(String name) {
-    if (name.length <= 10) return name;
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0]} ${parts[1][0]}.';
-    }
-    return '${name.substring(0, 8)}...';
-  }
 }
 
 // Enhanced version with breadcrumbs
@@ -438,12 +375,12 @@ class AdvancedNavigationHeader extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppTheme.green50,
               border: Border(
-                bottom: BorderSide(color: AppTheme.neutral200.withOpacity(0.5)),
+                bottom: BorderSide(color: AppTheme.neutral200.withValues(alpha: 0.5)),
               ),
             ),
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.home,
                   size: 12,
                   color: AppTheme.greenPrimary,
@@ -470,7 +407,7 @@ class AdvancedNavigationHeader extends StatelessWidget {
                             ),
                             if (!isLast) ...[
                               const SizedBox(width: 3),
-                              Icon(
+                              const Icon(
                                 Icons.chevron_right,
                                 size: 10,
                                 color: AppTheme.neutral400,

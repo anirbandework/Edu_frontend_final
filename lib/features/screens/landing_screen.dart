@@ -1,259 +1,266 @@
-// lib/features/tenant_management/screens/landing_screen.dart
+// lib/features/screens/landing_screen.dart
+//
+// Standalone pre-login landing page (loads at "/"). Green + white design system:
+// a green gradient backdrop, white rounded action cards (each with one green
+// accent), and a translucent "About" panel. Fully responsive — two columns on
+// web, single column on phones — and vertically centred so it never looks
+// top/left-stuck. No 3D, no animations (just Material tap feedback).
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_theme.dart';
-import '../../core/utils/responsive.dart';
+import '../../core/auth/auth_session.dart';
+import '../../shared/widgets/login_card.dart';
 
 class LandingScreen extends StatelessWidget {
   const LandingScreen({super.key});
 
+  static const double _bp = 760; // wide / mobile breakpoint
+
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final isWide = w >= _bp;
+
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
+      body: DecoratedBox(
         decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
-        child: SafeArea(
-          child: ResponsiveContainer(
-            maxWidth: context.responsive(ResponsiveSize.maxContentWidth),
-            child: SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight:
-                      MediaQuery.of(context).size.height -
-                      MediaQuery.of(context).padding.top,
-                ),
-                child: IntrinsicHeight(
-                  child: Column(
-                    children: [
-                      SizedBox(height: context.isMobile ? 30 : 20),
-
-                      _buildHeaderSection(context),
-
-                      SizedBox(height: context.isMobile ? 40 : 25),
-
-                      _buildActionButtonsSection(context),
-
-                      // Increased spacing here
-                      SizedBox(height: context.isMobile ? 150 : 45),
-
-                      _buildAboutSection(context),
-
-                      const Spacer(),
-
-                      _buildFooterSection(context),
-
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
+        child: Stack(
+          children: [
+            // Subtle static light from the top for depth (no animation).
+            const Positioned.fill(child: _TopGlow()),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  return SingleChildScrollView(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: c.maxHeight),
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isWide ? 32 : 20,
+                            vertical: 28,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 940),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _header(isWide),
+                                SizedBox(height: isWide ? 44 : 36),
+                                _actions(context, isWide),
+                                SizedBox(height: isWide ? 28 : 22),
+                                _about(isWide),
+                                const SizedBox(height: 24),
+                                _footer(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHeaderSection(BuildContext context) {
+  // ── Header ──────────────────────────────────────────────────────────────
+  Widget _header(bool isWide) {
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.all(
-            context.responsive(ResponsiveSize.paddingSmall) + 2,
-          ),
+          width: 86,
+          height: 86,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: AppTheme.surfacePrimary,
+            color: Colors.white,
             shape: BoxShape.circle,
-            boxShadow: const [AppTheme.cardShadow],
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-          child: Icon(
-            Icons.school,
-            size: context.responsive(ResponsiveSize.iconLarge) - 4,
-            color: AppTheme.greenPrimary,
-          ),
+          child: const Icon(Icons.school, size: 42, color: AppTheme.greenPrimary),
         ),
-        SizedBox(height: context.responsive(ResponsiveSize.paddingSmall)),
+        const SizedBox(height: 18),
         Text(
           'EduAssist',
-          style: AppTheme.headingMedium.copyWith(
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: AppTheme.bauhausFontFamily,
+            fontSize: isWide ? 40 : 30,
+            fontWeight: FontWeight.w700,
             color: Colors.white,
-            fontSize: context.responsive(ResponsiveSize.headingMedium) - 2,
+            letterSpacing: 0.5,
           ),
-          textAlign: TextAlign.center,
         ),
-        SizedBox(height: context.responsive(ResponsiveSize.paddingSmall) / 2),
+        const SizedBox(height: 10),
         Text(
-          'Empowering Education Through Technology',
-          style: AppTheme.bodyMedium.copyWith(
-            color: Colors.white70,
-            fontSize: context.responsive(ResponsiveSize.bodyMedium),
-          ),
+          'Empowering education through technology',
           textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: AppTheme.interFontFamily,
+            fontSize: isWide ? 17 : 15,
+            height: 1.4,
+            color: Colors.white.withValues(alpha: 0.88),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildActionButtonsSection(BuildContext context) {
-    return ResponsiveRow(
-      spacing: 12,
+  // ── Primary actions ───────────────────────────────────────────────────────
+  Widget _actions(BuildContext context, bool isWide) {
+    final getStarted = _ActionCard(
+      title: 'Get Started',
+      subtitle: 'Choose your school and sign in',
+      icon: Icons.rocket_launch_outlined,
+      onTap: () => context.go(AppConstants.schoolSelectionRoute),
+    );
+    final manage = _ActionCard(
+      title: 'Manage Schools',
+      subtitle: 'Add and manage educational institutions',
+      icon: Icons.admin_panel_settings_outlined,
+      onTap: () => _showLoginDialog(context),
+    );
+
+    if (isWide) {
+      return IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: getStarted),
+            const SizedBox(width: 16),
+            Expanded(child: manage),
+          ],
+        ),
+      );
+    }
+    return Column(
+      children: [getStarted, const SizedBox(height: 14), manage],
+    );
+  }
+
+  // ── About panel ─────────────────────────────────────────────────────────
+  Widget _about(bool isWide) {
+    const desc =
+        'EduAssist is a comprehensive school management platform that streamlines '
+        'administration and strengthens communication between schools, teachers, '
+        'students and parents.';
+
+    final description = Text(
+      desc,
+      style: TextStyle(
+        fontFamily: AppTheme.interFontFamily,
+        fontSize: 14.5,
+        height: 1.6,
+        color: Colors.white.withValues(alpha: 0.9),
+      ),
+    );
+
+    const features = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _buildActionButton(
-          context,
-          title: 'Get Started',
-          subtitle: 'Select your school and continue',
-          icon: Icons.rocket_launch,
-          onPressed: () => context.go(AppConstants.schoolSelectionRoute),
-          isPrimary: true,
-        ),
-        _buildActionButton(
-          context,
-          title: 'Manage Schools',
-          subtitle: 'Add and manage educational institutions',
-          icon: Icons.admin_panel_settings,
-          onPressed: () => _showLoginDialog(context),
-          isPrimary: false,
-        ),
+        _Feature(Icons.assignment_outlined, 'Assignment & grade management'),
+        _Feature(Icons.notifications_active_outlined,
+            'Real-time notifications & communication'),
+        _Feature(Icons.insights_outlined, 'Comprehensive analytics & reports'),
+        _Feature(Icons.groups_2_outlined,
+            'Multi-role access — students, teachers, admins'),
       ],
     );
-  }
 
-  Widget _buildAboutSection(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: context.responsive(ResponsiveSize.paddingSmall),
+      padding: EdgeInsets.all(isWide ? 26 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
-      decoration: AppTheme.getGlassDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: AppTheme.borderRadius12,
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
-      ),
-      padding: EdgeInsets.all(context.isMobile ? 16 : 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(6),
+                width: 38,
+                height: 38,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.16),
                   borderRadius: AppTheme.borderRadius8,
                 ),
-                child: Icon(
-                  Icons.info_outline,
-                  color: Colors.white,
-                  size: context.isMobile ? 16 : 14,
-                ),
+                child:
+                    const Icon(Icons.info_outline, color: Colors.white, size: 20),
               ),
-              const SizedBox(width: 10),
-              Text(
+              const SizedBox(width: 12),
+              const Text(
                 'About EduAssist',
-                style: AppTheme.labelMedium.copyWith(
+                style: TextStyle(
+                  fontFamily: AppTheme.bauhausFontFamily,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
-                  fontSize: context.isMobile ? 14 : 13,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
-
-          SizedBox(height: context.isMobile ? 12 : 10),
-
-          Text(
-            'EduAssist is a comprehensive school management platform designed to streamline educational administration and enhance communication between schools, teachers, students, and parents.',
-            style: AppTheme.bodySmall.copyWith(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: context.isMobile ? 12 : 11,
-              height: 1.4,
-            ),
-          ),
-
-          SizedBox(height: context.isMobile ? 12 : 8),
-
-          // Feature highlights
-          ...[
-            _buildFeatureItem(
-              context,
-              Icons.assignment,
-              'Assignment & Grade Management',
-            ),
-            _buildFeatureItem(
-              context,
-              Icons.notifications_active,
-              'Real-time Notifications & Communication',
-            ),
-            _buildFeatureItem(
-              context,
-              Icons.analytics,
-              'Comprehensive Analytics & Reports',
-            ),
-            _buildFeatureItem(
-              context,
-              Icons.people,
-              'Multi-role Access (Students, Teachers, Admins)',
-            ),
+          const SizedBox(height: 18),
+          if (isWide)
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: description),
+                  const SizedBox(width: 28),
+                  const Expanded(child: features),
+                ],
+              ),
+            )
+          else ...[
+            description,
+            const SizedBox(height: 18),
+            features,
           ],
-
-          SizedBox(height: context.isMobile ? 10 : 6),
-
-          Container(
-            padding: EdgeInsets.all(context.isMobile ? 10 : 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
-              borderRadius: AppTheme.borderRadius8,
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.security,
-                  color: Colors.white.withOpacity(0.8),
-                  size: context.isMobile ? 14 : 12,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Secure, scalable, and designed for modern educational institutions',
-                    style: AppTheme.bodySmall.copyWith(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: context.isMobile ? 11 : 10,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 18),
+          _secureNote(),
         ],
       ),
     );
   }
 
-  Widget _buildFeatureItem(BuildContext context, IconData icon, String text) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: context.isMobile ? 6 : 4),
+  Widget _secureNote() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: AppTheme.borderRadius12,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            margin: const EdgeInsets.only(top: 2),
-            child: Icon(
-              icon,
-              color: Colors.white.withOpacity(0.7),
-              size: context.isMobile ? 14 : 12,
-            ),
-          ),
-          const SizedBox(width: 8),
+          const Icon(Icons.verified_user_outlined, color: Colors.white, size: 18),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              text,
-              style: AppTheme.bodySmall.copyWith(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: context.isMobile ? 11 : 10,
+              'Secure, scalable and designed for modern educational institutions.',
+              style: TextStyle(
+                fontFamily: AppTheme.interFontFamily,
+                fontSize: 13.5,
+                height: 1.4,
+                fontStyle: FontStyle.italic,
+                color: Colors.white.withValues(alpha: 0.9),
               ),
             ),
           ),
@@ -262,89 +269,129 @@ class LandingScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildActionButton(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required VoidCallback onPressed,
-    required bool isPrimary,
-  }) {
-    return Container(
-      decoration: AppTheme.getGlassDecoration(),
+  Widget _footer() {
+    return Text(
+      'EduAssist · Powering the future of education',
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontFamily: AppTheme.interFontFamily,
+        fontSize: 12.5,
+        color: Colors.white.withValues(alpha: 0.7),
+      ),
+    );
+  }
+
+  // "Manage Schools" opens the login card directly (phone + password). The
+  // forgot-password flow runs inside that same card (no separate page).
+  void _showLoginDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierColor: AppTheme.surfaceOverlay,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: SingleChildScrollView(
+          child: LoginCard(
+            roleLabel: 'Admin',
+            onClose: () => Navigator.of(ctx).pop(),
+            onSuccess: () {
+              Navigator.of(ctx).pop();
+              context.go(AuthSession.instance.landingRoute());
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── White action card (hover-aware on web; tap ripple on all) ────────────────
+class _ActionCard extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _ActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  State<_ActionCard> createState() => _ActionCardState();
+}
+
+class _ActionCardState extends State<_ActionCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
       child: Material(
-        color: Colors.transparent,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        elevation: _hover ? 8 : 2,
+        shadowColor: Colors.black.withValues(alpha: 0.25),
         child: InkWell(
-          onTap: onPressed,
-          borderRadius: AppTheme.borderRadius12,
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
-            padding: EdgeInsets.all(
-              context.responsive(ResponsiveSize.paddingSmall) + 2,
-            ),
+            padding: const EdgeInsets.all(18),
             child: Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(
-                    context.responsive(ResponsiveSize.paddingSmall) - 2,
+                  width: 50,
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: AppTheme.borderRadius12,
                   ),
-                  decoration: BoxDecoration(
-                    gradient: isPrimary
-                        ? AppTheme.primaryGradient
-                        : AppTheme.primaryGradientHover,
-                    borderRadius: AppTheme.borderRadius8,
-                    boxShadow: const [AppTheme.cardShadow],
-                  ),
-                  child: Icon(
-                    icon,
-                    color: Colors.white,
-                    size: context.responsive(ResponsiveSize.iconSmall) + 2,
-                  ),
+                  child: Icon(widget.icon, color: Colors.white, size: 25),
                 ),
-                SizedBox(
-                  width: context.responsive(ResponsiveSize.paddingSmall) + 2,
-                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        title,
-                        style: AppTheme.labelMedium.copyWith(
-                          fontSize: context.responsive(
-                            ResponsiveSize.bodyMedium,
-                          ),
-                          fontWeight: FontWeight.bold,
+                        widget.title,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.bauhausFontFamily,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.neutral900,
                         ),
                       ),
-                      SizedBox(
-                        height:
-                            context.responsive(ResponsiveSize.paddingSmall) / 3,
-                      ),
+                      const SizedBox(height: 3),
                       Text(
-                        subtitle,
-                        style: AppTheme.bodySmall.copyWith(
+                        widget.subtitle,
+                        style: const TextStyle(
+                          fontFamily: AppTheme.interFontFamily,
+                          fontSize: 13.5,
+                          height: 1.35,
                           color: AppTheme.neutral600,
-                          fontSize: context.responsive(
-                            ResponsiveSize.bodySmall,
-                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
-                  padding: EdgeInsets.all(
-                    context.responsive(ResponsiveSize.paddingSmall) - 2,
-                  ),
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: AppTheme.green50,
-                    borderRadius: AppTheme.borderRadius8,
+                    color: AppTheme.greenPrimary
+                        .withValues(alpha: _hover ? 0.16 : 0.10),
+                    shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    color: AppTheme.greenPrimary,
-                    size: context.responsive(ResponsiveSize.iconSmall) - 2,
-                  ),
+                  child: const Icon(Icons.arrow_forward_rounded,
+                      color: AppTheme.greenPrimary, size: 19),
                 ),
               ],
             ),
@@ -353,175 +400,71 @@ class LandingScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _buildFooterSection(BuildContext context) {
-    return Text(
-      'Powering the Future of Education',
-      style: AppTheme.bodySmall.copyWith(
-        color: Colors.white60,
-        fontSize: context.responsive(ResponsiveSize.bodySmall) - 1,
+// ── Feature row (white-on-green) ────────────────────────────────────────────
+class _Feature extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _Feature(this.icon, this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 13),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: AppTheme.borderRadius8,
+            ),
+            child: Icon(icon, color: Colors.white, size: 15),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontFamily: AppTheme.interFontFamily,
+                  fontSize: 14,
+                  height: 1.35,
+                  color: Colors.white.withValues(alpha: 0.95),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-      textAlign: TextAlign.center,
     );
   }
+}
 
-  void _showLoginDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierColor: AppTheme.surfaceOverlay,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          width: context.isMobile ? context.screenWidth * 0.9 : 400,
-          constraints: const BoxConstraints(maxWidth: 400),
-          decoration: AppTheme.getGlassDecoration(
-            borderRadius: AppTheme.borderRadius16,
-          ),
-          padding: EdgeInsets.all(
-            context.responsive(ResponsiveSize.paddingMedium) + 2,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: EdgeInsets.all(
-                  context.responsive(ResponsiveSize.paddingSmall) + 2,
-                ),
-                decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient,
-                  borderRadius: AppTheme.borderRadius12,
-                  boxShadow: const [AppTheme.cardShadow],
-                ),
-                child: Icon(
-                  Icons.admin_panel_settings,
-                  size: context.responsive(ResponsiveSize.iconMedium),
-                  color: Colors.white,
-                ),
-              ),
+// ── Static top light glow (depth, no animation) ──────────────────────────────
+class _TopGlow extends StatelessWidget {
+  const _TopGlow();
 
-              SizedBox(
-                height: context.responsive(ResponsiveSize.paddingSmall) + 2,
-              ),
-
-              Text(
-                'Admin Access',
-                style: AppTheme.headingSmall.copyWith(
-                  fontSize: context.responsive(ResponsiveSize.headingSmall),
-                  color: AppTheme.neutral900,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              SizedBox(
-                height: context.responsive(ResponsiveSize.paddingSmall) / 2,
-              ),
-
-              Text(
-                'Access the admin panel to manage schools and educational institutions',
-                style: AppTheme.bodySmall.copyWith(
-                  fontSize: context.responsive(ResponsiveSize.bodySmall),
-                  color: AppTheme.neutral600,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              SizedBox(
-                height: context.responsive(ResponsiveSize.paddingMedium),
-              ),
-
-              context.isMobile
-                  ? Column(
-                      children: [
-                        _buildDialogButton(
-                          context,
-                          'Cancel',
-                          () => Navigator.pop(context),
-                          false,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildDialogButton(context, 'Access Panel', () {
-                          Navigator.pop(context);
-                          context.go(AppConstants.tenantManagementRoute);
-                        }, true),
-                      ],
-                    )
-                  : Row(
-                      children: [
-                        Expanded(
-                          child: _buildDialogButton(
-                            context,
-                            'Cancel',
-                            () => Navigator.pop(context),
-                            false,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildDialogButton(
-                            context,
-                            'Access Panel',
-                            () {
-                              Navigator.pop(context);
-                              context.go(AppConstants.tenantManagementRoute);
-                            },
-                            true,
-                          ),
-                        ),
-                      ],
-                    ),
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: const Alignment(0, -1.1),
+            radius: 1.1,
+            colors: [
+              Colors.white.withValues(alpha: 0.10),
+              Colors.white.withValues(alpha: 0.0),
             ],
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildDialogButton(
-    BuildContext context,
-    String text,
-    VoidCallback onPressed,
-    bool isPrimary,
-  ) {
-    if (isPrimary) {
-      return Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient,
-          borderRadius: AppTheme.borderRadius8,
-          boxShadow: const [AppTheme.cardShadow],
-        ),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-          ),
-          child: Text(
-            text,
-            style: AppTheme.labelMedium.copyWith(
-              color: Colors.white,
-              fontSize: context.responsive(ResponsiveSize.bodySmall) + 1,
-            ),
-          ),
-        ),
-      );
-    } else {
-      return SizedBox(
-        width: double.infinity,
-        child: TextButton(
-          onPressed: onPressed,
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-          ),
-          child: Text(
-            text,
-            style: AppTheme.labelMedium.copyWith(
-              fontSize: context.responsive(ResponsiveSize.bodySmall) + 1,
-            ),
-          ),
-        ),
-      );
-    }
   }
 }

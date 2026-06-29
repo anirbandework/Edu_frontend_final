@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/models/timetable_models.dart';
+import '../core/auth/auth_session.dart';
 
 class TimetableService {
   TimetableService(this.baseUrl);
@@ -11,7 +12,7 @@ class TimetableService {
   Future<Map<String, dynamic>> createMaster(MasterTimetableCreate payload) async {
     final r = await http.post(
       _u("/api/v1/school_authority/timetable/master"),
-      headers: {"Content-Type": "application/json"},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode(payload.toJson()),
     );
     if (r.statusCode >= 200 && r.statusCode < 300) return jsonDecode(r.body) as Map<String, dynamic>;
@@ -22,7 +23,7 @@ class TimetableService {
     final q = <String, String>{};
     if (academicYear != null) q["academic_year"] = academicYear;
     if (status != null) q["status"] = status;
-    final r = await http.get(_u("/api/v1/school_authority/timetable/master/$tenantId", q));
+    final r = await http.get(_u("/api/v1/school_authority/timetable/master/$tenantId", q), headers: AuthSession.instance.headers(json: false));
     if (r.statusCode >= 200 && r.statusCode < 300) {
       final arr = jsonDecode(r.body) as List;
       return arr.map((e) => MasterTimetableSummary.fromJson(e as Map<String, dynamic>)).toList();
@@ -52,27 +53,22 @@ class TimetableService {
     if (!jsonPayload.containsKey('last_modified_by')) {
       jsonPayload['last_modified_by'] = payload.createdBy;
     }
-    
-    print('DEBUG: Using endpoint: $endpoint');
-    print('DEBUG: Payload: ${jsonEncode(jsonPayload)}');
-    
+
     final r = await http.post(
       _u(endpoint),
       headers: {
-        "Content-Type": "application/json",
         "Accept": "application/json",
+        ...AuthSession.instance.headers(),
       },
       body: jsonEncode(jsonPayload),
     );
-    
-    print('DEBUG: Response status: ${r.statusCode}');
-    print('DEBUG: Response body: ${r.body}');
-    
+
     if (r.statusCode >= 200 && r.statusCode < 300) return jsonDecode(r.body) as Map<String, dynamic>;
     
-    // If extended endpoint fails, try basic endpoint with minimal payload
-    if (useExtended && r.statusCode == 400) {
-      print('DEBUG: Extended endpoint failed, trying basic endpoint');
+    // The /class/extended route does not exist on the backend (returns 404), and
+    // some payloads 400. Fall back to the basic /class endpoint on ANY failure so
+    // timetable creation still succeeds instead of hard-erroring.
+    if (useExtended) {
       final basicPayload = {
         "tenant_id": payload.tenantId,
         "class_id": payload.classId,
@@ -92,10 +88,7 @@ class TimetableService {
         },
         body: jsonEncode(basicPayload),
       );
-      
-      print('DEBUG: Basic endpoint response: ${basicR.statusCode}');
-      print('DEBUG: Basic endpoint body: ${basicR.body}');
-      
+
       if (basicR.statusCode >= 200 && basicR.statusCode < 300) {
         return jsonDecode(basicR.body) as Map<String, dynamic>;
       }
@@ -109,7 +102,7 @@ class TimetableService {
     final r = await http.get(_u(
       "/api/v1/school_authority/timetable/class/$classId/schedule",
       {"academic_year": academicYear, "requester_type": "school_authority"},
-    ));
+    ), headers: AuthSession.instance.headers(json: false));
     if (r.statusCode >= 200 && r.statusCode < 300) {
       final j = jsonDecode(r.body) as Map<String, dynamic>;
       return (
@@ -126,7 +119,7 @@ class TimetableService {
   Future<Map<String, dynamic>> bulkCreateSchedule(BulkScheduleCreate payload) async {
     final r = await http.post(
       _u("/api/v1/school_authority/timetable/bulk/schedule"),
-      headers: {"Content-Type": "application/json"},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode(payload.toJson()),
     );
     if (r.statusCode >= 200 && r.statusCode < 300) return jsonDecode(r.body) as Map<String, dynamic>;
@@ -136,7 +129,7 @@ class TimetableService {
   Future<Map<String, dynamic>> bulkUpdateSchedule(BulkScheduleUpdate payload) async {
     final r = await http.put(
       _u("/api/v1/school_authority/timetable/bulk/schedule"),
-      headers: {"Content-Type": "application/json"},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode(payload.toJson()),
     );
     if (r.statusCode >= 200 && r.statusCode < 300) return jsonDecode(r.body) as Map<String, dynamic>;
@@ -146,7 +139,7 @@ class TimetableService {
   Future<Map<String, dynamic>> bulkDeleteSchedule(List<UUID> scheduleEntryIds, {bool hardDelete = false}) async {
     final r = await http.delete(
       _u("/api/v1/school_authority/timetable/bulk/schedule", {"hard_delete": hardDelete.toString()}),
-      headers: {"Content-Type": "application/json"},
+      headers: AuthSession.instance.headers(),
       body: jsonEncode(scheduleEntryIds),
     );
     if (r.statusCode >= 200 && r.statusCode < 300) return jsonDecode(r.body) as Map<String, dynamic>;
@@ -157,7 +150,7 @@ class TimetableService {
     final r = await http.get(_u(
       "/api/v1/school_authority/timetable/analytics/$tenantId",
       {"academic_year": academicYear},
-    ));
+    ), headers: AuthSession.instance.headers(json: false));
     if (r.statusCode >= 200 && r.statusCode < 300) return jsonDecode(r.body) as Map<String, dynamic>;
     throw Exception(r.body);
   }
@@ -165,7 +158,7 @@ class TimetableService {
   Future<List<ConflictItem>> getConflicts(UUID tenantId, {bool unresolvedOnly = true, String? severity}) async {
     final q = {"unresolved_only": unresolvedOnly.toString()};
     if (severity != null) q["severity"] = severity;
-    final r = await http.get(_u("/api/v1/school_authority/timetable/conflicts/$tenantId", q));
+    final r = await http.get(_u("/api/v1/school_authority/timetable/conflicts/$tenantId", q), headers: AuthSession.instance.headers(json: false));
     if (r.statusCode >= 200 && r.statusCode < 300) {
       final arr = jsonDecode(r.body) as List;
       return arr.map((e) => ConflictItem.fromJson(e as Map<String, dynamic>)).toList();

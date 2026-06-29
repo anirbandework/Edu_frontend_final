@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/models/notification.dart';
 import '../../../services/notification_service.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class SendNotificationScreen extends StatefulWidget {
   final String senderId;
@@ -33,8 +34,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   NotificationType _selectedType = NotificationType.announcement;
   NotificationPriority _selectedPriority = NotificationPriority.normal;
   RecipientType _selectedRecipientType = RecipientType.all_students;
-  List<DeliveryChannel> _selectedChannels = [DeliveryChannel.inApp];
-  
+  final List<DeliveryChannel> _selectedChannels = [DeliveryChannel.inApp];
+
   bool _isScheduled = false;
   DateTime? _scheduledDateTime;
   DateTime? _expiresDateTime;
@@ -43,12 +44,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   @override
   void initState() {
     super.initState();
-    
-    // Debug: Check if we have valid parameters
-    print('SenderId: ${widget.senderId}');
-    print('TenantId: ${widget.tenantId}');
-    print('SenderType: ${widget.senderType}');
-    
+
     // Check if we have valid parameters
     if (widget.senderId.isEmpty || widget.tenantId.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -88,7 +84,7 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              context.go(AppConstants.schoolSelectionRoute);
+              context.go(AppConstants.loginRoute);
             },
             child: const Text('Login Again'),
           ),
@@ -109,75 +105,33 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Send Notification'),
-        backgroundColor: AppTheme.primaryGreen,
-        foregroundColor: Colors.white,
-        actions: [
-          if (_isSending)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-            )
-          else
-            TextButton(
-              onPressed: _canSend() ? _sendNotification : null,
-              child: const Text(
-                'SEND',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-        ],
+    // NO Scaffold / AppBar — the MainLayout shell provides them.
+    return SaScreen(
+      header: const Padding(
+        padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Send Notification',
+          subtitle: 'Compose and deliver to your audience',
+          icon: Icons.campaign_outlined,
+        ),
       ),
-      body: widget.senderId.isEmpty || widget.tenantId.isEmpty
+      child: widget.senderId.isEmpty || widget.tenantId.isEmpty
           ? _buildErrorState()
           : _buildForm(),
     );
   }
 
   Widget _buildErrorState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red[400],
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Missing Required Information',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'User ID and Tenant ID are required to send notifications',
-            style: TextStyle(
-              color: Colors.grey[600],
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => context.go(AppConstants.homeRoute),
-            child: const Text('Go to Home'),
-          ),
-        ],
+    return SaStateView(
+      icon: Icons.error_outline_rounded,
+      iconColor: AppTheme.error,
+      title: 'Missing Required Information',
+      subtitle:
+          'User ID and Tenant ID are required to send notifications.',
+      action: SaPrimaryButton(
+        label: 'Go to Home',
+        icon: Icons.home_outlined,
+        onPressed: () => context.go(AppConstants.homeRoute),
       ),
     );
   }
@@ -186,46 +140,20 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     return Form(
       key: _formKey,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Debug Info Card (remove in production)
-            if (widget.senderId.isNotEmpty && widget.tenantId.isNotEmpty)
-              Card(
-                color: Colors.blue[50],
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Debug Information',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[800],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text('Sender ID: ${widget.senderId}'),
-                      Text('Sender Type: ${widget.senderType}'),
-                      Text('Tenant ID: ${widget.tenantId}'),
-                    ],
-                  ),
-                ),
-              ),
-            const SizedBox(height: 16),
-            
             _buildBasicInfoSection(),
-            const SizedBox(height: 24),
+            const SizedBox(height: Sa.gap),
             _buildRecipientSection(),
-            const SizedBox(height: 24),
+            const SizedBox(height: Sa.gap),
             _buildSettingsSection(),
-            const SizedBox(height: 24),
+            const SizedBox(height: Sa.gap),
             _buildSchedulingSection(),
-            const SizedBox(height: 24),
+            const SizedBox(height: Sa.gap),
             _buildActionSection(),
-            const SizedBox(height: 32),
+            const SizedBox(height: Sa.gapLg),
             _buildSendButton(),
           ],
         ),
@@ -234,122 +162,101 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   }
 
   Widget _buildBasicInfoSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.info, color: AppTheme.primaryGreen),
-                const SizedBox(width: 8),
-                Text(
-                  'Basic Information',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.info_outline,
+            title: 'Basic Information',
+          ),
+          const SizedBox(height: Sa.gapLg),
+
+          // Title
+          TextFormField(
+            controller: _titleController,
+            decoration: const InputDecoration(
+              labelText: 'Title *',
+              hintText: 'Enter notification title',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            
-            // Title
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Title *',
-                hintText: 'Enter notification title',
-                border: OutlineInputBorder(),
-              ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Title is required';
-                }
-                return null;
-              },
-              maxLength: 100,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Title is required';
+              }
+              return null;
+            },
+            maxLength: 100,
+          ),
+          const SizedBox(height: Sa.gap),
+
+          // Message
+          TextFormField(
+            controller: _messageController,
+            decoration: const InputDecoration(
+              labelText: 'Message *',
+              hintText: 'Enter detailed message',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            
-            // Message
-            TextFormField(
-              controller: _messageController,
-              decoration: const InputDecoration(
-                labelText: 'Message *',
-                hintText: 'Enter detailed message',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 4,
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Message is required';
-                }
-                return null;
-              },
-              maxLength: 500,
+            maxLines: 4,
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Message is required';
+              }
+              return null;
+            },
+            maxLength: 500,
+          ),
+          const SizedBox(height: Sa.gap),
+
+          // Short Message
+          TextFormField(
+            controller: _shortMessageController,
+            decoration: const InputDecoration(
+              labelText: 'Short Message',
+              hintText: 'Brief summary for push notifications',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            
-            // Short Message
-            TextFormField(
-              controller: _shortMessageController,
-              decoration: const InputDecoration(
-                labelText: 'Short Message',
-                hintText: 'Brief summary for push notifications',
-                border: OutlineInputBorder(),
-              ),
-              maxLength: 160,
-            ),
-          ],
-        ),
+            maxLength: 160,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildRecipientSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.people, color: AppTheme.primaryGreen),
-                const SizedBox(width: 8),
-                Text(
-                  'Recipients',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.people_outline,
+            title: 'Recipients',
+          ),
+          const SizedBox(height: Sa.gapLg),
+
+          DropdownButtonFormField<RecipientType>(
+            initialValue: _selectedRecipientType,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Recipient Type',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            
-            DropdownButtonFormField<RecipientType>(
-              value: _selectedRecipientType,
-              decoration: const InputDecoration(
-                labelText: 'Recipient Type',
-                border: OutlineInputBorder(),
-              ),
-              items: _getRecipientTypeOptions(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedRecipientType = value!;
-                });
-              },
-            ),
-          ],
-        ),
+            items: _getRecipientTypeOptions(),
+            onChanged: (value) {
+              setState(() {
+                _selectedRecipientType = value!;
+              });
+            },
+          ),
+        ],
       ),
     );
   }
 
   List<DropdownMenuItem<RecipientType>> _getRecipientTypeOptions() {
     final availableTypes = <RecipientType>[];
-    
+
     if (widget.senderType == 'school_authority') {
       availableTypes.addAll([
         RecipientType.all_students,
@@ -394,250 +301,221 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   }
 
   Widget _buildSettingsSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.settings, color: AppTheme.primaryGreen),
-                const SizedBox(width: 8),
-                Text(
-                  'Settings',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.settings_outlined,
+            title: 'Settings',
+          ),
+          const SizedBox(height: Sa.gapLg),
+
+          // Notification Type
+          DropdownButtonFormField<NotificationType>(
+            initialValue: _selectedType,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Notification Type',
+              border: OutlineInputBorder(),
+            ),
+            items: NotificationType.values.map((type) {
+              return DropdownMenuItem(
+                value: type,
+                child: Text(_getTypeDisplayName(type)),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedType = value!;
+              });
+            },
+          ),
+          const SizedBox(height: Sa.gap),
+
+          // Priority
+          DropdownButtonFormField<NotificationPriority>(
+            initialValue: _selectedPriority,
+            isExpanded: true,
+            decoration: const InputDecoration(
+              labelText: 'Priority',
+              border: OutlineInputBorder(),
+            ),
+            items: NotificationPriority.values.map((priority) {
+              return DropdownMenuItem(
+                value: priority,
+                child: Row(
+                  children: [
+                    Icon(
+                      _getPriorityIcon(priority),
+                      color: _getPriorityColor(priority),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_getPriorityDisplayName(priority)),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            
-            // Notification Type
-            DropdownButtonFormField<NotificationType>(
-              value: _selectedType,
-              decoration: const InputDecoration(
-                labelText: 'Notification Type',
-                border: OutlineInputBorder(),
-              ),
-              items: NotificationType.values.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(_getTypeDisplayName(type)),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedType = value!;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // Priority
-            DropdownButtonFormField<NotificationPriority>(
-              value: _selectedPriority,
-              decoration: const InputDecoration(
-                labelText: 'Priority',
-                border: OutlineInputBorder(),
-              ),
-              items: NotificationPriority.values.map((priority) {
-                return DropdownMenuItem(
-                  value: priority,
-                  child: Row(
-                    children: [
-                      Icon(
-                        _getPriorityIcon(priority),
-                        color: _getPriorityColor(priority),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(_getPriorityDisplayName(priority)),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedPriority = value!;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-            
-            // Delivery Channels
-            Text(
-              'Delivery Channels',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: DeliveryChannel.values.map((channel) {
-                return FilterChip(
-                  label: Text(_getChannelDisplayName(channel)),
-                  selected: _selectedChannels.contains(channel),
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedChannels.add(channel);
-                      } else {
-                        _selectedChannels.remove(channel);
-                      }
-                    });
-                  },
-                  selectedColor: AppTheme.lightGreen,
-                );
-              }).toList(),
-            ),
-          ],
-        ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() {
+                _selectedPriority = value!;
+              });
+            },
+          ),
+          const SizedBox(height: Sa.gapLg),
+
+          // Delivery Channels
+          const Text('Delivery Channels', style: Sa.value),
+          const SizedBox(height: Sa.gapXs),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: DeliveryChannel.values.map((channel) {
+              final selected = _selectedChannels.contains(channel);
+              return FilterChip(
+                label: Text(_getChannelDisplayName(channel)),
+                selected: selected,
+                onSelected: (value) {
+                  setState(() {
+                    if (value) {
+                      _selectedChannels.add(channel);
+                    } else {
+                      _selectedChannels.remove(channel);
+                    }
+                  });
+                },
+                selectedColor: AppTheme.greenPrimary,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: selected ? Colors.white : AppTheme.neutral700,
+                  fontWeight: FontWeight.w500,
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildSchedulingSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.schedule, color: AppTheme.primaryGreen),
-                const SizedBox(width: 8),
-                Text(
-                  'Scheduling',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.schedule_outlined,
+            title: 'Scheduling',
+          ),
+          const SizedBox(height: Sa.gapXs),
+
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Schedule for later', style: Sa.value),
+            subtitle: const Text(
+              'Send notification at a specific time',
+              style: Sa.label,
             ),
-            const SizedBox(height: 16),
-            
-            SwitchListTile(
-              title: const Text('Schedule for later'),
-              subtitle: const Text('Send notification at a specific time'),
-              value: _isScheduled,
-              onChanged: (value) {
-                setState(() {
-                  _isScheduled = value;
-                  if (!value) {
-                    _scheduledDateTime = null;
-                  }
-                });
-              },
-              activeColor: AppTheme.primaryGreen,
-            ),
-            
-            if (_isScheduled) ...[
-              const SizedBox(height: 16),
-              ListTile(
-                title: const Text('Schedule Date & Time'),
-                subtitle: Text(
-                  _scheduledDateTime != null
-                      ? _scheduledDateTime!.toString()
-                      : 'Tap to select',
-                ),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: _selectScheduledDateTime,
-              ),
-            ],
-            
-            const SizedBox(height: 16),
+            value: _isScheduled,
+            onChanged: (value) {
+              setState(() {
+                _isScheduled = value;
+                if (!value) {
+                  _scheduledDateTime = null;
+                }
+              });
+            },
+            activeThumbColor: AppTheme.greenPrimary,
+          ),
+
+          if (_isScheduled) ...[
+            const SizedBox(height: Sa.gapXs),
             ListTile(
-              title: const Text('Expiration Date (Optional)'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Schedule Date & Time', style: Sa.value),
               subtitle: Text(
-                _expiresDateTime != null
-                    ? _expiresDateTime!.toString()
-                    : 'Notification will never expire',
+                _scheduledDateTime != null
+                    ? _scheduledDateTime!.toString()
+                    : 'Tap to select',
+                style: Sa.label,
               ),
-              trailing: const Icon(Icons.event_busy),
-              onTap: _selectExpirationDateTime,
+              trailing: const Icon(
+                Icons.calendar_today,
+                color: AppTheme.neutral600,
+              ),
+              onTap: _selectScheduledDateTime,
             ),
           ],
-        ),
+
+          const SizedBox(height: Sa.gapXs),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Expiration Date (Optional)', style: Sa.value),
+            subtitle: Text(
+              _expiresDateTime != null
+                  ? _expiresDateTime!.toString()
+                  : 'Notification will never expire',
+              style: Sa.label,
+            ),
+            trailing: const Icon(
+              Icons.event_busy,
+              color: AppTheme.neutral600,
+            ),
+            onTap: _selectExpirationDateTime,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildActionSection() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.touch_app, color: AppTheme.primaryGreen),
-                const SizedBox(width: 8),
-                Text(
-                  'Action Button (Optional)',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.touch_app_outlined,
+            title: 'Action Button (Optional)',
+          ),
+          const SizedBox(height: Sa.gapLg),
+
+          TextFormField(
+            controller: _actionTextController,
+            decoration: const InputDecoration(
+              labelText: 'Button Text',
+              hintText: 'e.g., View Assignment',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            
-            TextFormField(
-              controller: _actionTextController,
-              decoration: const InputDecoration(
-                labelText: 'Button Text',
-                hintText: 'e.g., View Assignment',
-                border: OutlineInputBorder(),
-              ),
+          ),
+          const SizedBox(height: Sa.gap),
+
+          TextFormField(
+            controller: _actionUrlController,
+            decoration: const InputDecoration(
+              labelText: 'Action URL',
+              hintText: 'URL to navigate when button is tapped',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            
-            TextFormField(
-              controller: _actionUrlController,
-              decoration: const InputDecoration(
-                labelText: 'Action URL',
-                hintText: 'URL to navigate when button is tapped',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildSendButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton.icon(
-        onPressed: _canSend() && !_isSending ? _sendNotification : null,
-        icon: _isSending
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(_isScheduled ? Icons.schedule_send : Icons.send),
-        label: Text(_isScheduled ? 'Schedule Notification' : 'Send Now'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.primaryGreen,
-          foregroundColor: Colors.white,
-          textStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+    return SaPrimaryButton(
+      label: _isScheduled ? 'Schedule Notification' : 'Send Now',
+      icon: _isScheduled ? Icons.schedule_send : Icons.send,
+      busy: _isSending,
+      expand: true,
+      onPressed: _canSend() ? _sendNotification : null,
     );
   }
 
   bool _canSend() {
-    return widget.senderId.isNotEmpty && 
-           widget.tenantId.isNotEmpty && 
+    return widget.senderId.isNotEmpty &&
+           widget.tenantId.isNotEmpty &&
            _titleController.text.trim().isNotEmpty &&
            _messageController.text.trim().isNotEmpty;
   }
@@ -718,54 +596,40 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     });
 
     try {
-      final notificationData = {
-        'tenant_id': widget.tenantId,
-        'title': _titleController.text.trim(),
-        'message': _messageController.text.trim(),
-        'short_message': _shortMessageController.text.trim().isNotEmpty
-            ? _shortMessageController.text.trim()
-            : null,
-        'notification_type': _selectedType.value,
-        'priority': _selectedPriority.value,
-        'recipient_type': _selectedRecipientType.value,
-        'recipient_config': _buildRecipientConfig(),
-        'delivery_channels': _selectedChannels.map((e) => e.value).toList(),
-        'scheduled_at': _scheduledDateTime?.toIso8601String(),
-        'expires_at': _expiresDateTime?.toIso8601String(),
-        'action_url': _actionUrlController.text.trim().isNotEmpty
-            ? _actionUrlController.text.trim()
-            : null,
-        'action_text': _actionTextController.text.trim().isNotEmpty
-            ? _actionTextController.text.trim()
-            : null,
-      };
-
-      // For now, simulate the API call
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // In real implementation, uncomment this:
-      // await NotificationService.sendNotification(
-      //   senderId: widget.senderId,
-      //   notificationData: notificationData,
-      // );
-
-      _showSuccessSnackBar(
-        _isScheduled
-            ? 'Notification scheduled successfully!'
-            : 'Notification sent successfully!',
+      final res = await NotificationService.sendNotification(
+        senderId: widget.senderId,
+        senderType: widget.senderType,
+        tenantId: widget.tenantId,
+        title: _titleController.text.trim(),
+        message: _messageController.text.trim(),
+        notificationType: _selectedType.value,
+        recipientType: _selectedRecipientType.value,
+        recipientConfig: _buildRecipientConfig(),
+        priority: _selectedPriority.value,
+        deliveryChannels: _selectedChannels.map((e) => e.value).toList(),
       );
 
-      // Navigate back
-      context.pop();
+      final delivered = res['total_recipients'] ?? res['delivered_count'];
+      _showSuccessSnackBar(delivered != null
+          ? 'Notification sent to $delivered recipients'
+          : 'Notification sent successfully!');
+
+      if (mounted) context.pop();
     } catch (e) {
       _showErrorSnackBar(e.toString().replaceAll('Exception: ', ''));
     } finally {
-      setState(() {
-        _isSending = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
   }
 
+  /// Recipient targeting config. all_students/all_teachers/broadcast need no
+  /// config (server resolves the whole audience). grade/class_level/individual
+  /// would need a picker (grade number / class_id / user_ids) — not yet in the
+  /// UI, so those resolve to the broad audience for now.
   Map<String, dynamic> _buildRecipientConfig() {
     return {};
   }
@@ -774,7 +638,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -783,7 +648,8 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
+        backgroundColor: AppTheme.greenPrimary,
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -838,13 +704,13 @@ class _SendNotificationScreenState extends State<SendNotificationScreen> {
   Color _getPriorityColor(NotificationPriority priority) {
     switch (priority) {
       case NotificationPriority.low:
-        return Colors.grey;
+        return AppTheme.neutral500;
       case NotificationPriority.normal:
-        return Colors.blue;
+        return AppTheme.neutral600;
       case NotificationPriority.high:
-        return Colors.orange;
+        return AppTheme.greenPrimary;
       case NotificationPriority.urgent:
-        return Colors.red;
+        return AppTheme.error;
     }
   }
 

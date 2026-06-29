@@ -3,30 +3,62 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 
 import '../../features/screens/landing_screen.dart';
+import '../../features/screens/login_screen.dart';
 import '../../features/screens/school_selection_screen.dart';
+import '../../features/screens/signup_screen.dart';
+import '../../features/screens/forgot_password_screen.dart';
+import '../auth/auth_session.dart';
 import '../../shared/widgets/main_layout.dart';
 
 import '../../features/tenant_management/screens/tenant_management_screen.dart';
+import '../../features/super_admin/screens/admins_screen.dart';
+import '../../features/super_admin/screens/module_access_screen.dart';
+import '../../features/super_admin/screens/analytics_screen.dart';
+import '../../features/super_admin/screens/feedback_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 
-import '../../features/student/screens/student_dashboard_screen.dart';
-import '../../features/student/screens/student_assignments_screen.dart';
 
-import '../../features/teacher/screens/teacher_dashboard_screen.dart';
-import '../../features/teacher/screens/teacher_classes_screen.dart';
+import '../../features/exams/screens/exam_management_screen.dart';
+import '../../features/enrollment/screens/enrollment_screen.dart';
 
 import '../../features/admin/screens/admin_dashboard_screen.dart';
+import '../../features/admin/screens/admin_onboarding_screen.dart';
 import '../../features/admin/screens/send_notification_screen.dart';
 import '../../features/admin/screens/class_screen.dart';
 import '../../features/admin/screens/student_management_screen.dart';
+import '../../features/admin/screens/role_management_screen.dart';
+import '../../features/admin/screens/staff_management_screen.dart';
+import '../../features/staff/screens/staff_dashboard_screen.dart';
+import '../../features/profile/screens/profile_screen.dart';
 import '../../features/admin/screens/timetable_screen.dart';
 import '../../features/admin/screens/attendance_screen.dart';
 import '../../services/attendance_service.dart';
 
 import '../constants/app_constants.dart';
+import '../constants/app_theme.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: AppConstants.homeRoute,
+  refreshListenable: AuthSession.instance,
+  // Friendly fallback instead of go_router's raw red error screen — e.g. when a
+  // role is granted a page whose route isn't built yet, or a deep link is stale.
+  errorBuilder: (context, state) => _RouteNotFoundScreen(uri: state.uri.toString()),
+  // Route guard: only the landing and login pages are reachable without a token.
+  // Everything else requires an authenticated session. Server-side authorization
+  // is the real control; this is defense-in-depth + UX.
+  redirect: (context, state) {
+    final authed = AuthSession.instance.isAuthenticated;
+    final loc = state.uri.path;
+    const publicPaths = {
+      AppConstants.homeRoute,
+      AppConstants.loginRoute,
+      AppConstants.schoolSelectionRoute,
+      AppConstants.signupRoute,
+      AppConstants.forgotPasswordRoute,
+    };
+    if (!authed && !publicPaths.contains(loc)) return AppConstants.loginRoute;
+    return null;
+  },
   routes: [
     // Public routes
     GoRoute(
@@ -34,8 +66,28 @@ final GoRouter appRouter = GoRouter(
       builder: (context, state) => const LandingScreen(),
     ),
     GoRoute(
+      path: AppConstants.loginRoute,
+      builder: (context, state) => const LoginScreen(),
+    ),
+    GoRoute(
+      path: AppConstants.signupRoute,
+      builder: (context, state) => const SignupScreen(),
+    ),
+    GoRoute(
+      path: AppConstants.forgotPasswordRoute,
+      builder: (context, state) => const ForgotPasswordScreen(),
+    ),
+    GoRoute(
+      // School picker -> pick role -> phone+password login (public entry).
       path: AppConstants.schoolSelectionRoute,
       builder: (context, state) => const SchoolSelectionScreen(),
+    ),
+
+    // Admin onboarding (authed, standalone): a school-less admin lands here to
+    // create their first school before entering the dashboard.
+    GoRoute(
+      path: AppConstants.adminOnboardingRoute,
+      builder: (context, state) => const AdminOnboardingScreen(),
     ),
 
     // Global admin/tenant management
@@ -51,69 +103,45 @@ final GoRouter appRouter = GoRouter(
           path: AppConstants.tenantManagementRoute,
           builder: (context, state) => const TenantManagementScreen(),
         ),
+        GoRoute(
+          path: AppConstants.superAdminAdminsRoute,
+          builder: (context, state) => const AdminsScreen(),
+        ),
+        GoRoute(
+          path: AppConstants.superAdminModuleAccessRoute,
+          builder: (context, state) => const ModuleAccessScreen(),
+        ),
+        GoRoute(
+          path: AppConstants.superAdminAnalyticsRoute,
+          builder: (context, state) => const AnalyticsScreen(),
+        ),
+        GoRoute(
+          path: AppConstants.superAdminFeedbackRoute,
+          builder: (context, state) => const FeedbackScreen(),
+        ),
+        GoRoute(
+          path: AppConstants.superAdminProfileRoute,
+          builder: (context, state) => const ProfileScreen(),
+        ),
       ],
     ),
 
-    // Student
+    // Unified dynamic-role staff portal — pages come from their assigned role.
     ShellRoute(
       builder: (context, state, child) => MainLayout(
-        userRole: 'student',
+        userRole: 'staff',
         tenantId: state.uri.queryParameters['tenantId'],
         userId: state.uri.queryParameters['userId'],
         child: child,
       ),
       routes: [
         GoRoute(
-          path: AppConstants.studentDashboardRoute,
-          builder: (context, state) => const StudentDashboardScreen(),
+          path: AppConstants.staffDashboardRoute,
+          builder: (context, state) => const StaffDashboardScreen(),
         ),
         GoRoute(
-          path: AppConstants.studentNotificationsRoute,
-          builder: (context, state) => NotificationsScreen(
-            userId: state.uri.queryParameters['userId'] ?? '',
-            userType: 'student',
-            tenantId: state.uri.queryParameters['tenantId'] ?? '',
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentAssignmentsRoute,
-          builder: (context, state) => const StudentAssignmentsScreen(),
-        ),
-      ],
-    ),
-
-    // Teacher
-    ShellRoute(
-      builder: (context, state, child) => MainLayout(
-        userRole: 'teacher',
-        tenantId: state.uri.queryParameters['tenantId'],
-        userId: state.uri.queryParameters['userId'],
-        child: child,
-      ),
-      routes: [
-        GoRoute(
-          path: AppConstants.teacherDashboardRoute,
-          builder: (context, state) => const TeacherDashboardScreen(),
-        ),
-        GoRoute(
-          path: AppConstants.teacherNotificationsRoute,
-          builder: (context, state) => NotificationsScreen(
-            userId: state.uri.queryParameters['userId'] ?? '',
-            userType: 'teacher',
-            tenantId: state.uri.queryParameters['tenantId'] ?? '',
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherSendNotificationRoute,
-          builder: (context, state) => SendNotificationScreen(
-            senderId: state.uri.queryParameters['userId'] ?? '',
-            senderType: 'teacher',
-            tenantId: state.uri.queryParameters['tenantId'] ?? '',
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherClassesRoute,
-          builder: (context, state) => const TeacherClassesScreen(),
+          path: AppConstants.staffProfileRoute,
+          builder: (context, state) => const ProfileScreen(),
         ),
       ],
     ),
@@ -163,13 +191,29 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const StudentManagementScreen(),
         ),
 
+        // Exam management (create/publish/delete)
+        GoRoute(
+          path: AppConstants.adminExamsRoute,
+          builder: (context, state) => ExamManagementScreen(
+            tenantId: state.uri.queryParameters['tenantId'],
+          ),
+        ),
+
+        // Enrolment management
+        GoRoute(
+          path: AppConstants.adminEnrollmentRoute,
+          builder: (context, state) => EnrollmentScreen(
+            tenantId: state.uri.queryParameters['tenantId'],
+          ),
+        ),
+
         // Classes management (this is the ClassScreen you asked to wire)
         GoRoute(
           path: '/school_authority/classes',
           builder: (context, state) => ClassScreen(
             baseUrl: AppConstants.apiBaseUrl,
             tenantId: state.uri.queryParameters['tenantId'] ?? '',
-            headers: {
+            headers: const {
               // Example: inject auth header if present in app state
               // 'Authorization': 'Bearer ${someToken}',
             },
@@ -184,6 +228,24 @@ final GoRouter appRouter = GoRouter(
             academicYear:
                 state.uri.queryParameters['academicYear'] ?? '2025-26',
           ),
+        ),
+
+        // RBAC: roles & access management (authority)
+        GoRoute(
+          path: '/admin/roles',
+          builder: (context, state) => const RoleManagementScreen(),
+        ),
+
+        // Staff & Users — the unified dynamic-role directory (authority)
+        GoRoute(
+          path: AppConstants.adminStaffRoute,
+          builder: (context, state) => const StaffManagementScreen(),
+        ),
+
+        // Universal profile (always available, never RBAC-gated)
+        GoRoute(
+          path: AppConstants.adminProfileRoute,
+          builder: (context, state) => const ProfileScreen(),
         ),
 
         // Placeholder example
@@ -208,22 +270,22 @@ class _PlaceholderScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.construction, size: 64, color: Colors.orange[600]),
+            const Icon(Icons.construction, size: 64, color: AppTheme.neutral400),
             const SizedBox(height: 16),
             Text(
               title,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: AppTheme.headingMedium,
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'This feature is under construction',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: AppTheme.bodyMedium,
             ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => context.go(AppConstants.homeRoute),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo[600],
+                backgroundColor: AppTheme.greenPrimary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -233,6 +295,56 @@ class _PlaceholderScreen extends StatelessWidget {
               child: const Text('Go Home'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown by go_router's errorBuilder when a path has no route (e.g. a granted
+/// page that isn't built yet, or a stale deep link) — avoids a raw error screen.
+class _RouteNotFoundScreen extends StatelessWidget {
+  final String uri;
+  const _RouteNotFoundScreen({required this.uri});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundPrimary,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.explore_off_outlined, size: 56, color: AppTheme.neutral400),
+              const SizedBox(height: 16),
+              const Text('This page isn’t available',
+                  style: AppTheme.headingMedium, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(
+                'It may not be set up for your account yet. Try going back to your dashboard.',
+                style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: () {
+                  final dest = AuthSession.instance.isAuthenticated
+                      ? AuthSession.instance.dashboardRoute()
+                      : AppConstants.homeRoute;
+                  context.go(dest);
+                },
+                icon: const Icon(Icons.home_outlined),
+                label: const Text('Back to dashboard'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.greenPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

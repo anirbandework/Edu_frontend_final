@@ -7,6 +7,11 @@ import '../../core/utils/responsive.dart';
 import 'navigation_header.dart';
 import 'navigation_sidebar.dart';
 import '../../core/utils/school_authority_session.dart';
+import '../../core/utils/school_session.dart';
+import '../../core/utils/student_session.dart';
+import '../../core/utils/teacher_session.dart';
+import '../../core/auth/auth_session.dart';
+import '../../services/auth_api_service.dart';
 
 class MainLayout extends StatefulWidget {
   final Widget child;
@@ -44,43 +49,73 @@ class _MainLayoutState extends State<MainLayout>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _isSidebarOpen = false;
   bool _isInitialized = false;
+  bool? _wasMobile;
   late AnimationController _overlayController;
   late Animation<double> _overlayAnimation;
-  int _notificationCount = 0;
+  final int _notificationCount = 0;
 
 @override
 void initState() {
   super.initState();
   WidgetsBinding.instance.addObserver(this);
+  // Hydrate session stores SYNCHRONOUSLY (before any child screen's initState
+  // runs) from AuthSession + the widget's role/identity, so dashboards/dialogs
+  // that read the legacy static session holders never see null after login.
+  _hydrateSessions();
   _setupAnimations();
   _loadInitialData();
 
-  // After first frame: hydrate session from route and set initial sidebar state
+  // After first frame: second-chance hydration from route query params (covers
+  // the rare case where AuthSession is empty but the URL carries identity), then
+  // set the initial sidebar state.
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    // 1) Hydrate AuthoritySession from current route query params if missing
     try {
       final uri = GoRouterState.of(context).uri;
-      final userId = uri.queryParameters['userId'];
-      final tenantId = uri.queryParameters['tenantId'];
-      if ((AuthoritySession.authorityId ?? '').isEmpty &&
-          userId != null && userId.isNotEmpty &&
-          tenantId != null && tenantId.isNotEmpty) {
-        AuthoritySession.setSession(authorityId: userId, tenantId: tenantId);
-      }
-      // If you also use SchoolSession for display purposes, set it here too:
-      // SchoolSession.schoolName ??= uri.queryParameters['schoolName'];
+      _hydrateSessions(
+        fallbackUserId: uri.queryParameters['userId'],
+        fallbackTenantId: uri.queryParameters['tenantId'],
+      );
     } catch (_) {
-      // no-op: guard against contexts where GoRouterState isn't available yet
+      // no-op: GoRouterState may be unavailable in some contexts
     }
 
-    // 2) Initial sidebar open/close based on breakpoint
     if (mounted && !_isInitialized) {
       setState(() {
-        _isSidebarOpen = context.screenWidth > ResponsiveHelper.tabletBreakpoint;
+        _isSidebarOpen = !context.isMobile;
+        _wasMobile = context.isMobile;
         _isInitialized = true;
       });
     }
   });
+}
+
+/// Populate the legacy per-role static session holders from AuthSession (the
+/// single source of truth), preferring the widget's own role/identity and
+/// falling back to provided values. Idempotent — only fills what's empty.
+void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
+  final auth = AuthSession.instance;
+  final userId = (auth.userId?.isNotEmpty == true)
+      ? auth.userId!
+      : (widget.userId?.isNotEmpty == true ? widget.userId! : (fallbackUserId ?? ''));
+  final tenantId = (auth.tenantId?.isNotEmpty == true)
+      ? auth.tenantId!
+      : (widget.tenantId?.isNotEmpty == true ? widget.tenantId! : (fallbackTenantId ?? ''));
+  final role = (auth.role?.isNotEmpty == true) ? auth.role! : widget.userRole;
+  if (userId.isEmpty || tenantId.isEmpty) return;
+
+  if ((AuthoritySession.authorityId ?? '').isEmpty) {
+    AuthoritySession.setSession(authorityId: userId, tenantId: tenantId);
+  }
+  if (SchoolSession.tenantId == null) {
+    SchoolSession.setSchoolData(
+        schoolName: 'School', schoolId: tenantId, tenantId: tenantId);
+  }
+  if (role == 'student' && !StudentSession.hasValidSession) {
+    StudentSession.setSession(studentId: userId, tenantId: tenantId);
+  }
+  if (role == 'teacher' && !TeacherSession.hasValidSession) {
+    TeacherSession.setSession(teacherId: userId, tenantId: tenantId);
+  }
 }
 
 
@@ -94,15 +129,20 @@ void initState() {
   @override
   void didChangeMetrics() {
     super.didChangeMetrics();
-    // Handle screen size changes (rotation, window resize)
+    // Handle screen size changes (rotation, window resize). Only adjust the
+    // sidebar state when crossing the mobile/desktop boundary, so a user's
+    // manual toggle isn't overridden on every metrics change.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _isInitialized) {
-        final shouldBeOpen =
-            context.screenWidth > ResponsiveHelper.tabletBreakpoint;
-        if (_isSidebarOpen != shouldBeOpen) {
-          setState(() {
-            _isSidebarOpen = shouldBeOpen;
-          });
+        final isMobile = context.isMobile;
+        if (_wasMobile != isMobile) {
+          _wasMobile = isMobile;
+          final shouldBeOpen = !isMobile;
+          if (_isSidebarOpen != shouldBeOpen) {
+            setState(() {
+              _isSidebarOpen = shouldBeOpen;
+            });
+          }
         }
       }
     });
@@ -120,19 +160,10 @@ void initState() {
   }
 
   Future<void> _loadInitialData() async {
-    // Load notification count and other initial data
+    // Load initial data. Notification count defaults to 0 until a real
+    // count is wired up; no fabricated role-based badge.
     try {
-      final count = widget.userRole == 'student'
-          ? 5
-          : widget.userRole == 'teacher'
-          ? 3
-          : 2;
-
-      if (mounted) {
-        setState(() {
-          _notificationCount = count;
-        });
-      }
+      // Intentionally left without a fake notification count.
     } catch (e) {
       // Handle error silently
     }
@@ -173,8 +204,9 @@ void initState() {
       builder: (context) => _buildLogoutDialog(),
     ).then((confirmed) {
       if (confirmed == true) {
-        // Clear any stored data and navigate to home
-        context.go(AppConstants.homeRoute);
+        // Revoke the token server-side + clear the local session, then go home.
+        AuthApiService.logout();
+        if (mounted) context.go(AppConstants.homeRoute);
       }
     });
   }
@@ -242,7 +274,7 @@ void initState() {
                           return GestureDetector(
                             onTap: _closeSidebar,
                             child: Container(
-                              color: AppTheme.surfaceOverlay.withOpacity(
+                              color: AppTheme.surfaceOverlay.withValues(alpha: 
                                 _overlayAnimation.value * 0.5,
                               ),
                             ),
@@ -260,9 +292,10 @@ void initState() {
                       onLogout: _handleLogout,
                     ),
 
-                    // Micro FAB (Mobile)
-                    if (context.isMobile && !_isSidebarOpen && _shouldShowFAB())
-                      _buildMicroFAB(),
+                    // NOTE: No bottom-right floating button here. The sidebar is
+                    // toggled from the hamburger in the NavigationHeader, and the
+                    // bottom-right corner is reserved for the global AI assistant
+                    // (see ai_assistant_widget.dart) so nothing collides with it.
                   ],
                 ),
               ),
@@ -281,12 +314,12 @@ void initState() {
       decoration: BoxDecoration(
         color: AppTheme.green50,
         border: Border(
-          bottom: BorderSide(color: AppTheme.neutral200.withOpacity(0.5)),
+          bottom: BorderSide(color: AppTheme.neutral200.withValues(alpha: 0.5)),
         ),
       ),
       child: Row(
         children: [
-          Icon(Icons.home, size: 12, color: AppTheme.greenPrimary),
+          const Icon(Icons.home, size: 12, color: AppTheme.greenPrimary),
           const SizedBox(width: 4),
           Expanded(
             child: ListView.builder(
@@ -312,7 +345,7 @@ void initState() {
                     ),
                     if (!isLast) ...[
                       const SizedBox(width: 3),
-                      Icon(
+                      const Icon(
                         Icons.chevron_right,
                         size: 10,
                         color: AppTheme.neutral400,
@@ -357,50 +390,6 @@ void initState() {
   );
 }
 
-  bool _shouldShowFAB() {
-    // Show floating menu button based on user role
-    return [
-      'admin',
-      'teacher',
-      'school_authority',
-    ].contains(widget.userRole.toLowerCase());
-  }
-
-  Widget _buildMicroFAB() {
-    return Positioned(
-      bottom: 16,
-      right: 12,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppTheme.greenPrimary,
-          borderRadius: AppTheme.borderRadius8,
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.greenPrimary.withOpacity(0.3),
-              offset: const Offset(0, 4),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: InkWell(
-          onTap: _toggleSidebar,
-          borderRadius: AppTheme.borderRadius8,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 150),
-            child: Icon(
-              _isSidebarOpen ? Icons.close : Icons.menu,
-              key: ValueKey(_isSidebarOpen),
-              size: 20,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildLogoutDialog() {
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -417,10 +406,10 @@ void initState() {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
+                color: AppTheme.error.withValues(alpha: 0.1),
                 borderRadius: AppTheme.borderRadius8,
               ),
-              child: Icon(Icons.logout, size: 24, color: AppTheme.error),
+              child: const Icon(Icons.logout, size: 24, color: AppTheme.error),
             ),
 
             const SizedBox(height: 12),
@@ -448,7 +437,7 @@ void initState() {
                     onPressed: () => Navigator.of(context).pop(false),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: Size.zero,
+                      minimumSize: const Size(0, 44),
                     ),
                     child: Text(
                       'Cancel',
@@ -466,7 +455,7 @@ void initState() {
                       backgroundColor: AppTheme.error,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 8),
-                      minimumSize: Size.zero,
+                      minimumSize: const Size(0, 44),
                     ),
                     child: Text(
                       'Logout',
@@ -618,11 +607,9 @@ class MicroMainLayout extends StatelessWidget {
                     child: Center(
                       child: Text(
                         'EA',
-                        style: TextStyle(
-                          fontSize: 8,
+                        style: AppTheme.bodyMicro.copyWith(
                           color: AppTheme.greenPrimary,
                           fontWeight: FontWeight.bold,
-                          fontFamily: AppTheme.bauhausFontFamily,
                         ),
                       ),
                     ),

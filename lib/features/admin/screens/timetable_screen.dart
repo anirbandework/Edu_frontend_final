@@ -5,10 +5,10 @@ import '../widgets/timetable_screen_dialog/create_master_timetable_dialog.dart';
 import '../widgets/timetable_screen_dialog/create_class_timetable_dialog.dart';
 import '../widgets/timetable_screen_dialog/bulk_schedule_dialog.dart';
 import '../../../core/constants/app_theme.dart';
-import '../../../core/utils/responsive.dart';
 import '../../../services/class_service.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/models/class_model.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class TimetableScreen extends StatefulWidget {
   const TimetableScreen({
@@ -87,253 +87,302 @@ class _TimetableScreenState extends State<TimetableScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final height = constraints.maxHeight;
-          return SizedBox(
-            height: height,
-            child: Container(
-              decoration: BoxDecoration(gradient: AppTheme.primaryGradient),
-              child: SafeArea(
-                child: ResponsiveContainer(
-                  maxWidth: context.responsive(ResponsiveSize.maxContentWidth),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'School Timetables',
-                        style: Theme.of(context).textTheme.headlineLarge!
-                            .copyWith(color: Colors.white),
-                      ),
-                      const SizedBox(height: 12),
-                      Expanded(
-                        child: Card(
-                          child: Padding(
-                            padding: EdgeInsets.all(
-                              context.responsive(ResponsiveSize.cardPadding),
+  Future<void> _createMaster() async {
+    final created = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => CreateMasterTimetableDialog(
+        tenantId: widget.tenantId,
+        userId: widget.currentUserId,
+        academicYear: widget.academicYear,
+        api: api,
+      ),
+    );
+    if (created != null) {
+      await _loadMasters();
+      if (created["id"] != null) {
+        setState(() => selectedMasterId = created["id"] as String?);
+      }
+    }
+  }
+
+  Future<void> _createClassTimetable() async {
+    final classApi = ClassApi(
+      baseUrl: widget.baseUrl,
+      defaultHeaders: {'Accept': 'application/json'},
+    );
+
+    String masterIdToUse;
+    if (selectedMasterId != null) {
+      masterIdToUse = selectedMasterId!;
+    } else {
+      String temp = '';
+      final got = await showDialog<String>(
+        context: context,
+        builder: (ctx) {
+          final maxW = MediaQuery.of(ctx).size.width - 24;
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 24,
+            ),
+            backgroundColor: Sa.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(Sa.radius),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxW > 480 ? 480 : maxW),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Pick Master Timetable', style: Sa.cardTitle),
+                    const SizedBox(height: Sa.gap),
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      initialValue: null,
+                      items: masters
+                          .map(
+                            (m) => DropdownMenuItem(
+                              value: m.id,
+                              child: Text(
+                                '${m.timetableName} • ${m.academicYear}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                            child: Column(
-                              children: [
-                                _toolbar(context),
-                                const SizedBox(height: 12),
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: _MastersCard(
-                                        masters: masters,
-                                        selectedMasterId: selectedMasterId,
-                                        onSelect: (id) => setState(
-                                          () => selectedMasterId = id,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _RightColumn(
-                                        api: api,
-                                        tenantId: widget.tenantId,
-                                        academicYear: widget.academicYear,
-                                        baseUrl: widget.baseUrl,
-                                        onPickClass: (id) =>
-                                            _loadClassSchedule(id),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const Divider(),
-                                if (loadingSchedule)
-                                  const LinearProgressIndicator(),
-                                Expanded(
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        minWidth: 720,
-                                      ),
-                                      child: SingleChildScrollView(
-                                        scrollDirection: Axis.vertical,
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: 8,
-                                          ),
-                                          child: weekly == null
-                                              ? const Center(
-                                                  child: Text(
-                                                    "No class selected",
-                                                  ),
-                                                )
-                                              : _WeeklyGridTable(
-                                                  weekly: weekly!,
-                                                  totalPeriods: totalPeriods,
-                                                  workingDays: workingDays,
-                                                ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => temp = v ?? '',
+                    ),
+                    const SizedBox(height: Sa.gapLg),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.neutral600,
+                            minimumSize: const Size(0, 46),
                           ),
+                          child: const Text('Cancel'),
                         ),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: Sa.gapXs),
+                        SaPrimaryButton(
+                          label: 'Use',
+                          icon: Icons.check_rounded,
+                          onPressed: () => Navigator.pop(ctx, temp),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
           );
         },
+      );
+      if (got == null || got.isEmpty) return;
+      masterIdToUse = got;
+      setState(() => selectedMasterId = masterIdToUse);
+    }
+
+    final res = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => CreateClassTimetableDialog(
+        tenantId: widget.tenantId,
+        userId: widget.currentUserId,
+        masterId: masterIdToUse,
+        academicYear: widget.academicYear,
+        api: api,
+        classApi: classApi,
       ),
-      floatingActionButton: hasTenant
-          ? FloatingActionButton(
-              backgroundColor: AppTheme.greenPrimary,
-              onPressed: () async {
-                final created = await showDialog<Map<String, dynamic>>(
-                  context: context,
-                  builder: (_) => CreateMasterTimetableDialog(
-                    tenantId: widget.tenantId,
-                    userId: widget.currentUserId,
-                    academicYear: widget.academicYear,
-                    api: api,
-                  ),
-                );
-                if (created != null) {
-                  await _loadMasters();
-                  if (created["id"] != null) {
-                    setState(() => selectedMasterId = created["id"] as String?);
-                  }
-                }
-              },
-              child: const Icon(Icons.add, color: Colors.white),
-            )
-          : null,
     );
+    if (res != null && res["class_id"] != null) {
+      await _loadClassSchedule(res["class_id"] as String);
+    }
   }
 
-  Widget _toolbar(BuildContext context) {
-    return Row(
-      children: [
-        ElevatedButton.icon(
-          onPressed: hasTenant
-              ? () async {
-                  final created = await showDialog<Map<String, dynamic>>(
-                    context: context,
-                    builder: (_) => CreateMasterTimetableDialog(
-                      tenantId: widget.tenantId,
-                      userId: widget.currentUserId,
-                      academicYear: widget.academicYear,
-                      api: api,
-                    ),
-                  );
-                  if (created != null) {
-                    await _loadMasters();
-                    if (created["id"] != null) {
-                      setState(
-                        () => selectedMasterId = created["id"] as String?,
-                      );
-                    }
-                  }
-                }
+  Future<void> _bulkEdit() async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => BulkScheduleDialog(
+        tenantId: widget.tenantId,
+        classId: selectedClassId!,
+        academicYear: widget.academicYear,
+        api: api,
+      ),
+    );
+    if (saved == true && selectedClassId != null) {
+      await _loadClassSchedule(selectedClassId!);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'School Timetables',
+          subtitle: 'Masters, class schedules & conflicts',
+          icon: Icons.calendar_view_week_outlined,
+          trailing: hasTenant
+              ? SaHeaderAction(
+                  icon: Icons.add,
+                  tooltip: 'New master timetable',
+                  onPressed: _createMaster,
+                )
               : null,
-          icon: const Icon(Icons.add),
-          label: const Text("New Master"),
         ),
-        const SizedBox(width: 8),
-        OutlinedButton(
-          onPressed: () async {
-            final classApi = ClassApi(
-              baseUrl: widget.baseUrl,
-              defaultHeaders: {'Accept': 'application/json'},
-            );
-
-            // If no master selected, optionally prompt the user for a master id, or let the dialog handle it.
-            String masterIdToUse;
-            if (selectedMasterId != null) {
-              masterIdToUse = selectedMasterId!;
-            } else {
-              // Simple inline prompt; replace with a proper picker if you have one
-              String temp = '';
-              final got = await showDialog<String>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Pick Master Timetable'),
-                  content: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    value: null,
-                    items: masters
-                        .map(
-                          (m) => DropdownMenuItem(
-                            value: m.id,
-                            child: Text(
-                              '${m.timetableName} • ${m.academicYear}',
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => temp = v ?? '',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, temp),
-                      child: const Text('Use'),
-                    ),
-                  ],
-                ),
-              );
-              if (got == null || got.isEmpty) return;
-              masterIdToUse = got;
-              setState(() => selectedMasterId = masterIdToUse);
-            }
-
-            final res = await showDialog<Map<String, dynamic>>(
-              context: context,
-              builder: (_) => CreateClassTimetableDialog(
-                tenantId: widget.tenantId,
-                userId: widget.currentUserId,
-                masterId: masterIdToUse,
-                academicYear: widget.academicYear,
+      ),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 96),
+        children: [
+          _ActionsCard(
+            hasTenant: hasTenant,
+            canBulkEdit: canBulkEdit,
+            onCreateMaster: _createMaster,
+            onCreateClass: _createClassTimetable,
+            onBulkEdit: _bulkEdit,
+          ),
+          const SizedBox(height: Sa.gap),
+          _MastersCard(
+            masters: masters,
+            selectedMasterId: selectedMasterId,
+            onSelect: (id) => setState(() => selectedMasterId = id),
+          ),
+          const SizedBox(height: Sa.gap),
+          _ClassPicker(
+            tenantId: widget.tenantId,
+            academicYear: widget.academicYear,
+            baseUrl: widget.baseUrl,
+            onPick: _loadClassSchedule,
+          ),
+          const SizedBox(height: Sa.gap),
+          LayoutBuilder(
+            builder: (context, c) {
+              final oneCol = c.maxWidth < 600;
+              final analytics = _AnalyticsPanel(
                 api: api,
-                classApi: classApi,
-              ),
-            );
-            if (res != null && res["class_id"] != null) {
-              await _loadClassSchedule(res["class_id"] as String);
-            }
-          },
-          child: const Text("Create Class Timetable"),
-        ),
+                tenantId: widget.tenantId,
+                academicYear: widget.academicYear,
+              );
+              final conflicts = _ConflictsScrollable(
+                api: api,
+                tenantId: widget.tenantId,
+              );
+              if (oneCol) {
+                return Column(
+                  children: [
+                    analytics,
+                    const SizedBox(height: Sa.gap),
+                    conflicts,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: analytics),
+                  const SizedBox(width: Sa.gap),
+                  Expanded(child: conflicts),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: Sa.gap),
+          _ScheduleCard(
+            loading: loadingSchedule,
+            weekly: weekly,
+            totalPeriods: totalPeriods,
+            workingDays: workingDays,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-        const SizedBox(width: 8),
-        OutlinedButton(
-          onPressed: canBulkEdit
-              ? () async {
-                  final saved = await showDialog<bool>(
-                    context: context,
-                    builder: (_) => BulkScheduleDialog(
-                      tenantId: widget.tenantId,
-                      classId: selectedClassId!,
-                      academicYear: widget.academicYear,
-                      api: api,
-                    ),
-                  );
-                  if (saved == true && selectedClassId != null) {
-                    await _loadClassSchedule(selectedClassId!);
-                  }
-                }
-              : null,
-          child: const Text("Bulk Edit"),
+/// Quick-actions card: create master, create class timetable, bulk edit.
+class _ActionsCard extends StatelessWidget {
+  const _ActionsCard({
+    required this.hasTenant,
+    required this.canBulkEdit,
+    required this.onCreateMaster,
+    required this.onCreateClass,
+    required this.onBulkEdit,
+  });
+
+  final bool hasTenant;
+  final bool canBulkEdit;
+  final VoidCallback onCreateMaster;
+  final VoidCallback onCreateClass;
+  final VoidCallback onBulkEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.bolt_outlined,
+            title: 'Quick actions',
+          ),
+          const SizedBox(height: Sa.gap),
+          SaPrimaryButton(
+            label: 'New Master',
+            icon: Icons.add,
+            expand: true,
+            onPressed: hasTenant ? onCreateMaster : null,
+          ),
+          const SizedBox(height: Sa.gapXs),
+          _OutlinedAction(
+            label: 'Create Class Timetable',
+            icon: Icons.class_outlined,
+            onPressed: onCreateClass,
+          ),
+          const SizedBox(height: Sa.gapXs),
+          _OutlinedAction(
+            label: 'Bulk Edit',
+            icon: Icons.edit_calendar_outlined,
+            onPressed: canBulkEdit ? onBulkEdit : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OutlinedAction extends StatelessWidget {
+  const _OutlinedAction({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 18),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Sa.accent,
+          minimumSize: const Size(0, 48),
+          side: BorderSide(color: Sa.accent.withValues(alpha: 0.6), width: 1.4),
+          shape: const RoundedRectangleBorder(
+            borderRadius: AppTheme.borderRadius12,
+          ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -351,128 +400,88 @@ class _MastersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: const RoundedRectangleBorder(
-        borderRadius: AppTheme.borderRadius12,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Master Timetables",
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 260,
-              child: masters.isEmpty
-                  ? const Center(child: Text("No masters"))
-                  : ListView.builder(
-                      itemCount: masters.length,
-                      itemBuilder: (ctx, i) {
-                        final m = masters[i];
-                        final selected = m.id == selectedMasterId;
-                        return ListTile(
-                          dense: true,
-                          title: Text(m.timetableName),
-                          subtitle: Text(
-                            "${m.academicYear} • ${m.totalPeriodsPerDay} periods/day",
-                          ),
-                          selected: selected,
-                          onTap: () => onSelect(m.id),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RightColumn extends StatelessWidget {
-  const _RightColumn({
-    required this.api,
-    required this.tenantId,
-    required this.academicYear,
-    required this.baseUrl,
-    required this.onPickClass,
-  });
-
-  final TimetableService api;
-  final UUID tenantId;
-  final String academicYear;
-  final String baseUrl;
-  final void Function(UUID) onPickClass;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Card(
-          elevation: 0,
-          shape: const RoundedRectangleBorder(
-            borderRadius: AppTheme.borderRadius12,
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.event_note_outlined,
+            title: 'Master Timetables',
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: SizedBox(
-              height: 140,
-              child: _ClassPicker(
-                tenantId: tenantId,
-                academicYear: academicYear,
-                baseUrl: baseUrl,
-                onPick: onPickClass,
+          const SizedBox(height: Sa.gap),
+          if (masters.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'No masters yet',
+                style: Sa.body,
+                textAlign: TextAlign.center,
               ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 160,
-          child: Row(
-            children: [
-              Expanded(
-                child: Card(
-                  elevation: 0,
-                  shape: const RoundedRectangleBorder(
+            )
+          else
+            ...masters.map((m) {
+              final selected = m.id == selectedMasterId;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: Sa.gapXs),
+                child: Material(
+                  color: selected
+                      ? Sa.accent.withValues(alpha: 0.10)
+                      : AppTheme.neutral50,
+                  borderRadius: AppTheme.borderRadius12,
+                  child: InkWell(
+                    onTap: () => onSelect(m.id),
                     borderRadius: AppTheme.borderRadius12,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: SingleChildScrollView(
-                      child: _AnalyticsPanel(
-                        api: api,
-                        tenantId: tenantId,
-                        academicYear: academicYear,
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: AppTheme.borderRadius12,
+                        border: Border.all(
+                          color: selected
+                              ? Sa.accent.withValues(alpha: 0.5)
+                              : Sa.stroke.withValues(alpha: 0.7),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  m.timetableName,
+                                  style: Sa.value,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${m.academicYear} • ${m.totalPeriodsPerDay} periods/day',
+                                  style: Sa.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (selected)
+                            const Icon(
+                              Icons.check_circle,
+                              size: 18,
+                              color: Sa.accent,
+                            ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Card(
-                  elevation: 0,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: AppTheme.borderRadius12,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: SingleChildScrollView(
-                      child: _ConflictsScrollable(api: api, tenantId: tenantId),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+              );
+            }),
+        ],
+      ),
     );
   }
 }
@@ -535,9 +544,13 @@ class _ClassPickerState extends State<_ClassPicker> {
       setState(() {});
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Failed to load classes: $e")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to load classes: $e"),
+            backgroundColor: AppTheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => loading = false);
@@ -546,38 +559,129 @@ class _ClassPickerState extends State<_ClassPicker> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("Pick Class", style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        if (loading) const LinearProgressIndicator(),
-        DropdownButtonFormField<String>(
-          isDense: true,
-          value: selected,
-          hint: const Text("Select class"),
-          items: classes
-              .map(
-                (e) => DropdownMenuItem(
-                  value: e["id"],
-                  child: Text(e["name"] ?? e["id"]!),
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.groups_outlined,
+            title: 'Pick Class',
+          ),
+          const SizedBox(height: Sa.gap),
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: Sa.gapXs),
+              child: ClipRRect(
+                borderRadius: AppTheme.borderRadius8,
+                child: LinearProgressIndicator(
+                  minHeight: 6,
+                  backgroundColor: AppTheme.neutral200,
+                  valueColor: AlwaysStoppedAnimation(AppTheme.greenPrimary),
                 ),
-              )
-              .toList(),
-          onChanged: (v) => setState(() => selected = v),
-        ),
-        const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: selected == null ? null : () => widget.onPick(selected!),
-          child: const Text("Load Schedule"),
-        ),
-      ],
+              ),
+            ),
+          DropdownButtonFormField<String>(
+            isExpanded: true,
+            isDense: true,
+            initialValue: selected,
+            hint: const Text("Select class"),
+            items: classes
+                .map(
+                  (e) => DropdownMenuItem(
+                    value: e["id"],
+                    child: Text(
+                      e["name"] ?? e["id"]!,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+                .toList(),
+            onChanged: (v) => setState(() => selected = v),
+          ),
+          const SizedBox(height: Sa.gap),
+          SaPrimaryButton(
+            label: 'Load Schedule',
+            icon: Icons.download_outlined,
+            expand: true,
+            onPressed: selected == null
+                ? null
+                : () => widget.onPick(selected!),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _WeeklyGridTable extends StatelessWidget {
-  const _WeeklyGridTable({
+/// Weekly schedule card with day-wise, never-overflowing layout.
+class _ScheduleCard extends StatelessWidget {
+  const _ScheduleCard({
+    required this.loading,
+    required this.weekly,
+    required this.totalPeriods,
+    required this.workingDays,
+  });
+
+  final bool loading;
+  final WeeklySchedule? weekly;
+  final int totalPeriods;
+  final List<DayOfWeek> workingDays;
+
+  @override
+  Widget build(BuildContext context) {
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.calendar_month_outlined,
+            title: 'Weekly Schedule',
+          ),
+          const SizedBox(height: Sa.gap),
+          if (loading)
+            const Padding(
+              padding: EdgeInsets.only(bottom: Sa.gap),
+              child: ClipRRect(
+                borderRadius: AppTheme.borderRadius8,
+                child: LinearProgressIndicator(
+                  minHeight: 6,
+                  backgroundColor: AppTheme.neutral200,
+                  valueColor: AlwaysStoppedAnimation(AppTheme.greenPrimary),
+                ),
+              ),
+            ),
+          if (weekly == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.event_busy_outlined,
+                      size: 32,
+                      color: AppTheme.neutral400,
+                    ),
+                    SizedBox(height: Sa.gapXs),
+                    Text('No class selected', style: Sa.body),
+                  ],
+                ),
+              ),
+            )
+          else
+            _WeeklyDayWise(
+              weekly: weekly!,
+              totalPeriods: totalPeriods,
+              workingDays: workingDays,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Day-wise rendering of the weekly schedule so it never overflows on a phone.
+class _WeeklyDayWise extends StatelessWidget {
+  const _WeeklyDayWise({
     required this.weekly,
     required this.totalPeriods,
     required this.workingDays,
@@ -586,75 +690,118 @@ class _WeeklyGridTable extends StatelessWidget {
   final int totalPeriods;
   final List<DayOfWeek> workingDays;
 
+  String _dayLabel(DayOfWeek d) =>
+      d.name[0].toUpperCase() + d.name.substring(1);
+
   @override
   Widget build(BuildContext context) {
     final days = workingDays.isEmpty
         ? DayOfWeek.values.where((d) => d != DayOfWeek.sunday).toList()
         : workingDays;
 
-    return DataTable(
-      columns: [
-        const DataColumn(label: Text("Period")),
-        ...days.map(
-          (d) => DataColumn(
-            label: Text(d.name[0].toUpperCase() + d.name.substring(1)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final d in days) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: Sa.gapXs, top: Sa.gapXs),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Sa.accent.withValues(alpha: 0.12),
+                    borderRadius: AppTheme.borderRadius8,
+                  ),
+                  child: Text(
+                    _dayLabel(d),
+                    style: Sa.label.copyWith(
+                      color: Sa.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+          ...List.generate(totalPeriods, (i) {
+            final p = i + 1;
+            final cells = weekly.days[d] ?? [];
+            final cell = cells
+                .where((c) => c.periodNumber == p)
+                .cast<ScheduleCell?>()
+                .firstWhere((_) => true, orElse: () => null);
+            return _PeriodRow(period: p, cell: cell);
+          }),
+          const SizedBox(height: Sa.gapXs),
+          const Divider(height: 1, color: AppTheme.neutral200),
+        ],
       ],
-      rows: List.generate(totalPeriods, (i) {
-        final p = i + 1;
-        return DataRow(
-          cells: [
-            DataCell(Text("$p")),
-            ...days.map((d) {
-              final cells = weekly.days[d] ?? [];
-              final cell = cells
-                  .where((c) => c.periodNumber == p)
-                  .cast<ScheduleCell?>()
-                  .firstWhere((_) => true, orElse: () => null);
-              if (cell == null) return const DataCell(Text("—"));
-              return DataCell(
-                ConstrainedBox(
-                  constraints: const BoxConstraints(minWidth: 160),
-                  child: Column(
+    );
+  }
+}
+
+class _PeriodRow extends StatelessWidget {
+  const _PeriodRow({required this.period, required this.cell});
+  final int period;
+  final ScheduleCell? cell;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text(
+              'P$period',
+              style: Sa.label.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(width: Sa.gapXs),
+          Expanded(
+            child: cell == null
+                ? const Text('—', style: Sa.body)
+                : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "${cell.periodName} • ${cell.startTime}-${cell.endTime}",
-                        style: const TextStyle(fontSize: 12),
+                        "${cell!.periodName} • ${cell!.startTime}-${cell!.endTime}",
+                        style: Sa.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (cell.subjectName != null)
+                      if (cell!.subjectName != null)
                         Text(
-                          cell.subjectName!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          cell!.subjectName!,
+                          style: Sa.value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      if (cell.teacherName != null)
+                      if (cell!.teacherName != null)
                         Text(
-                          cell.teacherName!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
+                          cell!.teacherName!,
+                          style: Sa.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      if (cell.roomNumber != null)
+                      if (cell!.roomNumber != null)
                         Text(
-                          "Room ${cell.roomNumber!}",
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                          ),
+                          "Room ${cell!.roomNumber!}",
+                          style: Sa.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                     ],
                   ),
-                ),
-              );
-            }).toList(),
-          ],
-        );
-      }),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -688,21 +835,34 @@ class _AnalyticsPanelState extends State<_AnalyticsPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return data == null
-        ? const Text("No analytics")
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Analytics",
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 6),
-              Text("Total classes: ${data!["total_classes"] ?? "-"}"),
-              Text("Total teachers: ${data!["total_teachers"] ?? "-"}"),
-              Text("Entries: ${data!["total_schedule_entries"] ?? "-"}"),
-            ],
-          );
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.insights_outlined,
+            title: 'Analytics',
+          ),
+          const SizedBox(height: Sa.gap),
+          if (data == null)
+            const Text('No analytics', style: Sa.body)
+          else ...[
+            SaInfoRow(
+              label: 'Total classes',
+              value: '${data!["total_classes"] ?? "-"}',
+            ),
+            SaInfoRow(
+              label: 'Total teachers',
+              value: '${data!["total_teachers"] ?? "-"}',
+            ),
+            SaInfoRow(
+              label: 'Entries',
+              value: '${data!["total_schedule_entries"] ?? "-"}',
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -730,20 +890,44 @@ class _ConflictsScrollableState extends State<_ConflictsScrollable> {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const Text("No conflicts");
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      itemBuilder: (ctx, i) {
-        final c = items[i];
-        return ListTile(
-          dense: true,
-          contentPadding: EdgeInsets.zero,
-          title: Text(c.title),
-          subtitle: Text("${c.conflictType} • ${c.severity}"),
-        );
-      },
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SaCardHeader(
+            icon: Icons.report_problem_outlined,
+            title: 'Conflicts',
+            color: items.isEmpty ? Sa.accent : AppTheme.error,
+          ),
+          const SizedBox(height: Sa.gap),
+          if (items.isEmpty)
+            const Text('No conflicts', style: Sa.body)
+          else
+            ...items.map(
+              (c) => Padding(
+                padding: const EdgeInsets.only(bottom: Sa.gapXs),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      c.title,
+                      style: Sa.value,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "${c.conflictType} • ${c.severity}",
+                      style: Sa.label.copyWith(color: AppTheme.error),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

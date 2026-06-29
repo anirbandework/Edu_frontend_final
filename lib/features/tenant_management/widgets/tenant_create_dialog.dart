@@ -2,8 +2,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class TenantCreateDialog extends StatefulWidget {
   final VoidCallback onTenantCreated;
@@ -81,8 +83,70 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
     super.dispose();
   }
 
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppTheme.error,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  /// Turn a FastAPI error detail (a string, or a 422 list of {loc, msg}) into a
+  /// readable message instead of dumping raw JSON at the user.
+  String _formatDetail(dynamic detail) {
+    if (detail is String) return detail;
+    if (detail is List) {
+      final parts = detail.map((e) {
+        if (e is Map) {
+          final loc = (e['loc'] is List && (e['loc'] as List).isNotEmpty)
+              ? (e['loc'] as List).last.toString()
+              : '';
+          final msg = (e['msg'] ?? '').toString();
+          return loc.isEmpty ? msg : '$loc: $msg';
+        }
+        return e.toString();
+      }).where((s) => s.isNotEmpty);
+      if (parts.isNotEmpty) return parts.join('\n');
+    }
+    return detail?.toString() ?? 'Failed to create school';
+  }
+
   Future<void> _createTenant() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validate the visible Form fields (Basic Info required fields).
+    final formOk = _formKey.currentState?.validate() ?? false;
+
+    // Cross-tab required checks — Form validators on inactive tabs don't fire
+    // reliably, so enforce the compulsory numeric/list fields explicitly and
+    // jump the user to the tab that needs attention.
+    final maxCap = int.tryParse(_maximumCapacityController.text.trim());
+    if (maxCap == null || maxCap <= 0) {
+      _tabController.animateTo(2);
+      _showError('Maximum capacity is required and must be greater than 0.');
+      return;
+    }
+    if (_selectedGradeLevels.isEmpty) {
+      _tabController.animateTo(1);
+      setState(() {}); // surface the inline "required" hint
+      _showError('Select at least one grade level offered.');
+      return;
+    }
+    int? establishedYear;
+    final yearText = _establishedYearController.text.trim();
+    if (yearText.isNotEmpty) {
+      establishedYear = int.tryParse(yearText);
+      final thisYear = DateTime.now().year;
+      if (establishedYear == null || establishedYear < 1800 || establishedYear > thisYear) {
+        _tabController.animateTo(1);
+        _showError('Established year must be between 1800 and $thisYear (or leave it blank).');
+        return;
+      }
+    }
+    if (!formOk) {
+      _tabController.animateTo(0); // the required Basic-Info fields are here
+      _showError('Please fill all required fields.');
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -94,12 +158,13 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
       'principal_name': _principalNameController.text.trim(),
       'school_type': _schoolType,
       'language_of_instruction': _languageOfInstruction,
-      'established_year': int.tryParse(_establishedYearController.text) ?? 0,
+      // Only send established_year when provided (backend requires >= 1800).
+      if (establishedYear != null) 'established_year': establishedYear,
       'accreditation': _accreditationController.text.trim(),
       'academic_year_start': _academicYearStart?.toIso8601String(),
       'academic_year_end': _academicYearEnd?.toIso8601String(),
       'grade_levels': _selectedGradeLevels,
-      'maximum_capacity': int.tryParse(_maximumCapacityController.text) ?? 0,
+      'maximum_capacity': maxCap,
       'current_enrollment': int.tryParse(_currentEnrollmentController.text) ?? 0,
       'total_students': int.tryParse(_totalStudentsController.text) ?? 0,
       'total_teachers': int.tryParse(_totalTeachersController.text) ?? 0,
@@ -110,9 +175,11 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
     };
 
     try {
+      // Admin self-service create (the /api/v1/tenants router is super-admin
+      // only). This endpoint stamps the school's owner = the creating admin.
       final response = await http.post(
-        Uri.parse('${AppConstants.apiBaseUrl}/api/v1/tenants/'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('${AppConstants.apiBaseUrl}/api/auth/schools'),
+        headers: AuthSession.instance.headers(),
         body: json.encode(tenantData),
       );
 
@@ -129,17 +196,10 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
         }
       } else {
         final errorData = json.decode(response.body);
-        throw Exception(errorData['detail'] ?? 'Failed to create school');
+        _showError(_formatDetail(errorData['detail']));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      _showError(e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -148,50 +208,56 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.9,
-        padding: const EdgeInsets.all(24),
+      insetPadding: const EdgeInsets.all(8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            Row(
-              children: [
-                Icon(Icons.school, color: AppTheme.primaryGreen, size: 28),
-                const SizedBox(width: 12),
-                Text(
-                  'Add New School',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.primaryGreen,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.add_business, color: Sa.accent, size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Add new school',
+                      style: Sa.cardTitle.copyWith(fontSize: 18),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Close',
+                  ),
+                ],
+              ),
             ),
-            
-            const SizedBox(height: 24),
-            
-            // Tab Bar
+
+            // Tab Bar (scrollable so labels never overflow on a phone)
             TabBar(
               controller: _tabController,
-              labelColor: AppTheme.primaryGreen,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: AppTheme.primaryGreen,
+              isScrollable: true,
+              labelColor: Sa.accent,
+              unselectedLabelColor: AppTheme.neutral500,
+              indicatorColor: Sa.accent,
+              labelStyle: Sa.value,
               tabs: const [
-                Tab(text: 'Basic Info'),
+                Tab(text: 'Basic'),
                 Tab(text: 'Academic'),
                 Tab(text: 'Capacity & Finance'),
               ],
             ),
-            
-            const SizedBox(height: 24),
-            
+
+            const Divider(height: 1),
+
             // Tab Content
             Expanded(
               child: Form(
@@ -206,33 +272,40 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
                 ),
               ),
             ),
-            
-            const SizedBox(height: 24),
-            
+
+            const Divider(height: 1),
+
             // Actions
-            Row(
-              children: [
-                TextButton(
-                  onPressed: _isLoading ? null : () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _createTenant,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed:
+                          _isLoading ? null : () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppTheme.neutral700,
+                        minimumSize: const Size(0, 48),
+                        side: BorderSide(color: Sa.stroke.withValues(alpha: 0.8)),
+                        shape: const RoundedRectangleBorder(
+                            borderRadius: AppTheme.borderRadius12),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Create School'),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: SaPrimaryButton(
+                      label: 'Create school',
+                      icon: Icons.check,
+                      busy: _isLoading,
+                      expand: true,
+                      onPressed: _isLoading ? null : _createTenant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -240,42 +313,68 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
     );
   }
 
+  /// Lay [children] out as a Row on wide screens and a Column on phones
+  /// (< 600px). Spacing is inserted automatically between fields.
+  Widget _responsiveFields(List<Widget> children) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stack = constraints.maxWidth < 600;
+        if (stack) {
+          final col = <Widget>[];
+          for (var i = 0; i < children.length; i++) {
+            col.add(children[i]);
+            if (i != children.length - 1) {
+              col.add(const SizedBox(height: 16));
+            }
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: col,
+          );
+        }
+        final row = <Widget>[];
+        for (var i = 0; i < children.length; i++) {
+          row.add(Expanded(child: children[i]));
+          if (i != children.length - 1) {
+            row.add(const SizedBox(width: 16));
+          }
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: row);
+      },
+    );
+  }
+
   Widget _buildBasicInfoTab() {
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _schoolNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'School Name *',
-                    hintText: 'Enter school name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => value?.isEmpty == true ? 'School name is required' : null,
-                ),
+          _responsiveFields([
+            TextFormField(
+              controller: _schoolNameController,
+              decoration: const InputDecoration(
+                labelText: 'School Name *',
+                hintText: 'Enter school name',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _schoolType,
-                  decoration: const InputDecoration(
-                    labelText: 'School Type',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _schoolTypes.map((type) {
-                    return DropdownMenuItem(value: type, child: Text(type));
-                  }).toList(),
-                  onChanged: (value) => setState(() => _schoolType = value!),
-                ),
+              validator: (value) =>
+                  value?.isEmpty == true ? 'School name is required' : null,
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: _schoolType,
+              decoration: const InputDecoration(
+                labelText: 'School Type',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          
+              items: _schoolTypes.map((type) {
+                return DropdownMenuItem(value: type, child: Text(type));
+              }).toList(),
+              onChanged: (value) => setState(() => _schoolType = value!),
+            ),
+          ]),
+
           const SizedBox(height: 16),
-          
+
           TextFormField(
             controller: _addressController,
             decoration: const InputDecoration(
@@ -288,72 +387,62 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
           ),
           
           const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number *',
-                    hintText: '+91 98765 43210',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => value?.isEmpty == true ? 'Phone number is required' : null,
-                ),
+
+          _responsiveFields([
+            TextFormField(
+              controller: _phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number *',
+                hintText: '+91 98765 43210',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email Address *',
-                    hintText: 'school@example.com',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value?.isEmpty == true) return 'Email is required';
-                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value!)) {
-                      return 'Enter valid email';
-                    }
-                    return null;
-                  },
-                ),
+              validator: (value) =>
+                  value?.isEmpty == true ? 'Phone number is required' : null,
+            ),
+            TextFormField(
+              controller: _emailController,
+              decoration: const InputDecoration(
+                labelText: 'Email Address *',
+                hintText: 'school@example.com',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          
+              validator: (value) {
+                if (value?.isEmpty == true) return 'Email is required';
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                    .hasMatch(value!)) {
+                  return 'Enter valid email';
+                }
+                return null;
+              },
+            ),
+          ]),
+
           const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _principalNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Principal Name *',
-                    hintText: 'Enter principal name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) => value?.isEmpty == true ? 'Principal name is required' : null,
-                ),
+
+          _responsiveFields([
+            TextFormField(
+              controller: _principalNameController,
+              decoration: const InputDecoration(
+                labelText: 'Principal Name *',
+                hintText: 'Enter principal name',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  value: _languageOfInstruction,
-                  decoration: const InputDecoration(
-                    labelText: 'Language of Instruction',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: _languages.map((lang) {
-                    return DropdownMenuItem(value: lang, child: Text(lang));
-                  }).toList(),
-                  onChanged: (value) => setState(() => _languageOfInstruction = value!),
-                ),
+              validator: (value) =>
+                  value?.isEmpty == true ? 'Principal name is required' : null,
+            ),
+            DropdownButtonFormField<String>(
+              initialValue: _languageOfInstruction,
+              decoration: const InputDecoration(
+                labelText: 'Language of Instruction',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
+              items: _languages.map((lang) {
+                return DropdownMenuItem(value: lang, child: Text(lang));
+              }).toList(),
+              onChanged: (value) =>
+                  setState(() => _languageOfInstruction = value!),
+            ),
+          ]),
         ],
       ),
     );
@@ -361,98 +450,103 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
 
   Widget _buildAcademicTab() {
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _establishedYearController,
-                  decoration: const InputDecoration(
-                    labelText: 'Established Year',
-                    hintText: '1995',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
+          _responsiveFields([
+            TextFormField(
+              controller: _establishedYearController,
+              decoration: const InputDecoration(
+                labelText: 'Established Year (optional)',
+                hintText: 'e.g. 1995',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _accreditationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Accreditation',
-                    hintText: 'CBSE, ICSE, IB, etc.',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                final t = (value ?? '').trim();
+                if (t.isEmpty) return null; // optional
+                final y = int.tryParse(t);
+                if (y == null || y < 1800 || y > DateTime.now().year) {
+                  return '1800–${DateTime.now().year}';
+                }
+                return null;
+              },
+            ),
+            TextFormField(
+              controller: _accreditationController,
+              decoration: const InputDecoration(
+                labelText: 'Accreditation',
+                hintText: 'CBSE, ICSE, IB, etc.',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          
+            ),
+          ]),
+
           const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: _academicYearStart ?? DateTime.now(),
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime(2100),
-                    );
-                    if (date != null) setState(() => _academicYearStart = date);
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Academic Year Start',
-                      border: OutlineInputBorder(),
-                    ),
-                    child: Text(
-                      _academicYearStart != null
-                          ? '${_academicYearStart!.day}/${_academicYearStart!.month}/${_academicYearStart!.year}'
-                          : 'Select date',
-                    ),
-                  ),
+
+          _responsiveFields([
+            InkWell(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _academicYearStart ?? DateTime.now(),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime(2100),
+                );
+                if (date != null) setState(() => _academicYearStart = date);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Academic Year Start',
+                  border: OutlineInputBorder(),
+                ),
+                child: Text(
+                  _academicYearStart != null
+                      ? '${_academicYearStart!.day}/${_academicYearStart!.month}/${_academicYearStart!.year}'
+                      : 'Select date',
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: _academicYearEnd ?? DateTime.now(),
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime(2100),
-                    );
-                    if (date != null) setState(() => _academicYearEnd = date);
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Academic Year End',
-                      border: OutlineInputBorder(),
-                    ),
-                    child: Text(
-                      _academicYearEnd != null
-                          ? '${_academicYearEnd!.day}/${_academicYearEnd!.month}/${_academicYearEnd!.year}'
-                          : 'Select date',
-                    ),
-                  ),
+            ),
+            InkWell(
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _academicYearEnd ?? DateTime.now(),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime(2100),
+                );
+                if (date != null) setState(() => _academicYearEnd = date);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'Academic Year End',
+                  border: OutlineInputBorder(),
+                ),
+                child: Text(
+                  _academicYearEnd != null
+                      ? '${_academicYearEnd!.day}/${_academicYearEnd!.month}/${_academicYearEnd!.year}'
+                      : 'Select date',
                 ),
               ),
-            ],
-          ),
-          
+            ),
+          ]),
+
           const SizedBox(height: 16),
           
           Text(
-            'Grade Levels Offered',
+            'Grade Levels Offered *',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            _selectedGradeLevels.isEmpty
+                ? 'Select at least one grade level'
+                : '${_selectedGradeLevels.length} selected',
+            style: AppTheme.bodySmall.copyWith(
+              color: _selectedGradeLevels.isEmpty ? AppTheme.error : AppTheme.neutral500,
             ),
           ),
           const SizedBox(height: 8),
@@ -473,7 +567,12 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
                     }
                   });
                 },
-                selectedColor: AppTheme.lightGreen,
+                selectedColor: AppTheme.greenPrimary,
+                checkmarkColor: Colors.white,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : AppTheme.neutral700,
+                  fontWeight: FontWeight.w500,
+                ),
               );
             }).toList(),
           ),
@@ -484,126 +583,102 @@ class _TenantCreateDialogState extends State<TenantCreateDialog>
 
   Widget _buildCapacityFinanceTab() {
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Capacity Information',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppTheme.primaryGreen,
+            style: Sa.cardTitle.copyWith(color: Sa.accent),
+          ),
+          const SizedBox(height: 16),
+
+          _responsiveFields([
+            TextFormField(
+              controller: _maximumCapacityController,
+              decoration: const InputDecoration(
+                labelText: 'Maximum Capacity *',
+                hintText: '1000',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                final n = int.tryParse((value ?? '').trim());
+                if (n == null || n <= 0) return 'Required, must be > 0';
+                return null;
+              },
             ),
-          ),
+            TextFormField(
+              controller: _currentEnrollmentController,
+              decoration: const InputDecoration(
+                labelText: 'Current Enrollment',
+                hintText: '850',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ]),
+
           const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _maximumCapacityController,
-                  decoration: const InputDecoration(
-                    labelText: 'Maximum Capacity',
-                    hintText: '1000',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
+
+          _responsiveFields([
+            TextFormField(
+              controller: _totalStudentsController,
+              decoration: const InputDecoration(
+                labelText: 'Total Students',
+                hintText: '850',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _currentEnrollmentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Enrollment',
-                    hintText: '850',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
+              keyboardType: TextInputType.number,
+            ),
+            TextFormField(
+              controller: _totalTeachersController,
+              decoration: const InputDecoration(
+                labelText: 'Total Teachers',
+                hintText: '45',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _totalStudentsController,
-                  decoration: const InputDecoration(
-                    labelText: 'Total Students',
-                    hintText: '850',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
+              keyboardType: TextInputType.number,
+            ),
+            TextFormField(
+              controller: _totalStaffController,
+              decoration: const InputDecoration(
+                labelText: 'Total Staff',
+                hintText: '15',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _totalTeachersController,
-                  decoration: const InputDecoration(
-                    labelText: 'Total Teachers',
-                    hintText: '45',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _totalStaffController,
-                  decoration: const InputDecoration(
-                    labelText: 'Total Staff',
-                    hintText: '15',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
-              ),
-            ],
-          ),
-          
+              keyboardType: TextInputType.number,
+            ),
+          ]),
+
           const SizedBox(height: 24),
-          
+
           Text(
             'Financial Information',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppTheme.primaryGreen,
-            ),
+            style: Sa.cardTitle.copyWith(color: Sa.accent),
           ),
           const SizedBox(height: 16),
-          
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _annualTuitionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Annual Tuition (₹)',
-                    hintText: '50000',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
+
+          _responsiveFields([
+            TextFormField(
+              controller: _annualTuitionController,
+              decoration: const InputDecoration(
+                labelText: 'Annual Tuition (₹)',
+                hintText: '50000',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: TextFormField(
-                  controller: _registrationFeeController,
-                  decoration: const InputDecoration(
-                    labelText: 'Registration Fee (₹)',
-                    hintText: '5000',
-                    border: OutlineInputBorder(),
-                  ),
-                  keyboardType: TextInputType.number,
-                ),
+              keyboardType: TextInputType.number,
+            ),
+            TextFormField(
+              controller: _registrationFeeController,
+              decoration: const InputDecoration(
+                labelText: 'Registration Fee (₹)',
+                hintText: '5000',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
+              keyboardType: TextInputType.number,
+            ),
+          ]),
         ],
       ),
     );

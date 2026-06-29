@@ -1,8 +1,10 @@
 // lib/features/admin/widgets/attendance_dialog/bulk_mark_dialog.dart
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../../../../core/models/attendance_models.dart';
+import '../../../../core/constants/app_theme.dart';
 import '../../../../services/attendance_service.dart';
+import '../../../super_admin/widgets/sa_widgets.dart';
 
 class BulkMarkDialog extends StatefulWidget {
   final AttendanceService service;
@@ -30,32 +32,138 @@ class _BulkMarkDialogState extends State<BulkMarkDialog> {
   bool _loading = false;
 
   @override
+  void dispose() {
+    _json.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final maxW = math.min(size.width - 24, 520.0);
+
     return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Bulk Mark Attendance'),
-          const SizedBox(height: 8),
-          TextFormField(
-            controller: _json,
-            minLines: 10,
-            maxLines: 18,
-            decoration: const InputDecoration(hintText: 'Paste JSON array of attendance_records'),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Spacer(),
-              TextButton(onPressed: _loading ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-              const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                child: _loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Upload'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW,
+          maxHeight: size.height - 80,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Green gradient header.
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              decoration: const BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(Sa.radius),
+                ),
               ),
-            ],
-          ),
-        ]),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: AppTheme.borderRadius12,
+                    ),
+                    child: const Icon(Icons.upload_file_outlined,
+                        color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: Sa.gap),
+                  const Expanded(
+                    child: Text(
+                      'Bulk Mark Attendance',
+                      style: Sa.headerTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _loading ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    tooltip: 'Close',
+                  ),
+                ],
+              ),
+            ),
+            // Body.
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Paste a JSON array of attendance records to mark them in '
+                      'one request.',
+                      style: Sa.body,
+                    ),
+                    const SizedBox(height: Sa.gap),
+                    TextFormField(
+                      controller: _json,
+                      minLines: 10,
+                      maxLines: 18,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                        color: AppTheme.neutral800,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Paste JSON array of attendance_records',
+                        hintStyle: Sa.label,
+                        filled: true,
+                        fillColor: AppTheme.neutral50,
+                        contentPadding: const EdgeInsets.all(12),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: AppTheme.borderRadius12,
+                          borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: AppTheme.borderRadius12,
+                          borderSide: BorderSide(
+                              color: AppTheme.greenPrimary, width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Actions.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Row(
+                children: [
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _loading ? null : () => Navigator.pop(context),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.neutral600,
+                      minimumSize: const Size(0, 48),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: Sa.gapXs),
+                  SaPrimaryButton(
+                    label: 'Upload',
+                    icon: Icons.cloud_upload_outlined,
+                    busy: _loading,
+                    onPressed: _loading ? null : _submit,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -70,7 +178,11 @@ class _BulkMarkDialogState extends State<BulkMarkDialog> {
       if (mounted) Navigator.pop(context, res);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Failed: $e'),
+        backgroundColor: AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

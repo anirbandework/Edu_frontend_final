@@ -1,8 +1,8 @@
 // lib/features/admin/widgets/attendance_dialog/class_by_date_dialog.dart
-import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_constants.dart';
-import '../../../../core/utils/responsive.dart';
+import '../../../../core/constants/app_theme.dart';
 import '../../../../services/attendance_service.dart';
 import '../../../../core/models/attendance_models.dart';
 
@@ -10,6 +10,7 @@ import '../../../../core/models/attendance_models.dart';
 // If ClassApi is in lib/features/admin/services/class_api.dart, update the import accordingly.
 import '../../../../core/models/class_model.dart'; // <-- adjust to your actual path
 import '../../../../services/class_service.dart'; // <-- adjust to your actual path
+import '../../../super_admin/widgets/sa_widgets.dart';
 
 class ClassByDateDialog extends StatefulWidget {
   final AttendanceService service;
@@ -44,8 +45,14 @@ class _ClassByDateDialogState extends State<ClassByDateDialog> {
   void initState() {
     super.initState();
     _date = widget.initialDate ?? DateTime.now();
-    _classApi = ClassApi(baseUrl: AppConstants.apiBaseUrl);
+    _classApi = const ClassApi(baseUrl: AppConstants.apiBaseUrl);
     _loadClasses();
+  }
+
+  @override
+  void dispose() {
+    _periodCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadClasses() async {
@@ -70,9 +77,7 @@ class _ClassByDateDialogState extends State<ClassByDateDialog> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load classes: $e')),
-      );
+      _snack('Failed to load classes: $e', ok: false);
     } finally {
       if (mounted) setState(() => _loadingClasses = false);
     }
@@ -104,116 +109,366 @@ class _ClassByDateDialogState extends State<ClassByDateDialog> {
       setState(() => _rows = rows);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load attendance: $e')),
-      );
+      _snack('Failed to load attendance: $e', ok: false);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  void _snack(String msg, {required bool ok}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: ok ? AppTheme.greenPrimary : AppTheme.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  String _dateLabel(DateTime d) => d.toIso8601String().split('T').first;
+
   @override
   Widget build(BuildContext context) {
-    final dialogWidth = context.responsive(ResponsiveSize.dialogWidth) ?? (context.screenWidth - 32);
+    final media = MediaQuery.of(context);
+    final maxW = math.min(media.size.width - 24, 520.0);
+    final maxH = media.size.height - 80;
+
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+      ),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: dialogWidth, maxHeight: context.screenHeight * 0.9),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(children: [
-                const Icon(Icons.people_alt_outlined),
-                const SizedBox(width: 8),
-                Text('Class attendance by date', style: Theme.of(context).textTheme.titleLarge),
-                const Spacer(),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
-              ]),
-              const SizedBox(height: 12),
-
-              // Filters row
-              ResponsiveRow(
-                spacing: 12,
-                children: [
-                  // Tenant locked info (optional)
-                  Expanded(
-                    child: InkWell(
-                      onTap: null,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Tenant'),
-                        child: Text(widget.tenantId ?? '-'),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: _loadingClasses
-                        ? const LinearProgressIndicator(minHeight: 24)
-                        : DropdownButtonFormField<ClassModel>(
-                            value: _selectedClass,
-                            isExpanded: true,
-                            decoration: const InputDecoration(labelText: 'Class'),
-                            items: _classes
-                                .map(
-                                  (c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text('${c.className} • Grade ${c.gradeLevel}${c.section.isNotEmpty ? ' - ${c.section}' : ''}'),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) => setState(() => _selectedClass = v),
-                          ),
-                  ),
-                  Expanded(
-                    child: InkWell(
-                      onTap: _pickDate,
-                      child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Date'),
-                        child: Text(_date.toIso8601String().split('T').first),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _periodCtrl,
-                      decoration: const InputDecoration(labelText: 'Period (optional)'),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: (_selectedClass == null || _loading) ? null : _loadAttendance,
-                    icon: const Icon(Icons.search),
-                    label: _loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Load'),
-                  ),
-                ],
+        constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _header(),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                    Sa.gapLg, Sa.gapLg, Sa.gapLg, Sa.gapLg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _filtersCard(),
+                    const SizedBox(height: Sa.gapLg),
+                    _results(),
+                  ],
+                ),
               ),
-
-              const SizedBox(height: 16),
-
-              // Results
-              Expanded(
-                child: _rows.isEmpty
-                    ? const Center(child: Text('No records'))
-                    : Scrollbar(
-                        child: ListView.separated(
-                          itemCount: _rows.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (_, i) {
-                            final r = _rows[i];
-                            return ListTile(
-                              dense: true,
-                              title: Text('${r.userId} • ${r.subjectName ?? '-'}'),
-                              subtitle: Text('${r.status.name} • ${r.attendanceType.name} • Period ${r.periodNumber ?? '-'}'),
-                              trailing: Text(r.attendanceDate.toIso8601String().split('T').first),
-                            );
-                          },
-                        ),
-                      ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  // --- Gradient header -------------------------------------------------------
+  Widget _header() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(Sa.gapLg, Sa.gap, Sa.gap, Sa.gap),
+      decoration: const BoxDecoration(
+        gradient: AppTheme.primaryGradient,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(Sa.radius),
+          topRight: Radius.circular(Sa.radius),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: AppTheme.borderRadius12,
+            ),
+            child: const Icon(Icons.people_alt_outlined,
+                color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: Sa.gap),
+          const Expanded(
+            child: Text(
+              'Class attendance by date',
+              style: Sa.headerTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close, color: Colors.white),
+            tooltip: 'Close',
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- Filters ---------------------------------------------------------------
+  Widget _filtersCard() {
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SaCardHeader(
+            icon: Icons.tune_rounded,
+            title: 'Filters',
+          ),
+          const SizedBox(height: Sa.gap),
+          LayoutBuilder(
+            builder: (context, c) {
+              final oneCol = c.maxWidth < 600;
+              final tenantField = _tenantField();
+              final classField = _classField();
+              final dateField = _dateField();
+              final periodField = _periodField();
+
+              if (oneCol) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    tenantField,
+                    const SizedBox(height: Sa.gap),
+                    classField,
+                    const SizedBox(height: Sa.gap),
+                    dateField,
+                    const SizedBox(height: Sa.gap),
+                    periodField,
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: tenantField),
+                      const SizedBox(width: Sa.gap),
+                      Expanded(child: classField),
+                    ],
+                  ),
+                  const SizedBox(height: Sa.gap),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: dateField),
+                      const SizedBox(width: Sa.gap),
+                      Expanded(child: periodField),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: Sa.gapLg),
+          SaPrimaryButton(
+            label: _loading ? 'Loading…' : 'Load attendance',
+            icon: Icons.search_rounded,
+            busy: _loading,
+            expand: true,
+            onPressed: (_selectedClass == null || _loading) ? null : _loadAttendance,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tenantField() {
+    return InputDecorator(
+      decoration: _dec('Tenant'),
+      child: Text(
+        widget.tenantId?.isNotEmpty == true ? widget.tenantId! : '—',
+        style: Sa.value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _classField() {
+    if (_loadingClasses) {
+      return InputDecorator(
+        decoration: _dec('Class'),
+        child: const SizedBox(
+          height: 20,
+          child: Center(
+            child: LinearProgressIndicator(
+              minHeight: 4,
+              backgroundColor: AppTheme.neutral200,
+              valueColor: AlwaysStoppedAnimation(AppTheme.greenPrimary),
+            ),
+          ),
+        ),
+      );
+    }
+    return DropdownButtonFormField<ClassModel>(
+      initialValue: _selectedClass,
+      isExpanded: true,
+      decoration: _dec('Class'),
+      style: Sa.value,
+      items: _classes
+          .map(
+            (c) => DropdownMenuItem(
+              value: c,
+              child: Text(
+                '${c.className} • Grade ${c.gradeLevel}${c.section.isNotEmpty ? ' - ${c.section}' : ''}',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (v) => setState(() => _selectedClass = v),
+    );
+  }
+
+  Widget _dateField() {
+    return InkWell(
+      onTap: _pickDate,
+      borderRadius: AppTheme.borderRadius12,
+      child: InputDecorator(
+        decoration: _dec('Date').copyWith(
+          suffixIcon: const Icon(Icons.calendar_today_outlined,
+              size: 18, color: AppTheme.neutral500),
+        ),
+        child: Text(
+          _dateLabel(_date),
+          style: Sa.value,
+        ),
+      ),
+    );
+  }
+
+  Widget _periodField() {
+    return TextFormField(
+      controller: _periodCtrl,
+      style: Sa.value,
+      decoration: _dec('Period (optional)'),
+      keyboardType: TextInputType.number,
+    );
+  }
+
+  InputDecoration _dec(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: Sa.label,
+      isDense: true,
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
+      ),
+      border: OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: AppTheme.greenPrimary, width: 1.5),
+      ),
+    );
+  }
+
+  // --- Results ---------------------------------------------------------------
+  Widget _results() {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: SaLoading(message: 'Loading attendance…'),
+      );
+    }
+    if (_rows.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: SaStateView(
+          icon: Icons.inbox_outlined,
+          title: 'No records',
+          subtitle: 'Pick a class and date, then load attendance.',
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: Sa.gap),
+          child: Row(
+            children: [
+              const Text('Results', style: Sa.cardTitle),
+              const SizedBox(width: Sa.gapXs),
+              SaStatusPill(text: '${_rows.length}'),
+            ],
+          ),
+        ),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _rows.length,
+          separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
+          itemBuilder: (_, i) => _recordCard(_rows[i]),
+        ),
+      ],
+    );
+  }
+
+  Widget _recordCard(AttendanceRecord r) {
+    return SaCard(
+      padding: const EdgeInsets.all(Sa.gap),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${r.userId} • ${r.subjectName ?? '-'}',
+                  style: Sa.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: Sa.gapXs),
+              Text(
+                _dateLabel(r.attendanceDate),
+                style: Sa.label,
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              SaStatusPill(
+                text: r.status.name,
+                color: _statusColor(r.status.name),
+              ),
+              SaStatusPill(
+                text: r.attendanceType.name,
+                color: AppTheme.neutral500,
+              ),
+              SaStatusPill(
+                text: 'Period ${r.periodNumber ?? '-'}',
+                color: AppTheme.neutral500,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    final s = status.toLowerCase();
+    if (s.contains('absent')) return AppTheme.error;
+    return AppTheme.greenPrimary;
   }
 }

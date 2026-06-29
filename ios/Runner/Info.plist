@@ -45,5 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Allow cleartext HTTP to the dev backend on the local network (e.g. 192.168.x.x).
+	     Remove / switch to HTTPS for production. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>EduAssist connects to your school server on the local network.</string>
 </dict>
 </plist>

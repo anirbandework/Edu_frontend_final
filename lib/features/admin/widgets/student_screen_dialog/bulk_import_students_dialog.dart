@@ -1,11 +1,13 @@
 // lib/features/school_authority/widgets/bulk_import_students_dialog.dart
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/constants/app_theme.dart';
 import '../../../../core/utils/school_session.dart';
 import '../../../../services/student_bulk_operations_service.dart';
+import '../../../super_admin/widgets/sa_widgets.dart';
 
 class BulkImportStudentsDialog extends StatefulWidget {
   final Function(String message)? onSuccess;
@@ -30,23 +32,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
   String? _fileName;
   int _validStudents = 0;
   int _invalidStudents = 0;
-  List<String> _errors = [];
-
-  // For help text only
-  final Map<String, String> _columnMappings = const {
-    'student_id': 'Student ID',
-    'first_name': 'First Name',
-    'last_name': 'Last Name',
-    'email': 'Email',
-    'phone': 'Phone',
-    'date_of_birth': 'Date of Birth',
-    'address': 'Address',
-    'admission_number': 'Admission Number',
-    'roll_number': 'Roll Number',
-    'grade_level': 'Grade Level',
-    'section': 'Section',
-    'academic_year': 'Academic Year',
-  };
+  final List<String> _errors = [];
 
   Future<void> _pickAndProcessFile() async {
     try {
@@ -87,7 +73,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
       final List<dynamic> headers = csvTable.first
           .map((h) => h
               .toString()
-              .replaceAll('\uFEFF', '') // BOM
+              .replaceAll('﻿', '') // BOM
               .trim()
               .toLowerCase())
           .toList();
@@ -316,36 +302,78 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
     if (!mounted) return;
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sample CSV Content'),
-        content: SingleChildScrollView(
-          child: Text(
-            csvString,
-            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+      builder: (context) {
+        final maxW = MediaQuery.of(context).size.width - 24;
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          backgroundColor: Sa.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sa.radius)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: maxW > 520 ? 520 : maxW,
+              maxHeight: MediaQuery.of(context).size.height - 120,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  child: Text('Sample CSV Content', style: Sa.cardTitle),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.neutral50,
+                        borderRadius: AppTheme.borderRadius8,
+                        border: Border.all(color: Sa.stroke),
+                      ),
+                      child: Text(
+                        csvString,
+                        style: Sa.body.copyWith(fontFamily: 'monospace', fontSize: 12),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.neutral600,
+                        minimumSize: const Size(0, 44),
+                      ),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
+    final size = MediaQuery.of(context).size;
+    final maxW = math.min(size.width - 24, 560.0);
 
     return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: screenSize.width > 700 ? 600 : screenSize.width * 0.95,
-        constraints: BoxConstraints(maxHeight: screenSize.height * 0.9),
-        decoration: AppTheme.getCompactDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppTheme.neutral200),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sa.radius)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW,
+          maxHeight: size.height - 80,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -353,28 +381,35 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
             // Header
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(18),
               decoration: const BoxDecoration(
                 gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(Sa.radius)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.upload_file, color: Colors.white, size: 24),
-                  const SizedBox(width: 12),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: AppTheme.borderRadius12,
+                    ),
+                    child: const Icon(Icons.upload_file, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: Sa.gap),
                   const Expanded(
                     child: Text(
                       'Bulk Import Students',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Sa.headerTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Colors.white, size: 24),
+                    icon: const Icon(Icons.close, color: Colors.white, size: 22),
+                    splashRadius: 22,
                   ),
                 ],
               ),
@@ -383,59 +418,58 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
             // Content
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(Sa.gapLg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Instructions
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(Sa.gapLg),
                       decoration: BoxDecoration(
-                        color: AppTheme.info.withOpacity(0.1),
-                        borderRadius: AppTheme.borderRadius12,
-                        border: Border.all(color: AppTheme.info.withOpacity(0.3)),
+                        color: AppTheme.green50,
+                        borderRadius: BorderRadius.circular(Sa.radius),
+                        border: Border.all(color: Sa.accent.withValues(alpha: 0.25)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.info_outline, color: AppTheme.info, size: 20),
+                              const Icon(Icons.info_outline, color: Sa.accent, size: 20),
                               const SizedBox(width: 8),
-                              Text(
-                                'CSV Format Instructions',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.info,
+                              Expanded(
+                                child: Text(
+                                  'CSV Format Instructions',
+                                  style: Sa.cardTitle.copyWith(color: Sa.accent),
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text(
+                          const Text(
                             '• Upload a CSV file with student data\n'
                             '• Required columns: student_id, first_name, last_name, grade_level\n'
                             '• Optional columns: email, phone, date_of_birth, address, etc.\n'
                             '• Date format should be YYYY-MM-DD\n'
                             '• Grade level should be between 1-12',
-                            style: TextStyle(fontSize: 14, color: AppTheme.info),
+                            style: Sa.body,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: Sa.gap),
                           TextButton.icon(
                             onPressed: _downloadSampleCSV,
                             icon: const Icon(Icons.download, size: 18),
                             label: const Text('Download Sample CSV'),
                             style: TextButton.styleFrom(
-                              foregroundColor: AppTheme.info,
+                              foregroundColor: Sa.accent,
+                              minimumSize: const Size(0, 44),
                             ),
                           ),
                         ],
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: Sa.gapLg),
 
                     // File Upload Section
                     if (!_hasUploadedFile) ...[
@@ -443,44 +477,38 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                         child: Column(
                           children: [
                             Container(
-                              width: 120,
-                              height: 120,
+                              width: 128,
+                              height: 128,
                               decoration: BoxDecoration(
-                                color: AppTheme.neutral100,
-                                borderRadius: AppTheme.borderRadius12,
+                                color: AppTheme.neutral50,
+                                borderRadius: BorderRadius.circular(Sa.radius),
                                 border: Border.all(color: AppTheme.neutral300),
                               ),
                               child: Material(
                                 color: Colors.transparent,
                                 child: InkWell(
                                   onTap: _isLoading ? null : _pickAndProcessFile,
-                                  borderRadius: AppTheme.borderRadius12,
+                                  borderRadius: BorderRadius.circular(Sa.radius),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       if (_isLoading)
-                                        CircularProgressIndicator(color: AppTheme.greenPrimary)
+                                        const CircularProgressIndicator(color: Sa.accent)
                                       else ...[
-                                        Icon(Icons.cloud_upload_outlined, size: 40, color: AppTheme.neutral500),
+                                        const Icon(Icons.cloud_upload_outlined,
+                                            size: 40, color: AppTheme.neutral500),
                                         const SizedBox(height: 8),
-                                        Text(
-                                          'Upload CSV',
-                                          style: TextStyle(
-                                            color: AppTheme.neutral600,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
+                                        const Text('Upload CSV', style: Sa.label),
                                       ],
                                     ],
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: Sa.gapLg),
                             Text(
                               _isLoading ? 'Processing file...' : 'Click to select CSV file',
-                              style: TextStyle(color: AppTheme.neutral600, fontSize: 16),
+                              style: Sa.body,
                             ),
                           ],
                         ),
@@ -489,48 +517,48 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                       // File Upload Success
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(Sa.gapLg),
                         decoration: BoxDecoration(
-                          color: AppTheme.success.withOpacity(0.1),
-                          borderRadius: AppTheme.borderRadius12,
-                          border: Border.all(color: AppTheme.success.withOpacity(0.3)),
+                          color: AppTheme.green50,
+                          borderRadius: BorderRadius.circular(Sa.radius),
+                          border: Border.all(color: Sa.accent.withValues(alpha: 0.25)),
                         ),
                         child: Column(
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.check_circle, color: AppTheme.success, size: 24),
-                                const SizedBox(width: 12),
+                                const Icon(Icons.check_circle, color: Sa.accent, size: 24),
+                                const SizedBox(width: Sa.gap),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'File Processed Successfully',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.success,
-                                        ),
+                                        style: Sa.cardTitle.copyWith(color: Sa.accent),
                                       ),
                                       Text(
                                         _fileName ?? '',
-                                        style: TextStyle(fontSize: 14, color: AppTheme.success),
+                                        style: Sa.label,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: Sa.gap),
                             Row(
                               children: [
                                 Expanded(
-                                  child: _buildStatCard('Valid Students', '$_validStudents', AppTheme.success),
+                                  child: _buildStatCard(
+                                      'Valid Students', '$_validStudents', Sa.accent),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: Sa.gap),
                                 Expanded(
-                                  child: _buildStatCard('Invalid Rows', '$_invalidStudents', AppTheme.error),
+                                  child: _buildStatCard(
+                                      'Invalid Rows', '$_invalidStudents', AppTheme.error),
                                 ),
                               ],
                             ),
@@ -538,32 +566,28 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: Sa.gapLg),
 
                       // Errors (if any)
                       if (_errors.isNotEmpty) ...[
                         Container(
                           width: double.infinity,
                           constraints: const BoxConstraints(maxHeight: 200),
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(Sa.gapLg),
                           decoration: BoxDecoration(
-                            color: AppTheme.error.withOpacity(0.1),
-                            borderRadius: AppTheme.borderRadius12,
-                            border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+                            color: AppTheme.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(Sa.radius),
+                            border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'Errors Found:',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppTheme.error,
-                                ),
+                                style: Sa.cardTitle.copyWith(color: AppTheme.error),
                               ),
                               const SizedBox(height: 8),
-                              Expanded(
+                              Flexible(
                                 child: SingleChildScrollView(
                                   child: Column(
                                     children: _errors
@@ -572,11 +596,14 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                                               child: Row(
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
-                                                  Text('• ', style: TextStyle(color: AppTheme.error)),
+                                                  Text('• ',
+                                                      style: Sa.label
+                                                          .copyWith(color: AppTheme.error)),
                                                   Expanded(
                                                     child: Text(
                                                       error,
-                                                      style: TextStyle(fontSize: 12, color: AppTheme.error),
+                                                      style: Sa.label
+                                                          .copyWith(color: AppTheme.error),
                                                     ),
                                                   ),
                                                 ],
@@ -589,7 +616,7 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: Sa.gapLg),
                       ],
 
                       // Upload another file button
@@ -605,8 +632,12 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
                               _invalidStudents = 0;
                             });
                           },
-                          icon: const Icon(Icons.refresh, size: 18),
+                          icon: const Icon(Icons.upload_file, size: 18),
                           label: const Text('Upload Different File'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Sa.accent,
+                            minimumSize: const Size(0, 44),
+                          ),
                         ),
                       ),
                     ],
@@ -617,44 +648,32 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
 
             // Action Buttons
             Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppTheme.neutral200)),
+              padding: const EdgeInsets.all(Sa.gapLg),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Sa.stroke)),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: TextButton(
                       onPressed: _isLoading ? null : () => Navigator.pop(context),
-                      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                      child: Text('Cancel', style: TextStyle(fontSize: 16, color: AppTheme.neutral600)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.neutral600,
+                        minimumSize: const Size(0, 48),
+                      ),
+                      child: const Text('Cancel'),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: Sa.gap),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed:
-                          (_hasUploadedFile && _studentsData.isNotEmpty && !_isLoading) ? _importStudents : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.greenPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: AppTheme.borderRadius12),
-                      ),
-                      child: _isLoading
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                ),
-                                const SizedBox(width: 12),
-                                const Text('Importing...', style: TextStyle(fontSize: 16)),
-                              ],
-                            )
-                          : const Text('Import Students', style: TextStyle(fontSize: 16)),
+                    child: SaPrimaryButton(
+                      label: _isLoading ? 'Importing…' : 'Import Students',
+                      icon: Icons.upload_file,
+                      busy: _isLoading,
+                      expand: true,
+                      onPressed: (_hasUploadedFile && _studentsData.isNotEmpty && !_isLoading)
+                          ? _importStudents
+                          : null,
                     ),
                   ),
                 ],
@@ -668,20 +687,24 @@ class _BulkImportStudentsDialogState extends State<BulkImportStudentsDialog> {
 
   Widget _buildStatCard(String label, String value, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(Sa.gap),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.08),
         borderRadius: AppTheme.borderRadius8,
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           Text(
             value,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+            style: Sa.cardTitle.copyWith(fontSize: 18, color: color),
           ),
           const SizedBox(height: 4),
-          Text(label, style: TextStyle(fontSize: 12, color: color), textAlign: TextAlign.center),
+          Text(
+            label,
+            style: Sa.label.copyWith(color: color),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );

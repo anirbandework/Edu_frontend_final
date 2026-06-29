@@ -1,7 +1,6 @@
 // lib/shared/widgets/search_bar_widget.dart
 import 'package:flutter/material.dart';
 import '../../core/constants/app_theme.dart';
-import '../../core/utils/responsive.dart';
 
 class SearchBarWidget extends StatefulWidget {
   final TextEditingController controller;
@@ -71,7 +70,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
           height: 36, // Reduced height
           decoration: AppTheme.getGlassDecoration(
             color: _hasError 
-                ? AppTheme.error.withOpacity(0.05)
+                ? AppTheme.error.withValues(alpha: 0.05)
                 : _hasFocus 
                     ? AppTheme.surfacePrimary
                     : AppTheme.neutral50,
@@ -152,7 +151,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 8), // Reduced padding
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.error_outline,
                   size: 12, // Reduced icon size
                   color: AppTheme.error,
@@ -291,7 +290,7 @@ class AdvancedSearchBarWidget extends StatelessWidget {
               padding: const EdgeInsets.all(6), // Reduced padding
               margin: const EdgeInsets.symmetric(horizontal: 2), // Reduced margin
               decoration: BoxDecoration(
-                color: AppTheme.greenPrimary.withOpacity(0.1),
+                color: AppTheme.greenPrimary.withValues(alpha: 0.1),
                 borderRadius: AppTheme.borderRadius8,
               ),
               child: Icon(
@@ -317,7 +316,7 @@ class AdvancedSearchBarWidget extends StatelessWidget {
               padding: const EdgeInsets.all(6), // Reduced padding
               margin: const EdgeInsets.symmetric(horizontal: 2), // Reduced margin
               decoration: BoxDecoration(
-                color: AppTheme.info.withOpacity(0.1),
+                color: AppTheme.info.withValues(alpha: 0.1),
                 borderRadius: AppTheme.borderRadius8,
               ),
               child: Icon(
@@ -376,7 +375,7 @@ class CompactSearchBarWidget extends StatelessWidget {
             fontSize: 11, // Very small font
             color: AppTheme.neutral400,
           ),
-          prefixIcon: Icon(
+          prefixIcon: const Icon(
             Icons.search,
             size: 14, // Small icon
             color: AppTheme.neutral500,
@@ -419,8 +418,8 @@ class MicroSearchBarWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
+          const Padding(
+            padding: EdgeInsets.only(left: 8),
             child: Icon(
               Icons.search,
               size: 12, // Very small icon
@@ -453,8 +452,8 @@ class MicroSearchBarWidget extends StatelessWidget {
           if (controller.text.isNotEmpty)
             InkWell(
               onTap: enabled ? () => controller.clear() : null,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
+              child: const Padding(
+                padding: EdgeInsets.only(right: 8),
                 child: Icon(
                   Icons.close,
                   size: 12, // Very small icon
