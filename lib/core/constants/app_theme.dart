@@ -17,7 +17,7 @@ class AppTheme {
   static const Color greenSecondary = Color(0xFF388E3C);  
   static const Color greenLight = Color(0xFF66BB6A);      
   static const Color green50 = Color(0xFFF1F8E9);        
-  static const Color green100 = Color(0xDCEDC8);         
+  static const Color green100 = Color(0xFFDCEDC8);
 
   // Surface Colors - Based on your glass morphism theme
   static const Color surfacePrimary = Color.fromRGBO(255, 255, 255, 0.95);
@@ -240,7 +240,7 @@ class AppTheme {
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
     shape: const RoundedRectangleBorder(borderRadius: borderRadius12),
     elevation: 3,
-    shadowColor: greenPrimary.withOpacity(0.3),
+    shadowColor: greenPrimary.withValues(alpha: 0.3),
     textStyle: const TextStyle(
       fontSize: 16,
       fontWeight: FontWeight.w500,
@@ -306,7 +306,7 @@ class AppTheme {
     color: surfacePrimary,
     borderRadius: borderRadius16,  // Was borderRadius10
     border: Border.all(
-      color: neutral200.withOpacity(0.5),
+      color: neutral200.withValues(alpha: 0.5),
       width: 0.8,  // Slightly thicker
     ),
     boxShadow: const [cardShadow],
@@ -316,7 +316,7 @@ class AppTheme {
     color: surfacePrimary,
     borderRadius: borderRadius16,
     border: Border.all(
-      color: greenPrimary.withOpacity(0.3),
+      color: greenPrimary.withValues(alpha: 0.3),
       width: 1.5,  // Thicker
     ),
     boxShadow: const [greenShadow, cardShadow],
@@ -327,7 +327,7 @@ class AppTheme {
     color: surfacePrimary,
     borderRadius: borderRadius8,  // Was borderRadius6
     border: Border.all(
-      color: neutral200.withOpacity(0.3),
+      color: neutral200.withValues(alpha: 0.3),
       width: 0.8,
     ),
     boxShadow: const [microShadow],
@@ -337,7 +337,7 @@ class AppTheme {
     color: surfacePrimary,
     borderRadius: borderRadius12,  // Was borderRadius8
     border: Border.all(
-      color: neutral200.withOpacity(0.4),
+      color: neutral200.withValues(alpha: 0.4),
       width: 0.8,
     ),
     boxShadow: const [cardShadow],
@@ -347,25 +347,25 @@ class AppTheme {
   static InputDecorationTheme get inputDecorationTheme => InputDecorationTheme(
     filled: true,
     fillColor: neutral50,
-    border: OutlineInputBorder(
+    border: const OutlineInputBorder(
       borderRadius: borderRadius12,  // Was borderRadius8
       borderSide: BorderSide(color: neutral300),
     ),
-    enabledBorder: OutlineInputBorder(
+    enabledBorder: const OutlineInputBorder(
       borderRadius: borderRadius12,
       borderSide: BorderSide(color: neutral300),
     ),
-    focusedBorder: OutlineInputBorder(
+    focusedBorder: const OutlineInputBorder(
       borderRadius: borderRadius12,
-      borderSide: const BorderSide(color: greenPrimary, width: 2),  // Thicker
+      borderSide: BorderSide(color: greenPrimary, width: 2),  // Thicker
     ),
-    errorBorder: OutlineInputBorder(
+    errorBorder: const OutlineInputBorder(
       borderRadius: borderRadius12,
-      borderSide: const BorderSide(color: error, width: 1.5),
+      borderSide: BorderSide(color: error, width: 1.5),
     ),
-    focusedErrorBorder: OutlineInputBorder(
+    focusedErrorBorder: const OutlineInputBorder(
       borderRadius: borderRadius12,
-      borderSide: const BorderSide(color: error, width: 2),
+      borderSide: BorderSide(color: error, width: 2),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),  // Was 12, 8
     hintStyle: bodyMedium.copyWith(color: neutral400),
@@ -415,7 +415,7 @@ class AppTheme {
   static CardThemeData get cardTheme => CardThemeData(
     color: Colors.white,
     elevation: 2,  // Increased
-    shadowColor: neutral900.withOpacity(0.1),
+    shadowColor: neutral900.withValues(alpha: 0.1),
     shape: const RoundedRectangleBorder(borderRadius: borderRadius12),  // Was borderRadius8
     margin: const EdgeInsets.all(6),  // Was 4
   );
@@ -478,7 +478,7 @@ class AppTheme {
     iconTheme: const IconThemeData(color: neutral600, size: 26),  // Was 20
     primaryIconTheme: const IconThemeData(color: Colors.white, size: 26),
     
-    dividerTheme: DividerThemeData(
+    dividerTheme: const DividerThemeData(
       color: neutral200,
       thickness: 0.8,  // Slightly thicker
       space: 2,  // More space
@@ -491,9 +491,9 @@ class AppTheme {
       behavior: SnackBarBehavior.floating,
     ),
     
-    dialogTheme: DialogThemeData(
+    dialogTheme: const DialogThemeData(
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: borderRadius18),  // Was borderRadius12
+      shape: RoundedRectangleBorder(borderRadius: borderRadius18),  // Was borderRadius12
       titleTextStyle: headingSmall,
       contentTextStyle: bodyMedium,
     ),
@@ -507,7 +507,7 @@ class AppTheme {
     
     tabBarTheme: TabBarThemeData(
       labelColor: Colors.white,
-      unselectedLabelColor: Colors.white.withOpacity(0.7),
+      unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
       indicatorColor: Colors.white,
       labelStyle: labelMedium.copyWith(fontWeight: FontWeight.w600),
       unselectedLabelStyle: labelMedium,
@@ -520,34 +520,34 @@ class AppTheme {
     ),
     
     switchTheme: SwitchThemeData(
-      thumbColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.selected)) {
+      thumbColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
           return greenPrimary;
         }
         return neutral400;
       }),
-      trackColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.selected)) {
-          return greenPrimary.withOpacity(0.5);
+      trackColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return greenPrimary.withValues(alpha: 0.5);
         }
         return neutral300;
       }),
     ),
     
     checkboxTheme: CheckboxThemeData(
-      fillColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.selected)) {
+      fillColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
           return greenPrimary;
         }
         return Colors.transparent;
       }),
-      checkColor: MaterialStateProperty.all(Colors.white),
+      checkColor: WidgetStateProperty.all(Colors.white),
       shape: const RoundedRectangleBorder(borderRadius: borderRadius8),  // Was borderRadius6
     ),
     
     radioTheme: RadioThemeData(
-      fillColor: MaterialStateProperty.resolveWith((states) {
-        if (states.contains(MaterialState.selected)) {
+      fillColor: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
           return greenPrimary;
         }
         return neutral400;
@@ -558,14 +558,14 @@ class AppTheme {
       activeTrackColor: greenPrimary,
       inactiveTrackColor: green50,
       thumbColor: greenPrimary,
-      overlayColor: greenPrimary.withOpacity(0.2),
+      overlayColor: greenPrimary.withValues(alpha: 0.2),
       valueIndicatorColor: greenPrimary,
       valueIndicatorTextStyle: labelSmall.copyWith(color: Colors.white),
     ),
     
-    listTileTheme: ListTileThemeData(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),  // Was 12, 4
-      shape: const RoundedRectangleBorder(borderRadius: borderRadius12),
+    listTileTheme: const ListTileThemeData(
+      contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 8),  // Was 12, 4
+      shape: RoundedRectangleBorder(borderRadius: borderRadius12),
       titleTextStyle: labelLarge,
       subtitleTextStyle: bodyMedium,
     ),
@@ -602,7 +602,7 @@ class AppTheme {
       color: color ?? surfacePrimary,
       borderRadius: borderRadius ?? AppTheme.borderRadius16,  // Was borderRadius10
       border: border ?? Border.all(
-        color: neutral200.withOpacity(0.5),
+        color: neutral200.withValues(alpha: 0.5),
         width: 0.8,
       ),
       boxShadow: const [cardShadow],
@@ -619,7 +619,7 @@ class AppTheme {
       color: color ?? surfacePrimary,
       borderRadius: borderRadius ?? AppTheme.borderRadius8,  // Was borderRadius6
       border: border ?? Border.all(
-        color: neutral200.withOpacity(0.3),
+        color: neutral200.withValues(alpha: 0.3),
         width: 0.8,
       ),
       boxShadow: const [microShadow],
@@ -635,7 +635,7 @@ class AppTheme {
       color: color ?? surfacePrimary,
       borderRadius: borderRadius ?? AppTheme.borderRadius12,  // Was borderRadius8
       border: border ?? Border.all(
-        color: neutral200.withOpacity(0.4),
+        color: neutral200.withValues(alpha: 0.4),
         width: 0.8,
       ),
       boxShadow: const [cardShadow],

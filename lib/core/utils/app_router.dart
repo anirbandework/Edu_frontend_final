@@ -7,39 +7,19 @@ import '../../features/screens/login_screen.dart';
 import '../../features/screens/school_selection_screen.dart';
 import '../../features/screens/signup_screen.dart';
 import '../../features/screens/forgot_password_screen.dart';
-import '../../features/screens/invite_screen.dart';
 import '../auth/auth_session.dart';
 import '../../shared/widgets/main_layout.dart';
 
 import '../../features/tenant_management/screens/tenant_management_screen.dart';
-import '../../features/tenant_management/screens/tenant_access_screen.dart';
 import '../../features/super_admin/screens/admins_screen.dart';
 import '../../features/super_admin/screens/module_access_screen.dart';
 import '../../features/super_admin/screens/analytics_screen.dart';
 import '../../features/super_admin/screens/feedback_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 
-import '../../features/student/screens/student_dashboard_screen.dart';
-import '../../features/student/screens/student_assignments_screen.dart';
-import '../../features/student/screens/student_timetable_screen.dart';
-import '../../features/student/screens/student_attendance_screen.dart';
-import '../../features/student/screens/student_results_screen.dart';
-import '../../features/student/screens/student_quiz_screen.dart';
-import '../../features/student/screens/student_report_card_screen.dart';
 
-import '../../features/teacher/screens/teacher_dashboard_screen.dart';
-import '../../features/teacher/screens/teacher_classes_screen.dart';
-import '../../features/teacher/screens/teacher_schedule_screen.dart';
-import '../../features/teacher/screens/teacher_attendance_screen.dart';
-import '../../features/teacher/screens/teacher_students_screen.dart';
-import '../../features/teacher/screens/teacher_grades_screen.dart';
 import '../../features/exams/screens/exam_management_screen.dart';
 import '../../features/enrollment/screens/enrollment_screen.dart';
-import '../../features/quizzes/screens/quiz_list_screen.dart';
-import '../../features/quizzes/screens/quiz_builder_screen.dart';
-import '../../features/quizzes/screens/quiz_results_screen.dart';
-import '../../features/assignments/screens/assignment_management_screen.dart';
-import '../../features/chat/screens/chat_screen.dart';
 
 import '../../features/admin/screens/admin_dashboard_screen.dart';
 import '../../features/admin/screens/admin_onboarding_screen.dart';
@@ -91,16 +71,11 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: AppConstants.signupRoute,
-      builder: (context, state) =>
-          SignupScreen(token: state.uri.queryParameters['token'] ?? ''),
+      builder: (context, state) => const SignupScreen(),
     ),
     GoRoute(
       path: AppConstants.forgotPasswordRoute,
       builder: (context, state) => const ForgotPasswordScreen(),
-    ),
-    GoRoute(
-      path: AppConstants.inviteRoute,
-      builder: (context, state) => const InviteScreen(),
     ),
     GoRoute(
       // School picker -> pick role -> phone+password login (public entry).
@@ -129,10 +104,6 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const TenantManagementScreen(),
         ),
         GoRoute(
-          path: '/admin/tenant-access',
-          builder: (context, state) => const TenantAccessScreen(),
-        ),
-        GoRoute(
           path: AppConstants.superAdminAdminsRoute,
           builder: (context, state) => const AdminsScreen(),
         ),
@@ -151,195 +122,6 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: AppConstants.superAdminProfileRoute,
           builder: (context, state) => const ProfileScreen(),
-        ),
-      ],
-    ),
-
-    // Student
-    ShellRoute(
-      builder: (context, state, child) => MainLayout(
-        userRole: 'student',
-        tenantId: state.uri.queryParameters['tenantId'],
-        userId: state.uri.queryParameters['userId'],
-        child: child,
-      ),
-      routes: [
-        GoRoute(
-          path: AppConstants.studentDashboardRoute,
-          builder: (context, state) => const StudentDashboardScreen(),
-        ),
-        GoRoute(
-          path: AppConstants.studentNotificationsRoute,
-          builder: (context, state) => NotificationsScreen(
-            userId: state.uri.queryParameters['userId'] ?? '',
-            userType: 'student',
-            tenantId: state.uri.queryParameters['tenantId'] ?? '',
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentAssignmentsRoute,
-          builder: (context, state) => StudentAssignmentsScreen(
-            studentId: state.uri.queryParameters['userId'],
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentQuizRoute,
-          builder: (context, state) => StudentQuizScreen(
-            quizId: state.uri.queryParameters['quizId'] ?? '',
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentProfileRoute,
-          builder: (context, state) => const ProfileScreen(),
-        ),
-        GoRoute(
-          path: AppConstants.studentTimetableRoute,
-          builder: (context, state) => StudentTimetableScreen(
-            studentId: state.uri.queryParameters['userId'],
-            academicYear: state.uri.queryParameters['academicYear'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentAttendanceRoute,
-          builder: (context, state) => StudentAttendanceScreen(
-            studentId: state.uri.queryParameters['userId'],
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentGradesRoute,
-          builder: (context, state) => StudentResultsScreen(
-            studentId: state.uri.queryParameters['userId'],
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentChatRoute,
-          builder: (context, state) => ChatScreen(
-            role: 'student',
-            userId: state.uri.queryParameters['userId'],
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.studentReportCardRoute,
-          builder: (context, state) => StudentReportCardScreen(
-            studentId: state.uri.queryParameters['userId'],
-            academicYear: state.uri.queryParameters['academicYear'],
-            studentName: state.uri.queryParameters['name'],
-          ),
-        ),
-      ],
-    ),
-
-    // Teacher
-    ShellRoute(
-      builder: (context, state, child) => MainLayout(
-        userRole: 'teacher',
-        tenantId: state.uri.queryParameters['tenantId'],
-        userId: state.uri.queryParameters['userId'],
-        child: child,
-      ),
-      routes: [
-        GoRoute(
-          path: AppConstants.teacherDashboardRoute,
-          builder: (context, state) => const TeacherDashboardScreen(),
-        ),
-        GoRoute(
-          path: AppConstants.teacherNotificationsRoute,
-          builder: (context, state) => NotificationsScreen(
-            userId: state.uri.queryParameters['userId'] ?? '',
-            userType: 'teacher',
-            tenantId: state.uri.queryParameters['tenantId'] ?? '',
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherSendNotificationRoute,
-          builder: (context, state) => SendNotificationScreen(
-            senderId: state.uri.queryParameters['userId'] ?? '',
-            senderType: 'teacher',
-            tenantId: state.uri.queryParameters['tenantId'] ?? '',
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherClassesRoute,
-          builder: (context, state) => TeacherClassesScreen(
-            teacherId: state.uri.queryParameters['userId'],
-            academicYear: state.uri.queryParameters['academicYear'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherScheduleRoute,
-          builder: (context, state) => TeacherScheduleScreen(
-            teacherId: state.uri.queryParameters['userId'],
-            academicYear: state.uri.queryParameters['academicYear'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherProfileRoute,
-          builder: (context, state) => const ProfileScreen(),
-        ),
-        GoRoute(
-          path: AppConstants.teacherAttendanceRoute,
-          builder: (context, state) => TeacherAttendanceScreen(
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherStudentsRoute,
-          builder: (context, state) => TeacherStudentsScreen(
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherGradesRoute,
-          builder: (context, state) => TeacherGradesScreen(
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherExamsRoute,
-          builder: (context, state) => ExamManagementScreen(
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherQuizBuilderRoute,
-          builder: (context, state) => QuizBuilderScreen(
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherQuizzesRoute,
-          builder: (context, state) => QuizListScreen(
-            teacherId: state.uri.queryParameters['userId'],
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherQuizResultsRoute,
-          builder: (context, state) => QuizResultsScreen(
-            quizId: state.uri.queryParameters['quizId'] ?? '',
-            quizTitle: state.uri.queryParameters['title'] ?? 'Quiz',
-            teacherId: state.uri.queryParameters['userId'],
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherAssignmentsRoute,
-          builder: (context, state) => AssignmentManagementScreen(
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
-        ),
-        GoRoute(
-          path: AppConstants.teacherChatRoute,
-          builder: (context, state) => ChatScreen(
-            role: 'teacher',
-            userId: state.uri.queryParameters['userId'],
-            tenantId: state.uri.queryParameters['tenantId'],
-          ),
         ),
       ],
     ),
@@ -431,7 +213,7 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => ClassScreen(
             baseUrl: AppConstants.apiBaseUrl,
             tenantId: state.uri.queryParameters['tenantId'] ?? '',
-            headers: {
+            headers: const {
               // Example: inject auth header if present in app state
               // 'Authorization': 'Bearer ${someToken}',
             },
@@ -488,14 +270,14 @@ class _PlaceholderScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.construction, size: 64, color: AppTheme.warning),
+            const Icon(Icons.construction, size: 64, color: AppTheme.neutral400),
             const SizedBox(height: 16),
             Text(
               title,
               style: AppTheme.headingMedium,
             ),
             const SizedBox(height: 8),
-            Text(
+            const Text(
               'This feature is under construction',
               style: AppTheme.bodyMedium,
             ),
@@ -503,7 +285,7 @@ class _PlaceholderScreen extends StatelessWidget {
             ElevatedButton(
               onPressed: () => context.go(AppConstants.homeRoute),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo[600],
+                backgroundColor: AppTheme.greenPrimary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -537,7 +319,7 @@ class _RouteNotFoundScreen extends StatelessWidget {
             children: [
               const Icon(Icons.explore_off_outlined, size: 56, color: AppTheme.neutral400),
               const SizedBox(height: 16),
-              Text('This page isn’t available',
+              const Text('This page isn’t available',
                   style: AppTheme.headingMedium, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(

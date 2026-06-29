@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
-import '../../../core/utils/responsive.dart';
 import '../../../core/utils/school_authority_session.dart';
 import '../../../services/school_authority_service.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -32,7 +32,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final state = GoRouterState.of(context);
     final authorityId = state.uri.queryParameters['userId'];
     final tenantId = state.uri.queryParameters['tenantId'];
-    
+
     if (authorityId != null && tenantId != null) {
       // Set authority data in session
       AuthoritySession.setSession(authorityId: authorityId, tenantId: tenantId);
@@ -65,19 +65,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _error = null;
       });
 
-      print('Loading authority data for ID: ${AuthoritySession.authorityId}'); // Debug
-
       // Load only authority data from the single API endpoint
       final authorityData = await AuthorityService.getAuthorityById(AuthoritySession.authorityId!);
-
-      print('Received authority data: $authorityData'); // Debug
 
       if (mounted) {
         setState(() {
           _authorityData = authorityData;
           _isLoading = false;
         });
-        
+
         // Update session with authority data
         AuthoritySession.setSession(
           authorityId: AuthoritySession.authorityId!,
@@ -86,7 +82,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         );
       }
     } catch (e) {
-      print('Error loading authority data: $e'); // Debug
       if (mounted) {
         setState(() {
           _error = e.toString().replaceAll('Exception: ', '');
@@ -98,224 +93,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return _buildLoadingState();
-    if (_error != null) return _buildErrorState();
-    if (_authorityData == null) return _buildEmptyState();
-
-    return RefreshIndicator(
-      onRefresh: _loadAuthorityData,
-      color: AppTheme.greenPrimary,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Section
-            _buildWelcomeCard(),
-            
-            const SizedBox(height: 8),
-            
-            // Authority Info Cards
-            _buildAuthorityInfoGrid(),
-            
-            const SizedBox(height: 8),
-            
-            // Administrative Summary
-            _buildAdministrativeSummary(),
-            
-            const SizedBox(height: 8),
-            
-            // School Overview
-            _buildSchoolOverview(),
-            
-            const SizedBox(height: 8),
-            
-            // Quick Actions
-            _buildQuickActions(),
-            
-            // Add some bottom padding
-            const SizedBox(height: 20),
-          ],
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: _headerTitle(),
+          subtitle: _headerSubtitle(),
+          icon: Icons.admin_panel_settings,
         ),
       ),
+      child: _body(),
     );
   }
 
-  Widget _buildLoadingState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(color: AppTheme.greenPrimary, strokeWidth: 2),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Loading dashboard...',
-            style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral600),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.getMicroDecoration(
-        color: AppTheme.error.withOpacity(0.1),
-        border: Border.all(color: AppTheme.error.withOpacity(0.3)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.error_outline, size: 32, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(
-            'Failed to load dashboard',
-            style: AppTheme.headingSmall.copyWith(color: AppTheme.error),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "We couldn't load your dashboard. Check your connection and try again.",
-            style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral700),
-            textAlign: TextAlign.center,
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              _error!,
-              style: AppTheme.bodyMicro.copyWith(
-                color: AppTheme.neutral500,
-                fontSize: 9,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: _loadAuthorityData,
-                style: AppTheme.smallButtonStyle,
-                child: Text('Retry', style: AppTheme.bodyMicro.copyWith(color: Colors.white)),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () {
-                  AuthoritySession.clearSession();
-                  context.go(AppConstants.homeRoute);
-                },
-                child: Text('Back to Home', style: AppTheme.bodyMicro),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.neutral100,
-              borderRadius: AppTheme.borderRadius12,
-            ),
-            child: Icon(Icons.admin_panel_settings, size: 40, color: AppTheme.neutral400),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'No authority data available',
-            style: AppTheme.headingSmall.copyWith(color: AppTheme.neutral600),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              AuthoritySession.clearSession();
-              context.go(AppConstants.homeRoute);
-            },
-            child: Text('Back to Home', style: AppTheme.bodyMicro),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWelcomeCard() {
+  String _headerTitle() {
+    if (_authorityData == null) return 'Admin Dashboard';
     final firstName = _getStringValue(_authorityData!['first_name']) ?? '';
     final lastName = _getStringValue(_authorityData!['last_name']) ?? '';
-    final authorityName = '$firstName $lastName'.trim().isNotEmpty ? '$firstName $lastName'.trim() : 'Admin';
-    final role = _getStringValue(_authorityData!['role']) ?? 'school_authority';
-    final position = _getStringValue(_authorityData!['position']) ?? '';
-    final authorityDetails = _authorityData!['authority_details'] as Map<String, dynamic>? ?? {};
-    final department = _getStringValue(authorityDetails['department']) ?? '';
+    final name = '$firstName $lastName'.trim();
+    return name.isNotEmpty ? 'Welcome, $name' : 'Welcome, Admin';
+  }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: BorderRadius.all(Radius.circular(12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: AppTheme.borderRadius8,
-                ),
-                child: Icon(Icons.admin_panel_settings, color: AppTheme.greenPrimary, size: 20),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Welcome, $authorityName!',
-                      style: AppTheme.labelMedium.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (position.isNotEmpty || department.isNotEmpty)
-                      Text(
-                        _buildAuthorityInfo(position, department),
-                        style: AppTheme.bodyMicro.copyWith(color: Colors.white70),
-                      ),
-                  ],
-                ),
-              ),
-            ],
+  String _headerSubtitle() {
+    if (_authorityData == null) return 'School administration & management';
+    final position = _getStringValue(_authorityData!['position']) ?? '';
+    final authorityDetails =
+        _authorityData!['authority_details'] as Map<String, dynamic>? ?? {};
+    final department = _getStringValue(authorityDetails['department']) ?? '';
+    final info = _buildAuthorityInfo(position, department);
+    return info.isNotEmpty ? info : 'School administration & management';
+  }
+
+  Widget _body() {
+    if (_isLoading) return const SaLoading(message: 'Loading dashboard…');
+    if (_error != null) {
+      return SaStateView.error(message: _error!, onRetry: _loadAuthorityData);
+    }
+    if (_authorityData == null) {
+      return SaStateView(
+        icon: Icons.admin_panel_settings,
+        title: 'No authority data available',
+        subtitle: 'We could not find your administrative profile.',
+        action: OutlinedButton.icon(
+          onPressed: () {
+            AuthoritySession.clearSession();
+            context.go(AppConstants.homeRoute);
+          },
+          icon: const Icon(Icons.home_outlined, size: 18),
+          label: const Text('Back to Home'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Sa.accent,
+            minimumSize: const Size(0, 46),
+            side: const BorderSide(color: Sa.accent, width: 1.5),
+            shape: const RoundedRectangleBorder(
+                borderRadius: AppTheme.borderRadius12),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'School administration and management portal.',
-            style: AppTheme.bodyMicro.copyWith(color: Colors.white70),
-          ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+      children: [
+        _buildQuickStatsGrid(),
+        const SizedBox(height: Sa.gap),
+        _buildShortcutsCard(),
+        const SizedBox(height: Sa.gap),
+        _buildAdministrativeSummary(),
+        const SizedBox(height: Sa.gap),
+        _buildSchoolOverview(),
+        const SizedBox(height: Sa.gap),
+        _buildContactCard(),
+      ],
     );
   }
 
@@ -326,76 +175,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return info.join(' • ');
   }
 
-  Widget _buildAuthorityInfoGrid() {
-    final email = _getStringValue(_authorityData!['email']) ?? 'Not provided';
-    final phone = _getStringValue(_authorityData!['phone']) ?? 'Not provided';
-    final authorityId = _getStringValue(_authorityData!['authority_id']) ?? 'Not provided';
-    final experienceYears = _getStringValue(_authorityData!['experience_years']) ?? 'Not provided';
+  // ---- Quick stats ---------------------------------------------------------
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 6,
-      mainAxisSpacing: 6,
-      childAspectRatio: 1.4,
-      children: [
-        _buildInfoCard(
-          'Email',
-          email,
-          Icons.email,
-          AppTheme.info,
-        ),
-        _buildInfoCard(
-          'Phone',
-          phone,
-          Icons.phone,
-          AppTheme.success,
-        ),
-        _buildInfoCard(
-          'Authority ID',
-          authorityId,
-          Icons.badge,
-          AppTheme.warning,
-        ),
-        _buildInfoCard(
-          'Experience',
-          experienceYears != 'Not provided' ? '$experienceYears years' : 'Not provided',
-          Icons.work_history,
-          AppTheme.greenPrimary,
-        ),
-      ],
+  Widget _buildQuickStatsGrid() {
+    final schoolOverview =
+        _authorityData!['school_overview'] as Map<String, dynamic>? ?? {};
+    final totalStudents = schoolOverview['total_students_managed'] ?? 0;
+    final gradeLevels =
+        schoolOverview['grade_levels_supervised'] as List<dynamic>? ?? [];
+    final directReports = schoolOverview['direct_reports'] ?? 0;
+    final permissions =
+        _authorityData!['permissions'] as Map<String, dynamic>? ?? {};
+    final grantedPermissions =
+        permissions.values.where((value) => value == true).length;
+
+    final stats = <_Stat>[
+      _Stat('Students', '${totalStudents is num ? totalStudents : 0}',
+          Icons.people_alt_outlined),
+      _Stat('Grade Levels', '${gradeLevels.length}', Icons.layers_outlined),
+      _Stat('Direct Reports', '${directReports is num ? directReports : 0}',
+          Icons.supervisor_account_outlined),
+      _Stat('Permissions', '$grantedPermissions', Icons.verified_user_outlined),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        final cols = c.maxWidth < 360 ? 2 : 2;
+        return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: cols,
+          crossAxisSpacing: Sa.gap,
+          mainAxisSpacing: Sa.gap,
+          childAspectRatio: 1.7,
+          children: stats.map(_statCard).toList(),
+        );
+      },
     );
   }
 
-  Widget _buildInfoCard(String title, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: AppTheme.getMicroDecoration(
-        color: color.withOpacity(0.05),
-        border: Border.all(color: color.withOpacity(0.2)),
-      ),
+  Widget _statCard(_Stat stat) {
+    return SaCard(
+      padding: const EdgeInsets.all(12),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, size: 20, color: color),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: AppTheme.bodyMicro.copyWith(
-              fontWeight: FontWeight.w600,
-              color: AppTheme.neutral800,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: Sa.accent.withValues(alpha: 0.12),
+                  borderRadius: AppTheme.borderRadius12,
+                ),
+                child: Icon(stat.icon, color: Sa.accent, size: 19),
+              ),
+              const Spacer(),
+              Flexible(
+                child: Text(
+                  stat.value,
+                  style: Sa.cardTitle.copyWith(fontSize: 20),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
           Text(
-            value,
-            style: AppTheme.bodyMicro.copyWith(
-              color: color,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
+            stat.label,
+            style: Sa.label,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -403,45 +254,132 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  // ---- Shortcuts -----------------------------------------------------------
+
+  Widget _buildShortcutsCard() {
+    final shortcuts = <_Shortcut>[
+      _Shortcut('Students', Icons.people_alt_outlined, _navigateToStudents),
+      _Shortcut('Classes', Icons.class_outlined, _navigateToClasses),
+      _Shortcut('Exams', Icons.assignment_outlined, _navigateToExams),
+      _Shortcut('Enrolment', Icons.group_add_outlined, _navigateToEnrolment),
+    ];
+
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.dashboard_outlined,
+            title: 'Quick Actions',
+          ),
+          const SizedBox(height: Sa.gap),
+          LayoutBuilder(
+            builder: (context, c) {
+              final cols = c.maxWidth < 360 ? 2 : (c.maxWidth < 600 ? 2 : 4);
+              return GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: cols,
+                crossAxisSpacing: Sa.gapXs,
+                mainAxisSpacing: Sa.gapXs,
+                childAspectRatio: 1.0,
+                children: shortcuts.map(_shortcutTile).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shortcutTile(_Shortcut shortcut) {
+    return Material(
+      color: Sa.accent.withValues(alpha: 0.06),
+      borderRadius: AppTheme.borderRadius12,
+      child: InkWell(
+        onTap: shortcut.onTap,
+        borderRadius: AppTheme.borderRadius12,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 72),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            borderRadius: AppTheme.borderRadius12,
+            border: Border.all(color: Sa.accent.withValues(alpha: 0.18)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(shortcut.icon, size: 24, color: Sa.accent),
+              const SizedBox(height: 6),
+              Text(
+                shortcut.label,
+                style: Sa.label.copyWith(
+                  color: AppTheme.neutral800,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---- Administrative information -----------------------------------------
+
   Widget _buildAdministrativeSummary() {
     final role = _getStringValue(_authorityData!['role']) ?? '';
     final position = _getStringValue(_authorityData!['position']) ?? '';
     final qualification = _getStringValue(_authorityData!['qualification']) ?? '';
     final joiningDate = _getStringValue(_authorityData!['joining_date']) ?? '';
     final status = _getStringValue(_authorityData!['status']) ?? 'active';
-    final permissions = _authorityData!['permissions'] as Map<String, dynamic>? ?? {};
-    final authorityDetails = _authorityData!['authority_details'] as Map<String, dynamic>? ?? {};
+    final permissions =
+        _authorityData!['permissions'] as Map<String, dynamic>? ?? {};
+    final authorityDetails =
+        _authorityData!['authority_details'] as Map<String, dynamic>? ?? {};
     final department = _getStringValue(authorityDetails['department']) ?? '';
+    final isActive = status.toLowerCase() == 'active';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      decoration: AppTheme.getMicroDecoration(),
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(Icons.admin_panel_settings, size: 16, color: AppTheme.greenPrimary),
-              const SizedBox(width: 4),
-              Text(
-                'Administrative Information',
-                style: AppTheme.labelMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.neutral900,
-                ),
-              ),
-            ],
+          SaCardHeader(
+            icon: Icons.admin_panel_settings,
+            title: 'Administrative Information',
+            trailing: SaStatusPill(
+              text: status.toUpperCase(),
+              color: isActive ? AppTheme.greenPrimary : AppTheme.error,
+              icon: isActive ? Icons.check_circle_outline : Icons.cancel_outlined,
+            ),
           ),
-          const SizedBox(height: 8),
-          _buildAdministrativeInfoRow('Role', role.isNotEmpty ? role.replaceAll('_', ' ').split(' ').map((word) => word[0].toUpperCase() + word.substring(1)).join(' ') : 'Not assigned'),
-          _buildAdministrativeInfoRow('Position', position.isNotEmpty ? position : 'Not assigned'),
-          _buildAdministrativeInfoRow('Department', department.isNotEmpty ? department : 'Not assigned'),
-          _buildAdministrativeInfoRow('Qualification', qualification.isNotEmpty ? qualification : 'Not provided'),
-          _buildAdministrativeInfoRow('Joining Date', _formatDate(joiningDate)),
-          _buildAdministrativeInfoRow('Permissions', _getPermissionsCount(permissions)),
-          _buildAdministrativeInfoRow('Status', status, isStatus: true),
+          const SizedBox(height: Sa.gapXs),
+          SaInfoRow(
+            label: 'Role',
+            value: role.isNotEmpty
+                ? role
+                    .replaceAll('_', ' ')
+                    .split(' ')
+                    .map((word) => word[0].toUpperCase() + word.substring(1))
+                    .join(' ')
+                : 'Not assigned',
+          ),
+          SaInfoRow(
+              label: 'Position',
+              value: position.isNotEmpty ? position : 'Not assigned'),
+          SaInfoRow(
+              label: 'Department',
+              value: department.isNotEmpty ? department : 'Not assigned'),
+          SaInfoRow(
+              label: 'Qualification',
+              value: qualification.isNotEmpty ? qualification : 'Not provided'),
+          SaInfoRow(label: 'Joining Date', value: _formatDate(joiningDate)),
+          SaInfoRow(
+              label: 'Permissions',
+              value: _getPermissionsCount(permissions)),
         ],
       ),
     );
@@ -449,197 +387,93 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   String _getPermissionsCount(Map<String, dynamic> permissions) {
     if (permissions.isEmpty) return 'None assigned';
-    final grantedPermissions = permissions.values.where((value) => value == true).length;
+    final grantedPermissions =
+        permissions.values.where((value) => value == true).length;
     final totalPermissions = permissions.length;
     return '$grantedPermissions of $totalPermissions granted';
   }
 
   Widget _buildSchoolOverview() {
-    final schoolOverview = _authorityData!['school_overview'] as Map<String, dynamic>? ?? {};
+    final schoolOverview =
+        _authorityData!['school_overview'] as Map<String, dynamic>? ?? {};
     final totalStudents = schoolOverview['total_students_managed'] ?? 0;
-    final gradeLevels = schoolOverview['grade_levels_supervised'] as List<dynamic>? ?? [];
+    final gradeLevels =
+        schoolOverview['grade_levels_supervised'] as List<dynamic>? ?? [];
     final directReports = schoolOverview['direct_reports'] ?? 0;
-    final contactInfo = _authorityData!['contact_info'] as Map<String, dynamic>? ?? {};
-    final officeExtension = _getStringValue(contactInfo['office_extension']) ?? '';
+
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(
+            icon: Icons.school,
+            title: 'School Overview',
+          ),
+          const SizedBox(height: Sa.gapXs),
+          SaInfoRow(
+              label: 'Students Managed',
+              value: totalStudents is num && totalStudents > 0
+                  ? totalStudents.toString()
+                  : 'None'),
+          SaInfoRow(
+              label: 'Grade Levels',
+              value: gradeLevels.isNotEmpty
+                  ? 'Grades ${gradeLevels.join(', ')}'
+                  : 'None assigned'),
+          SaInfoRow(
+              label: 'Direct Reports',
+              value: directReports is num && directReports > 0
+                  ? directReports.toString()
+                  : 'None'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactCard() {
+    final email = _getStringValue(_authorityData!['email']) ?? 'Not provided';
+    final phone = _getStringValue(_authorityData!['phone']) ?? 'Not provided';
+    final authorityId =
+        _getStringValue(_authorityData!['authority_id']) ?? 'Not provided';
+    final experienceYears =
+        _getStringValue(_authorityData!['experience_years']) ?? 'Not provided';
+    final contactInfo =
+        _authorityData!['contact_info'] as Map<String, dynamic>? ?? {};
+    final officeExtension =
+        _getStringValue(contactInfo['office_extension']) ?? '';
     final officeHours = _getStringValue(contactInfo['office_hours']) ?? '';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      decoration: AppTheme.getMicroDecoration(),
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              Icon(Icons.school, size: 16, color: AppTheme.greenPrimary),
-              const SizedBox(width: 4),
-              Text(
-                'School Overview',
-                style: AppTheme.labelMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.neutral900,
-                ),
-              ),
-            ],
+          const SaCardHeader(
+            icon: Icons.contact_mail_outlined,
+            title: 'Contact & Profile',
           ),
-          const SizedBox(height: 8),
-          _buildAdministrativeInfoRow('Students Managed', totalStudents > 0 ? totalStudents.toString() : 'None'),
-          _buildAdministrativeInfoRow('Grade Levels', gradeLevels.isNotEmpty ? 'Grades ${gradeLevels.join(', ')}' : 'None assigned'),
-          _buildAdministrativeInfoRow('Direct Reports', directReports > 0 ? directReports.toString() : 'None'),
-          _buildAdministrativeInfoRow('Office Extension', officeExtension.isNotEmpty ? officeExtension : 'Not provided'),
-          _buildAdministrativeInfoRow('Office Hours', officeHours.isNotEmpty ? officeHours : 'Not provided'),
+          const SizedBox(height: Sa.gapXs),
+          SaInfoRow(label: 'Email', value: email),
+          SaInfoRow(label: 'Phone', value: phone),
+          SaInfoRow(label: 'Authority ID', value: authorityId),
+          SaInfoRow(
+              label: 'Experience',
+              value: experienceYears != 'Not provided'
+                  ? '$experienceYears years'
+                  : 'Not provided'),
+          SaInfoRow(
+              label: 'Office Extension',
+              value: officeExtension.isNotEmpty
+                  ? officeExtension
+                  : 'Not provided'),
+          SaInfoRow(
+              label: 'Office Hours',
+              value: officeHours.isNotEmpty ? officeHours : 'Not provided'),
         ],
       ),
     );
   }
 
-  Widget _buildAdministrativeInfoRow(String label, String value, {bool isStatus = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: AppTheme.bodyMicro.copyWith(
-                color: AppTheme.neutral600,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Expanded(
-            child: isStatus
-                ? Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: value.toLowerCase() == 'active' 
-                          ? AppTheme.success.withOpacity(0.1)
-                          : AppTheme.error.withOpacity(0.1),
-                      borderRadius: AppTheme.borderRadius8,
-                      border: Border.all(
-                        color: value.toLowerCase() == 'active' 
-                            ? AppTheme.success.withOpacity(0.3)
-                            : AppTheme.error.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Text(
-                      value.toUpperCase(),
-                      style: AppTheme.bodyMicro.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: value.toLowerCase() == 'active'
-                            ? AppTheme.success
-                            : AppTheme.error,
-                      ),
-                    ),
-                  )
-                : Text(
-                    value,
-                    style: AppTheme.bodyMicro.copyWith(
-                      color: AppTheme.neutral800,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActions() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(8),
-      decoration: AppTheme.getMicroDecoration(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.dashboard, size: 16, color: AppTheme.greenPrimary),
-              const SizedBox(width: 4),
-              Text(
-                'Quick Actions',
-                style: AppTheme.labelMedium.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.neutral900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 4,
-            crossAxisSpacing: 6,
-            mainAxisSpacing: 6,
-            childAspectRatio: 0.8,
-            children: [
-              _buildQuickActionButton(
-                'Students',
-                Icons.people,
-                AppTheme.success,
-                () => _navigateToStudents(),
-              ),
-              _buildQuickActionButton(
-                'Classes',
-                Icons.class_,
-                AppTheme.info,
-                () => _navigateToClasses(),
-              ),
-              _buildQuickActionButton(
-                'Exams',
-                Icons.assignment,
-                AppTheme.warning,
-                () => _navigateToExams(),
-              ),
-              _buildQuickActionButton(
-                'Enrolment',
-                Icons.group_add,
-                AppTheme.greenPrimary,
-                () => _navigateToEnrolment(),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickActionButton(String title, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: AppTheme.borderRadius8,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: AppTheme.getMicroDecoration(
-          color: color.withOpacity(0.05),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 24, color: color),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: AppTheme.bodyMicro.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.neutral800,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // ---- Navigation ----------------------------------------------------------
 
   String get _idParams =>
       'userId=${AuthoritySession.authorityId}&tenantId=${AuthoritySession.tenantId}';
@@ -660,6 +494,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     context.go('${AppConstants.adminEnrollmentRoute}?$_idParams');
   }
 
+  // ---- Helpers -------------------------------------------------------------
+
   // Helper method to safely get string values from API response
   String? _getStringValue(dynamic value) {
     if (value == null) return null;
@@ -673,7 +509,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (dateString == null || dateString.isEmpty) {
       return 'Not provided';
     }
-    
+
     try {
       final date = DateTime.parse(dateString);
       return '${date.day}/${date.month}/${date.year}';
@@ -681,4 +517,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return dateString;
     }
   }
+}
+
+class _Stat {
+  final String label;
+  final String value;
+  final IconData icon;
+  const _Stat(this.label, this.value, this.icon);
+}
+
+class _Shortcut {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _Shortcut(this.label, this.icon, this.onTap);
 }

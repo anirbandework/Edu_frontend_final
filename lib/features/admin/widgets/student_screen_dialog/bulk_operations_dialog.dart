@@ -1,8 +1,11 @@
-// lib/features/school_authority/widgets/bulk_operations_dialog.dart
+// lib/features/admin/widgets/student_screen_dialog/bulk_operations_dialog.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_theme.dart';
 import '../../../../core/utils/school_session.dart';
 import '../../../../services/student_bulk_operations_service.dart';
+import '../../../super_admin/widgets/sa_widgets.dart';
 
 class BulkOperationsDialog extends StatefulWidget {
   final List<String> selectedStudentIds;
@@ -22,21 +25,22 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
   String _selectedOperation = 'update_status';
   String _newStatus = 'active';
   String _newSection = 'A';
-  int _newGrade = 1;
   int _currentGrade = 1;
   String _academicYear = '';
   bool _isLoading = false;
 
+  // No bulk "delete" — to disable many students at once, use Update status -> inactive.
   final List<String> _operations = [
     'update_status',
     'update_sections',
     'promote',
-    'delete',
   ];
 
   final List<String> _statusOptions = ['active', 'inactive', 'suspended', 'graduated'];
   final List<String> _sections = ['A', 'B', 'C', 'D', 'E'];
   final List<int> _grades = List.generate(12, (index) => index + 1);
+
+  bool get _isDelete => false;
 
   Future<void> _executeOperation() async {
     if (!_validateInputs()) return;
@@ -60,7 +64,7 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
             'student_id': id,
             'new_section': _newSection,
           }).toList();
-          
+
           await StudentBulkOperationsService.updateSections(
             tenantId: SchoolSession.tenantId!,
             sectionUpdates: sectionUpdates,
@@ -75,12 +79,6 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
           );
           break;
 
-        case 'delete':
-          await StudentBulkOperationsService.deleteStudents(
-            tenantId: SchoolSession.tenantId!,
-            studentIds: widget.selectedStudentIds,
-          );
-          break;
       }
 
       if (mounted) {
@@ -114,12 +112,14 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white)),
+            Expanded(
+              child: Text(message, style: Sa.body.copyWith(color: Colors.white)),
+            ),
           ],
         ),
-        backgroundColor: AppTheme.success,
+        backgroundColor: AppTheme.greenPrimary,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -130,9 +130,11 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Expanded(child: Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white))),
+            Expanded(
+              child: Text(message, style: Sa.body.copyWith(color: Colors.white)),
+            ),
           ],
         ),
         backgroundColor: AppTheme.error,
@@ -141,243 +143,254 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
     );
   }
 
-  String _getOperationTitle() {
+  String _getOperationDescription() {
     switch (_selectedOperation) {
-      case 'update_status': return 'Update Status';
-      case 'update_sections': return 'Update Sections';
-      case 'promote': return 'Promote Students';
-      case 'delete': return 'Delete Students';
-      default: return 'Bulk Operation';
+      case 'update_status':
+        return 'Change the status of ${widget.selectedStudentIds.length} students';
+      case 'update_sections':
+        return 'Move ${widget.selectedStudentIds.length} students to a new section';
+      case 'promote':
+        return 'Promote all students from grade $_currentGrade to grade ${_currentGrade + 1}';
+      case 'delete':
+        return 'Soft delete ${widget.selectedStudentIds.length} students';
+      default:
+        return '';
     }
   }
 
-  String _getOperationDescription() {
-    switch (_selectedOperation) {
-      case 'update_status': 
-        return 'Change the status of ${widget.selectedStudentIds.length} students';
-      case 'update_sections': 
-        return 'Move ${widget.selectedStudentIds.length} students to a new section';
-      case 'promote': 
-        return 'Promote all students from grade $_currentGrade to grade ${_currentGrade + 1}';
-      case 'delete': 
-        return 'Soft delete ${widget.selectedStudentIds.length} students';
-      default: return '';
+  String _getOperationDisplayName(String operation) {
+    switch (operation) {
+      case 'update_status':
+        return 'Update Status';
+      case 'update_sections':
+        return 'Update Sections';
+      case 'promote':
+        return 'Promote Students';
+      case 'delete':
+        return 'Delete Students';
+      default:
+        return operation;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    
+    final media = MediaQuery.of(context);
+    final maxW = math.min(media.size.width - 24, 520.0);
+
     return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: screenSize.width > 600 ? 500 : screenSize.width * 0.9,
-        decoration: AppTheme.getCompactDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppTheme.neutral200),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sa.radius)),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW,
+          maxHeight: media.size.height - 80,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.settings, color: Colors.white, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Bulk Operations',
-                          style: AppTheme.headingSmall.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${widget.selectedStudentIds.length} students selected',
-                          style: AppTheme.bodySmall.copyWith(color: Colors.white70),
-                        ),
-                      ],
+            _buildHeader(),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Operation Selection
+                    const Text('Select Operation', style: Sa.label),
+                    const SizedBox(height: Sa.gapXs),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedOperation,
+                      style: Sa.value,
+                      decoration: _fieldDecoration(),
+                      items: _operations
+                          .map((op) => DropdownMenuItem(
+                                value: op,
+                                child: Text(_getOperationDisplayName(op)),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedOperation = value!;
+                        });
+                      },
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, color: Colors.white, size: 24),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: Sa.gapLg),
 
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Operation Selection
-                  Text(
-                    'Select Operation',
-                    style: AppTheme.labelMedium.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.neutral800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: _selectedOperation,
-                    style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
+                    // Operation Description
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppTheme.green50,
                         borderRadius: AppTheme.borderRadius12,
+                        border: Border.all(color: AppTheme.greenPrimary.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.info_outline,
+                              color: AppTheme.greenPrimary, size: 18),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _getOperationDescription(),
+                              style: Sa.body.copyWith(color: AppTheme.greenPrimary),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    items: _operations.map((op) => DropdownMenuItem(
-                      value: op,
-                      child: Text(_getOperationDisplayName(op)),
-                    )).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedOperation = value!;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: Sa.gapLg),
 
-                  // Operation Description
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.info.withOpacity(0.1),
-                      borderRadius: AppTheme.borderRadius12,
-                      border: Border.all(color: AppTheme.info.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      _getOperationDescription(),
-                      style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.info,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Operation-specific fields
-                  if (_selectedOperation == 'update_status')
-                    ..._buildStatusUpdateFields(),
-                  if (_selectedOperation == 'update_sections')
-                    ..._buildSectionUpdateFields(),
-                  if (_selectedOperation == 'promote')
-                    ..._buildPromoteFields(),
-                  if (_selectedOperation == 'delete')
-                    ..._buildDeleteWarning(),
-                ],
+                    // Operation-specific fields
+                    if (_selectedOperation == 'update_status')
+                      ..._buildStatusUpdateFields(),
+                    if (_selectedOperation == 'update_sections')
+                      ..._buildSectionUpdateFields(),
+                    if (_selectedOperation == 'promote') ..._buildPromoteFields(),
+                    if (_selectedOperation == 'delete') ..._buildDeleteWarning(),
+                  ],
+                ),
               ),
             ),
-
-            // Action Buttons
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppTheme.neutral200)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: _isLoading ? null : () => Navigator.pop(context),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: Text(
-                        'Cancel',
-                        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _executeOperation,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _selectedOperation == 'delete' 
-                            ? AppTheme.error 
-                            : AppTheme.greenPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppTheme.borderRadius12,
-                        ),
-                      ),
-                      child: _isLoading
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text('Processing...', style: AppTheme.bodyMedium),
-                              ],
-                            )
-                          : Text('Execute', style: AppTheme.bodyMedium),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildActions(),
           ],
         ),
       ),
     );
   }
 
-  String _getOperationDisplayName(String operation) {
-    switch (operation) {
-      case 'update_status': return 'Update Status';
-      case 'update_sections': return 'Update Sections';
-      case 'promote': return 'Promote Students';
-      case 'delete': return 'Delete Students';
-      default: return operation;
-    }
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        gradient: AppTheme.primaryGradient,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: AppTheme.borderRadius12,
+            ),
+            child: const Icon(Icons.settings, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: Sa.gap),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Bulk Operations',
+                  style: Sa.headerTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${widget.selectedStudentIds.length} students selected',
+                  style: Sa.headerSubtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _isLoading ? null : () => Navigator.pop(context),
+            icon: const Icon(Icons.close, color: Colors.white, size: 24),
+            tooltip: 'Close',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActions() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: Sa.stroke)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextButton(
+              onPressed: _isLoading ? null : () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.neutral600,
+                minimumSize: const Size(0, 48),
+              ),
+              child: Text('Cancel', style: Sa.value.copyWith(color: AppTheme.neutral600)),
+            ),
+          ),
+          const SizedBox(width: Sa.gapLg),
+          Expanded(
+            child: SaPrimaryButton(
+              label: _isLoading
+                  ? 'Processing…'
+                  : (_isDelete ? 'Delete' : 'Execute'),
+              icon: _isDelete ? Icons.delete_outline : Icons.check_rounded,
+              busy: _isLoading,
+              expand: true,
+              color: _isDelete ? AppTheme.error : AppTheme.greenPrimary,
+              onPressed: _isLoading ? null : _executeOperation,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _fieldDecoration({String? hintText}) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: Sa.body.copyWith(color: AppTheme.neutral400),
+      filled: true,
+      fillColor: Sa.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: Sa.stroke),
+      ),
+      enabledBorder: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: Sa.stroke),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: AppTheme.greenPrimary, width: 1.5),
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sa.gapXs),
+      child: Text(text, style: Sa.label),
+    );
   }
 
   List<Widget> _buildStatusUpdateFields() {
     return [
-      Text(
-        'New Status',
-        style: AppTheme.labelMedium.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppTheme.neutral700,
-        ),
-      ),
-      const SizedBox(height: 8),
+      _fieldLabel('New Status'),
       DropdownButtonFormField<String>(
-        value: _newStatus,
-        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
-        decoration: InputDecoration(
-          border: OutlineInputBorder(
-            borderRadius: AppTheme.borderRadius12,
-          ),
-        ),
-        items: _statusOptions.map((status) => DropdownMenuItem(
-          value: status,
-          child: Text(status.toUpperCase()),
-        )).toList(),
+        initialValue: _newStatus,
+        style: Sa.value,
+        decoration: _fieldDecoration(),
+        items: _statusOptions
+            .map((status) => DropdownMenuItem(
+                  value: status,
+                  child: Text(status.toUpperCase()),
+                ))
+            .toList(),
         onChanged: (value) {
           setState(() {
             _newStatus = value!;
@@ -389,26 +402,17 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
 
   List<Widget> _buildSectionUpdateFields() {
     return [
-      Text(
-        'New Section',
-        style: AppTheme.labelMedium.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppTheme.neutral700,
-        ),
-      ),
-      const SizedBox(height: 8),
+      _fieldLabel('New Section'),
       DropdownButtonFormField<String>(
-        value: _newSection,
-        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
-        decoration: InputDecoration(
-          border: OutlineInputBorder(
-            borderRadius: AppTheme.borderRadius12,
-          ),
-        ),
-        items: _sections.map((section) => DropdownMenuItem(
-          value: section,
-          child: Text('Section $section'),
-        )).toList(),
+        initialValue: _newSection,
+        style: Sa.value,
+        decoration: _fieldDecoration(),
+        items: _sections
+            .map((section) => DropdownMenuItem(
+                  value: section,
+                  child: Text('Section $section'),
+                ))
+            .toList(),
         onChanged: (value) {
           setState(() {
             _newSection = value!;
@@ -419,52 +423,64 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
   }
 
   List<Widget> _buildPromoteFields() {
+    final gradeField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Current Grade'),
+        DropdownButtonFormField<int>(
+          initialValue: _currentGrade,
+          style: Sa.value,
+          decoration: _fieldDecoration(),
+          items: _grades
+              .map((grade) => DropdownMenuItem(
+                    value: grade,
+                    child: Text('Grade $grade'),
+                  ))
+              .toList(),
+          onChanged: (value) {
+            setState(() {
+              _currentGrade = value!;
+            });
+          },
+        ),
+      ],
+    );
+
+    final yearField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Academic Year'),
+        TextFormField(
+          style: Sa.value,
+          decoration: _fieldDecoration(hintText: 'e.g., 2024-2025'),
+          onChanged: (value) {
+            _academicYear = value;
+          },
+        ),
+      ],
+    );
+
     return [
-      Text(
-        'Current Grade',
-        style: AppTheme.labelMedium.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppTheme.neutral700,
-        ),
-      ),
-      const SizedBox(height: 8),
-      DropdownButtonFormField<int>(
-        value: _currentGrade,
-        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
-        decoration: InputDecoration(
-          border: OutlineInputBorder(
-            borderRadius: AppTheme.borderRadius12,
-          ),
-        ),
-        items: _grades.map((grade) => DropdownMenuItem(
-          value: grade,
-          child: Text('Grade $grade'),
-        )).toList(),
-        onChanged: (value) {
-          setState(() {
-            _currentGrade = value!;
-          });
-        },
-      ),
-      const SizedBox(height: 16),
-      Text(
-        'Academic Year',
-        style: AppTheme.labelMedium.copyWith(
-          fontWeight: FontWeight.w600,
-          color: AppTheme.neutral700,
-        ),
-      ),
-      const SizedBox(height: 8),
-      TextFormField(
-        style: AppTheme.bodyMedium,
-        decoration: InputDecoration(
-          hintText: 'e.g., 2024-2025',
-          border: OutlineInputBorder(
-            borderRadius: AppTheme.borderRadius12,
-          ),
-        ),
-        onChanged: (value) {
-          _academicYear = value;
+      LayoutBuilder(
+        builder: (context, c) {
+          final oneCol = c.maxWidth < 600;
+          if (oneCol) {
+            return Column(
+              children: [
+                gradeField,
+                const SizedBox(height: Sa.gapLg),
+                yearField,
+              ],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: gradeField),
+              const SizedBox(width: Sa.gap),
+              Expanded(child: yearField),
+            ],
+          );
         },
       ),
     ];
@@ -476,27 +492,22 @@ class _BulkOperationsDialogState extends State<BulkOperationsDialog> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.error.withOpacity(0.1),
+          color: AppTheme.error.withValues(alpha: 0.08),
           borderRadius: AppTheme.borderRadius12,
-          border: Border.all(color: AppTheme.error.withOpacity(0.3)),
+          border: Border.all(color: AppTheme.error.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
-            Icon(Icons.warning, color: AppTheme.error, size: 32),
-            const SizedBox(height: 8),
+            const Icon(Icons.warning_amber_rounded, color: AppTheme.error, size: 32),
+            const SizedBox(height: Sa.gapXs),
             Text(
               'Warning!',
-              style: AppTheme.labelMedium.copyWith(
-                fontWeight: FontWeight.bold,
-                color: AppTheme.error,
-              ),
+              style: Sa.cardTitle.copyWith(color: AppTheme.error),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: Sa.gapXs),
             Text(
               'This will soft delete ${widget.selectedStudentIds.length} students. They can be restored later.',
-              style: AppTheme.bodySmall.copyWith(
-                color: AppTheme.error,
-              ),
+              style: Sa.body.copyWith(color: AppTheme.error),
               textAlign: TextAlign.center,
             ),
           ],

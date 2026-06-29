@@ -40,13 +40,6 @@ class AttendanceService {
   }) =>
       _markOne(markedBy, markedByType, body, 'student');
 
-  Future<Map<String, dynamic>> markTeacher({
-    required String markedBy,
-    required UserType markedByType,
-    required Map<String, dynamic> body,
-  }) =>
-      _markOne(markedBy, markedByType, body, 'teacher');
-
   Future<Map<String, dynamic>> _markOne(
     String markedBy,
     UserType markedByType,

@@ -52,11 +52,11 @@ class StaffService {
     required String firstName,
     required String lastName,
     required String phone,
-    required String password,
     required String roleId,
     String? email,
     String? position,
   }) async {
+    // No password: the user sets their own at first login (phone + OTP).
     final uri = Uri.parse('$_base/api/staff');
     final r = await http
         .post(uri,
@@ -65,7 +65,6 @@ class StaffService {
               'first_name': firstName,
               'last_name': lastName,
               'phone': phone,
-              'password': password,
               'rbac_role_id': roleId,
               if (email != null && email.isNotEmpty) 'email': email,
               if (position != null && position.isNotEmpty) 'position': position,
@@ -124,15 +123,5 @@ class StaffService {
         .timeout(const Duration(seconds: 12));
     if (r.statusCode == 200) return;
     throw _err(r, 'Failed to reset password');
-  }
-
-  /// DELETE /api/staff/{id}
-  static Future<void> deleteStaff(String id) async {
-    final uri = Uri.parse('$_base/api/staff/$id');
-    final r = await http
-        .delete(uri, headers: AuthSession.instance.headers(json: false))
-        .timeout(const Duration(seconds: 12));
-    if (r.statusCode == 200) return;
-    throw _err(r, 'Failed to delete staff member');
   }
 }

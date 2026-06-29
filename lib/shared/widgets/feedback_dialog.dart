@@ -76,10 +76,10 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Row(children: [
+      title: const Row(children: [
         Icon(Icons.feedback_outlined, color: AppTheme.greenPrimary, size: AppTheme.iconMedium),
-        const SizedBox(width: 8),
-        const Text('Give feedback'),
+        SizedBox(width: 8),
+        Text('Give feedback'),
       ]),
       content: SizedBox(
         width: 440,
@@ -89,7 +89,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               DropdownButtonFormField<String>(
-                value: _type,
+                initialValue: _type,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Type', isDense: true),
                 items: _types

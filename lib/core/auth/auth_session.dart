@@ -41,14 +41,11 @@ class AuthSession extends ChangeNotifier {
           return '${AppConstants.adminOnboardingRoute}?userId=$u';
         }
         return '${AppConstants.adminDashboardRoute}$qs';
-      case 'teacher':
-        return '${AppConstants.teacherDashboardRoute}$qs';
       case 'staff':
-        // Unified dynamic-role user — lands on a hub built from their granted pages.
-        return '${AppConstants.staffDashboardRoute}$qs';
-      case 'student':
       default:
-        return '${AppConstants.studentDashboardRoute}$qs';
+        // Every non-admin is a unified dynamic-role user — lands on a hub built
+        // from their granted pages.
+        return '${AppConstants.staffDashboardRoute}$qs';
     }
   }
 
@@ -62,9 +59,13 @@ class AuthSession extends ChangeNotifier {
     }
     final ps = PermissionStore.instance;
     if (ps.loaded) {
+      final dashboardOn = ps.module('dashboard')?.enabled ?? true;
       final hasAnyPage = ps.modules.any(
           (m) => m.enabled && m.key != 'profile' && m.key != 'dashboard');
-      if (!hasAnyPage) return profileRoute();
+      // Land on Profile (always available) if the user has no pages at all, OR if
+      // their Dashboard page was turned off — so they're never dropped onto a page
+      // that's hidden from their own menu with no way back to it.
+      if (!hasAnyPage || !dashboardOn) return profileRoute();
     }
     return dashboardRoute();
   }
@@ -79,13 +80,9 @@ class AuthSession extends ChangeNotifier {
         return '${AppConstants.superAdminProfileRoute}?userId=$u';
       case 'school_authority':
         return '${AppConstants.adminProfileRoute}$qs';
-      case 'teacher':
-        return '${AppConstants.teacherProfileRoute}$qs';
       case 'staff':
-        return '${AppConstants.staffProfileRoute}$qs';
-      case 'student':
       default:
-        return '${AppConstants.studentProfileRoute}$qs';
+        return '${AppConstants.staffProfileRoute}$qs';
     }
   }
 

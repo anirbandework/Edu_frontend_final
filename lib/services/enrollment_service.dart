@@ -1,11 +1,13 @@
 // lib/services/enrollment_service.dart
 //
-// Enrolment management (require_authority for writes). Enrol students into a
+// Enrolment management (require_authority for writes). Enrol members into a
 // class, list a class's enrolments, and withdraw. Real backend under
 // /api/v1/school_authority/enrollments and .../classes. AppTheme-agnostic.
 //
-// ID NOTE: the roster/available endpoints return `id` = students.id UUID and
-// `student_id` = the human school code. Enrolment writes take the UUID.
+// MEMBER MODEL: an enrolled "student" is a MEMBER (members table) with an
+// Enrollment row. The roster/available endpoints return `id` = members.id UUID
+// and `member_hrid` = the human school code (member.staff_id). Enrolment writes
+// take the member UUID (member_id / member_ids).
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -23,7 +25,7 @@ class EnrollmentService {
     return Exception('$fallback (${r.statusCode})');
   }
 
-  /// Students eligible to enrol in a class (same grade / ungraded, not already in).
+  /// Members eligible to enrol in a class (same grade / ungraded, not already in).
   /// GET /api/v1/school_authority/classes/students/available-for-class/{classId}
   static Future<Map<String, dynamic>> getAvailableForClass({required String classId}) async {
     final uri = Uri.parse(
@@ -33,12 +35,13 @@ class EnrollmentService {
         .get(uri, headers: AuthSession.instance.headers(json: false))
         .timeout(const Duration(seconds: 12));
     if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
-    throw _err(r, 'Failed to load available students');
+    throw _err(r, 'Failed to load available members');
   }
 
   /// Raw enrolment rows for a class (gives enrollment_id needed to withdraw).
   /// GET /api/v1/school_authority/enrollments/class/{classId}
-  /// -> [{id (enrollment id), student_id (UUID), academic_year, status}]
+  /// -> [{id (enrollment id), member_id (UUID), academic_year, status,
+  ///      member_name, member_hrid}]
   static Future<List<Map<String, dynamic>>> getClassEnrollments({required String classId}) async {
     final uri = Uri.parse('$_base/api/v1/school_authority/enrollments/class/$classId');
     final r = await http
@@ -52,11 +55,11 @@ class EnrollmentService {
     throw _err(r, 'Failed to load enrolments');
   }
 
-  /// Bulk-enrol many students into ONE class.
+  /// Bulk-enrol many members into ONE class.
   /// POST /api/v1/school_authority/enrollments/bulk
   static Future<Map<String, dynamic>> bulkEnroll({
     required String classId,
-    required List<String> studentIds,
+    required List<String> memberIds,
     required String academicYear,
   }) async {
     final uri = Uri.parse('$_base/api/v1/school_authority/enrollments/bulk');
@@ -65,12 +68,12 @@ class EnrollmentService {
             headers: AuthSession.instance.headers(),
             body: json.encode({
               'class_id': classId,
-              'student_ids': studentIds,
+              'member_ids': memberIds,
               'academic_year': academicYear,
             }))
         .timeout(const Duration(seconds: 20));
     if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
-    throw _err(r, 'Failed to enrol students');
+    throw _err(r, 'Failed to enrol members');
   }
 
   /// Soft-delete (withdraw) one enrolment.
@@ -84,10 +87,10 @@ class EnrollmentService {
     throw _err(r, 'Failed to remove enrolment');
   }
 
-  /// Transfer students from one class to another.
+  /// Transfer members from one class to another.
   /// POST /api/v1/school_authority/enrollments/bulk/transfer
   static Future<Map<String, dynamic>> transferStudents({
-    required List<String> studentIds,
+    required List<String> memberIds,
     required String fromClassId,
     required String toClassId,
     required String academicYear,
@@ -97,13 +100,13 @@ class EnrollmentService {
         .post(uri,
             headers: AuthSession.instance.headers(),
             body: json.encode({
-              'student_ids': studentIds,
+              'member_ids': memberIds,
               'from_class_id': fromClassId,
               'to_class_id': toClassId,
               'academic_year': academicYear,
             }))
         .timeout(const Duration(seconds: 20));
     if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
-    throw _err(r, 'Failed to transfer students');
+    throw _err(r, 'Failed to transfer members');
   }
 }

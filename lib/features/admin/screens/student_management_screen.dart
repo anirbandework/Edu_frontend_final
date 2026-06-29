@@ -1,9 +1,5 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 
-import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/models/student.dart';
 import '../../../core/utils/school_session.dart';
@@ -17,6 +13,9 @@ import '../widgets/student_screen_dialog/bulk_import_students_dialog.dart';
 
 // GLOBAL: root messenger key
 import '../../../shared/root_scaffold_messenger.dart';
+
+// Phone-first design system
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class StudentManagementScreen extends StatefulWidget {
   const StudentManagementScreen({super.key});
@@ -32,7 +31,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
 
   List<Student> _students = [];
   List<Student> _filteredStudents = [];
-  Set<String> _selectedStudents = {};
+  final Set<String> _selectedStudents = {};
   bool _isLoading = true;
   bool _isLoadingMore = false;
   String? _error;
@@ -46,7 +45,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
   String? _selectedSection;
   String _selectedStatus = 'all';
   String _sortBy = 'name';
-  bool _sortAscending = true;
+  final bool _sortAscending = true;
 
   final List<int> _grades = List.generate(12, (index) => index + 1);
   final List<String> _sections = ['A', 'B', 'C', 'D', 'E'];
@@ -207,12 +206,12 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
     setState(() => _filteredStudents = filtered);
   }
 
-  Future<void> _deleteStudent(String studentId) async {
+  Future<void> _deactivateStudent(String studentId) async {
     try {
-      await StudentManagementService.deleteStudent(studentId);
+      await StudentManagementService.updateStudent(studentId, {'status': 'inactive'});
       await _loadStudents(refresh: true);
       if (mounted) {
-        _showSuccessSnackBar('Student deleted successfully');
+        _showSuccessSnackBar('Student deactivated');
       }
     } catch (e) {
       if (mounted) {
@@ -259,9 +258,9 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             ),
           ],
         ),
-        backgroundColor: AppTheme.success,
+        backgroundColor: AppTheme.greenPrimary,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppTheme.borderRadius8),
+        shape: const RoundedRectangleBorder(borderRadius: AppTheme.borderRadius8),
         margin: const EdgeInsets.all(8),
       ),
     );
@@ -286,7 +285,7 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
         ),
         backgroundColor: AppTheme.error,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppTheme.borderRadius8),
+        shape: const RoundedRectangleBorder(borderRadius: AppTheme.borderRadius8),
         margin: const EdgeInsets.all(8),
       ),
     );
@@ -294,37 +293,46 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final statusBarHeight = MediaQuery.of(context).padding.top;
-    final availableHeight = screenSize.height - statusBarHeight;
-
-    if (_animationController == null || _fadeAnimation == null) {
-      return Container(
-        width: screenSize.width,
-        height: availableHeight,
-        color: AppTheme.backgroundPrimary,
-        child: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Container(
-      width: screenSize.width,
-      height: availableHeight,
-      color: AppTheme.backgroundPrimary,
-      child: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation!,
-          child: Column(
+    // NO Scaffold / AppBar — the MainLayout shell provides them.
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Student Management',
+          subtitle: '${_filteredStudents.length} students found',
+          icon: Icons.school_outlined,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildHeader(),
-              _buildFiltersSection(),
-              _buildSearchSection(),
-              if (_selectedStudents.isNotEmpty) _buildBulkActions(),
-              Expanded(child: _buildContent()),
+              SaHeaderAction(
+                icon: Icons.upload_file,
+                tooltip: 'Bulk import',
+                onPressed: _showBulkImportDialog,
+              ),
+              const SizedBox(width: Sa.gapXs),
+              SaHeaderAction(
+                icon: Icons.add,
+                tooltip: 'Add student',
+                onPressed: _showAddStudentDialog,
+              ),
             ],
           ),
         ),
       ),
+      child: _animationController == null || _fadeAnimation == null
+          ? _buildBodyScaffold()
+          : FadeTransition(opacity: _fadeAnimation!, child: _buildBodyScaffold()),
+    );
+  }
+
+  Widget _buildBodyScaffold() {
+    return Column(
+      children: [
+        _buildFiltersSection(),
+        _buildSearchSection(),
+        if (_selectedStudents.isNotEmpty) _buildBulkActions(),
+        Expanded(child: _buildContent()),
+      ],
     );
   }
 
@@ -332,180 +340,102 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
   // Builders
   // ======================
 
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildFiltersSection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      child: SaCard(
+        padding: const EdgeInsets.all(12),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final oneCol = c.maxWidth < 600;
+            final grade = _buildDropdown<int>(
+              label: 'Grade',
+              value: _selectedGrade,
+              items: _grades,
+              onChanged: (value) {
+                setState(() => _selectedGrade = value);
+                _loadStudents(refresh: true);
+              },
+              itemBuilder: (grade) => 'Grade $grade',
+            );
+            final section = _buildDropdown<String>(
+              label: 'Section',
+              value: _selectedSection,
+              items: _sections,
+              onChanged: (value) {
+                setState(() => _selectedSection = value);
+                _loadStudents(refresh: true);
+              },
+              itemBuilder: (section) => 'Section $section',
+            );
+            final status = _buildDropdown<String>(
+              label: 'Status',
+              value: _selectedStatus,
+              items: _statusOptions,
+              onChanged: (value) {
+                setState(() => _selectedStatus = value ?? 'all');
+                _filterStudents();
+              },
+              itemBuilder: (status) => status == 'all' ? 'All Status' : status.toUpperCase(),
+            );
+            final sort = _buildDropdown<String>(
+              label: 'Sort By',
+              value: _sortBy,
+              items: const ['name', 'grade', 'roll_number', 'created_at'],
+              onChanged: (value) {
+                setState(() => _sortBy = value ?? 'name');
+                _filterStudents();
+              },
+              itemBuilder: (sort) {
+                switch (sort) {
+                  case 'name':
+                    return 'Name';
+                  case 'grade':
+                    return 'Grade';
+                  case 'roll_number':
+                    return 'Roll Number';
+                  case 'created_at':
+                    return 'Date Added';
+                  default:
+                    return sort;
+                }
+              },
+            );
+
+            if (oneCol) {
+              return Column(
+                children: [
+                  grade,
+                  const SizedBox(height: Sa.gap),
+                  section,
+                  const SizedBox(height: Sa.gap),
+                  status,
+                  const SizedBox(height: Sa.gap),
+                  sort,
+                ],
+              );
+            }
+            return Column(
               children: [
-                Text(
-                  'Student Management',
-                  style: AppTheme.headingSmall.copyWith(color: Colors.white),
+                Row(
+                  children: [
+                    Expanded(child: grade),
+                    const SizedBox(width: Sa.gap),
+                    Expanded(child: section),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_filteredStudents.length} students found',
-                  style: AppTheme.bodySmall.copyWith(color: Colors.white70),
+                const SizedBox(height: Sa.gap),
+                Row(
+                  children: [
+                    Expanded(child: status),
+                    const SizedBox(width: Sa.gap),
+                    Expanded(child: sort),
+                  ],
                 ),
               ],
-            ),
-          ),
-          // Bulk Import Button
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _showBulkImportDialog,
-              borderRadius: AppTheme.borderRadius12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: AppTheme.borderRadius12,
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.upload_file, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Bulk Import',
-                      style: AppTheme.labelSmall.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Add Student Button
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _showAddStudentDialog,
-              borderRadius: AppTheme.borderRadius12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: AppTheme.borderRadius12,
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.add, color: Colors.white, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Add Student',
-                      style: AppTheme.labelSmall.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFiltersSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppTheme.neutral200, width: 0.5)),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdown<int>(
-                  label: 'Grade',
-                  value: _selectedGrade,
-                  items: _grades,
-                  onChanged: (value) {
-                    setState(() => _selectedGrade = value);
-                    _loadStudents(refresh: true);
-                  },
-                  itemBuilder: (grade) => 'Grade $grade',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDropdown<String>(
-                  label: 'Section',
-                  value: _selectedSection,
-                  items: _sections,
-                  onChanged: (value) {
-                    setState(() => _selectedSection = value);
-                    _loadStudents(refresh: true);
-                  },
-                  itemBuilder: (section) => 'Section $section',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdown<String>(
-                  label: 'Status',
-                  value: _selectedStatus,
-                  items: _statusOptions,
-                  onChanged: (value) {
-                    setState(() => _selectedStatus = value ?? 'all');
-                    _filterStudents();
-                  },
-                  itemBuilder: (status) => status == 'all' ? 'All Status' : status.toUpperCase(),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildDropdown<String>(
-                  label: 'Sort By',
-                  value: _sortBy,
-                  items: const ['name', 'grade', 'roll_number', 'created_at'],
-                  onChanged: (value) {
-                    setState(() => _sortBy = value ?? 'name');
-                    _filterStudents();
-                  },
-                  itemBuilder: (sort) {
-                    switch (sort) {
-                      case 'name':
-                        return 'Name';
-                      case 'grade':
-                        return 'Grade';
-                      case 'roll_number':
-                        return 'Roll Number';
-                      case 'created_at':
-                        return 'Date Added';
-                      default:
-                        return sort;
-                    }
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -520,35 +450,35 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: AppTheme.bodyMicro.copyWith(fontWeight: FontWeight.w500, color: AppTheme.neutral600)),
+        Text(label, style: Sa.label),
         const SizedBox(height: 4),
         Container(
           width: double.infinity,
-          height: 40,
+          height: 44,
           decoration: BoxDecoration(
             border: Border.all(color: AppTheme.neutral300),
             borderRadius: AppTheme.borderRadius8,
             color: AppTheme.neutral50,
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<T>(
               value: value,
               isExpanded: true,
               isDense: true,
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral800),
-              icon: const Icon(Icons.keyboard_arrow_down, size: 18),
+              style: Sa.value,
+              icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: AppTheme.neutral600),
               onChanged: onChanged,
               items: [
                 if (label != 'Status' && label != 'Sort By')
                   DropdownMenuItem<T>(
                     value: null,
-                    child: Text('All ${label}s', style: AppTheme.bodySmall),
+                    child: Text('All ${label}s', style: Sa.value),
                   ),
                 ...items.map(
                   (item) => DropdownMenuItem<T>(
                     value: item,
-                    child: Text(itemBuilder(item), style: AppTheme.bodySmall),
+                    child: Text(itemBuilder(item), style: Sa.value),
                   ),
                 ),
               ],
@@ -560,21 +490,17 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
   }
 
   Widget _buildSearchSection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppTheme.neutral200, width: 0.5)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
       child: TextField(
         controller: _searchController,
-        style: AppTheme.bodyMedium,
-        decoration: InputDecoration(
-          hintText: 'Search by name, student ID, roll number, or email...',
-          hintStyle: AppTheme.bodySmall.copyWith(color: AppTheme.neutral400),
+        style: Sa.value,
+        decoration: const InputDecoration(
+          hintText: 'Search by name, ID, roll number, or email…',
+          hintStyle: Sa.label,
           prefixIcon: Icon(Icons.search, color: AppTheme.greenPrimary, size: 20),
           filled: true,
-          fillColor: AppTheme.neutral50,
+          fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: AppTheme.borderRadius12,
             borderSide: BorderSide(color: AppTheme.neutral300, width: 1),
@@ -587,205 +513,112 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
             borderRadius: AppTheme.borderRadius12,
             borderSide: BorderSide(color: AppTheme.greenPrimary, width: 2),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
   }
 
   Widget _buildBulkActions() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(12),
-      decoration: AppTheme.getCompactDecoration(
-        color: AppTheme.green50,
-        border: Border.all(color: AppTheme.greenPrimary.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.checklist, size: 20, color: AppTheme.greenPrimary),
-          const SizedBox(width: 8),
-          Text(
-            '${_selectedStudents.length} students selected',
-            style: AppTheme.bodySmall.copyWith(fontWeight: FontWeight.w600, color: AppTheme.greenPrimary),
-          ),
-          const Spacer(),
-          TextButton(
-            onPressed: () => setState(() => _selectedStudents.clear()),
-            child: Text('Clear', style: AppTheme.bodySmall),
-          ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: _showBulkOperationsDialog,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.greenPrimary,
-              foregroundColor: Colors.white,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      child: SaCard(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            const Icon(Icons.checklist, size: 20, color: AppTheme.greenPrimary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${_selectedStudents.length} selected',
+                style: Sa.value.copyWith(
+                    fontWeight: FontWeight.w700, color: AppTheme.greenPrimary),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            child: Text('Actions', style: AppTheme.bodySmall.copyWith(color: Colors.white)),
-          ),
-        ],
+            TextButton(
+              onPressed: () => setState(() => _selectedStudents.clear()),
+              child: const Text('Clear', style: Sa.label),
+            ),
+            const SizedBox(width: 4),
+            SaPrimaryButton(
+              label: 'Actions',
+              icon: Icons.tune_rounded,
+              onPressed: _showBulkOperationsDialog,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildContent() {
-    if (_isLoading) return _buildLoadingState();
-    if (_error != null) return _buildErrorState();
+    if (_isLoading) return const SaLoading(message: 'Loading students…');
+    if (_error != null) {
+      return SaStateView.error(
+        message: _error!,
+        onRetry: () => _loadStudents(refresh: true),
+      );
+    }
     if (_filteredStudents.isEmpty) return _buildEmptyState();
     return _buildStudentsList();
   }
 
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildEmptyState() {
+    final filtering = _searchController.text.isNotEmpty ||
+        _selectedGrade != null ||
+        _selectedSection != null;
+    if (filtering) {
+      return SaStateView(
+        icon: Icons.search_off_rounded,
+        title: 'No students found',
+        subtitle: 'Try adjusting your search or filters.',
+        action: TextButton(
+          onPressed: () {
+            _searchController.clear();
+            setState(() {
+              _selectedGrade = null;
+              _selectedSection = null;
+              _selectedStatus = 'all';
+            });
+            _loadStudents(refresh: true);
+          },
+          child: Text('Clear filters',
+              style: Sa.value.copyWith(color: AppTheme.greenPrimary)),
+        ),
+      );
+    }
+    return SaStateView(
+      icon: Icons.people_outline,
+      title: 'No students yet',
+      subtitle: 'Add your first student to get started.',
+      action: Wrap(
+        spacing: Sa.gap,
+        runSpacing: Sa.gapXs,
+        alignment: WrapAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppTheme.greenPrimary.withOpacity(0.1),
-              borderRadius: AppTheme.borderRadius12,
-            ),
-            child: const CircularProgressIndicator(color: AppTheme.greenPrimary, strokeWidth: 3),
+          SaPrimaryButton(
+            label: 'Add student',
+            icon: Icons.add,
+            onPressed: _showAddStudentDialog,
           ),
-          const SizedBox(height: 16),
-          Text('Loading students...', style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600)),
+          TextButton.icon(
+            onPressed: _showBulkImportDialog,
+            icon: const Icon(Icons.upload_file, size: 18, color: AppTheme.neutral600),
+            label: Text('Bulk import',
+                style: Sa.value.copyWith(color: AppTheme.neutral600)),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(20),
-        padding: const EdgeInsets.all(20),
-        decoration: AppTheme.getCompactDecoration(
-          color: AppTheme.error.withOpacity(0.1),
-          border: Border.all(color: AppTheme.error.withOpacity(0.3)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
-                borderRadius: AppTheme.borderRadius12,
-              ),
-              child: Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Failed to load students',
-              style: AppTheme.labelLarge.copyWith(color: AppTheme.error, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error ?? 'Unknown error',
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral600),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => _loadStudents(refresh: true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.greenPrimary,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.refresh, size: 18, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text('Try Again', style: AppTheme.bodySmall.copyWith(color: Colors.white)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(20),
-        padding: const EdgeInsets.all(20),
-        decoration: AppTheme.getCompactDecoration(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppTheme.neutral100,
-                borderRadius: AppTheme.borderRadius12,
-              ),
-              child: Icon(Icons.people_outline, size: 48, color: AppTheme.neutral400),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No students found',
-              style: AppTheme.labelLarge.copyWith(color: AppTheme.neutral600, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _searchController.text.isNotEmpty || _selectedGrade != null || _selectedSection != null
-                  ? 'Try adjusting your search or filters.'
-                  : 'Add your first student to get started.',
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            if (_searchController.text.isNotEmpty || _selectedGrade != null || _selectedSection != null)
-              TextButton(
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() {
-                    _selectedGrade = null;
-                    _selectedSection = null;
-                    _selectedStatus = 'all';
-                  });
-                  _loadStudents(refresh: true);
-                },
-                child: Text('Clear Filters', style: AppTheme.bodySmall),
-              )
-            else
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ElevatedButton(
-                    onPressed: _showAddStudentDialog,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.greenPrimary,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    ),
-                    child:
-                        Text('Add Student', style: AppTheme.bodySmall.copyWith(color: Colors.white)),
-                  ),
-                  const SizedBox(width: 12),
-                  TextButton.icon(
-                    onPressed: _showBulkImportDialog,
-                    icon: const Icon(Icons.upload_file, size: 18),
-                    label: Text('Bulk Import', style: AppTheme.bodySmall),
-                  ),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildStudentsList() {
-    return ListView.builder(
+    return ListView.separated(
       controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 96),
       itemCount: _filteredStudents.length + (_isLoadingMore ? 1 : 0),
+      separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
       itemBuilder: (context, index) {
         if (index == _filteredStudents.length) return _buildLoadMoreWidget();
         final student = _filteredStudents[index];
@@ -797,16 +630,16 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
   Widget _buildLoadMoreWidget() {
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
+      child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(
-            width: 24,
-            height: 24,
+          SizedBox(
+            width: 22,
+            height: 22,
             child: CircularProgressIndicator(color: AppTheme.greenPrimary, strokeWidth: 2),
           ),
-          const SizedBox(width: 12),
-          Text('Loading more...', style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral600)),
+          SizedBox(width: 12),
+          Text('Loading more…', style: Sa.label),
         ],
       ),
     );
@@ -816,182 +649,139 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
     final bool isSelected = _selectedStudents.contains(student.id);
     final bool isInactive = !student.isActive;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showStudentDetails(student),
-          borderRadius: AppTheme.borderRadius12,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: AppTheme.getCompactDecoration(
-              color: isSelected
-                  ? AppTheme.green50
-                  : isInactive
-                      ? AppTheme.neutral50.withOpacity(0.5)
-                      : AppTheme.surfacePrimary,
-              border: Border.all(
-                color: isSelected
-                    ? AppTheme.greenPrimary.withOpacity(0.5)
-                    : isInactive
-                        ? AppTheme.neutral300
-                        : AppTheme.neutral200,
-                width: isSelected ? 1.5 : 1,
+    return SaCard(
+      onTap: () => _showStudentDetails(student),
+      padding: const EdgeInsets.all(12),
+      child: Opacity(
+        opacity: isInactive ? 0.7 : 1.0,
+        child: Row(
+          children: [
+            Checkbox(
+              value: isSelected,
+              onChanged: (selected) {
+                setState(() {
+                  if (selected == true) {
+                    _selectedStudents.add(student.id);
+                  } else {
+                    _selectedStudents.remove(student.id);
+                  }
+                });
+              },
+              activeColor: AppTheme.greenPrimary,
+            ),
+            const SizedBox(width: 4),
+            CircleAvatar(
+              radius: 22,
+              backgroundColor:
+                  isInactive ? AppTheme.neutral200 : AppTheme.greenPrimary.withValues(alpha: 0.10),
+              child: Text(
+                student.firstName.isNotEmpty ? student.firstName[0].toUpperCase() : 'S',
+                style: Sa.cardTitle.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isInactive ? AppTheme.neutral600 : AppTheme.greenPrimary,
+                ),
               ),
             ),
-            child: Opacity(
-              opacity: isInactive ? 0.6 : 1.0,
-              child: Row(
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Transform.scale(
-                    scale: 1.0,
-                    child: Checkbox(
-                      value: isSelected,
-                      onChanged: (selected) {
-                        setState(() {
-                          if (selected == true) {
-                            _selectedStudents.add(student.id);
-                          } else {
-                            _selectedStudents.remove(student.id);
-                          }
-                        });
-                      },
-                      activeColor: AppTheme.greenPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor:
-                        isInactive ? AppTheme.neutral300 : AppTheme.greenPrimary.withOpacity(0.1),
-                    child: Text(
-                      student.firstName.isNotEmpty ? student.firstName[0].toUpperCase() : 'S',
-                      style: AppTheme.bodyLarge.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: isInactive ? AppTheme.neutral600 : AppTheme.greenPrimary,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          student.fullName,
+                          style: Sa.cardTitle.copyWith(
+                            color: isInactive ? AppTheme.neutral600 : AppTheme.neutral900,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
+                      if (isInactive) _buildStatusChip(student),
+                    ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                student.fullName,
-                                style: AppTheme.bodyMedium.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: isInactive ? AppTheme.neutral600 : AppTheme.neutral900,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isInactive) _buildStatusChip(student),
-                          ],
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          student.gradeText,
+                          style: Sa.value.copyWith(color: AppTheme.neutral600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Text(
-                              student.gradeText,
-                              style: AppTheme.bodySmall.copyWith(
-                                color: AppTheme.neutral600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            if (student.rollNumber != null) ...[
-                              const SizedBox(width: 12),
-                              Text('Roll: ${student.rollNumber}',
-                                  style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral500)),
-                            ],
-                          ],
-                        ),
-                        if (student.studentId.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text('ID: ${student.studentId}',
-                              style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral500)),
-                        ],
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            if (student.age > 0)
-                              _buildInfoBadge('${student.age} yrs', Icons.cake, AppTheme.info),
-                            if (student.age > 0 && student.email != null) const SizedBox(width: 8),
-                            if (student.email != null)
-                              _buildInfoBadge('Email', Icons.email, AppTheme.success),
-                            if ((student.age > 0 || student.email != null) &&
-                                student.phone != null)
-                              const SizedBox(width: 8),
-                            if (student.phone != null)
-                              _buildInfoBadge('Phone', Icons.phone, AppTheme.warning),
-                          ],
-                        ),
+                      ),
+                      if (student.rollNumber != null) ...[
+                        const SizedBox(width: 12),
+                        Text('Roll: ${student.rollNumber}', style: Sa.label),
                       ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  _buildActionsMenu(student),
+                  if (student.studentId.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text('ID: ${student.studentId}',
+                        style: Sa.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      if (student.age > 0)
+                        _buildInfoBadge('${student.age} yrs', Icons.cake_outlined),
+                      if (student.email != null)
+                        _buildInfoBadge('Email', Icons.email_outlined),
+                      if (student.phone != null)
+                        _buildInfoBadge('Phone', Icons.phone_outlined),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(width: 4),
+            _buildActionsMenu(student),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildStatusChip(Student student) {
+    // green for active/positive states; neutral for inactive/graduated;
+    // red only for suspended (a punitive/negative state).
     Color statusColor;
     switch (student.status.toLowerCase()) {
       case 'active':
-        statusColor = AppTheme.success;
-        break;
-      case 'inactive':
-        statusColor = AppTheme.neutral600;
+        statusColor = AppTheme.greenPrimary;
         break;
       case 'suspended':
         statusColor = AppTheme.error;
         break;
+      case 'inactive':
       case 'graduated':
-        statusColor = AppTheme.info;
-        break;
       default:
         statusColor = AppTheme.neutral500;
     }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.1),
-        borderRadius: AppTheme.borderRadius8,
-        border: Border.all(color: statusColor.withOpacity(0.3), width: 1),
-      ),
-      child: Text(
-        student.statusText,
-        style: AppTheme.bodyMicro.copyWith(color: statusColor, fontWeight: FontWeight.w600),
-      ),
-    );
+    return SaStatusPill(text: student.statusText, color: statusColor);
   }
 
-  Widget _buildInfoBadge(String label, IconData icon, Color color) {
+  Widget _buildInfoBadge(String label, IconData icon) {
+    // neutral, single-accent badges (no off-brand blue/amber/teal).
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+      decoration: const BoxDecoration(
+        color: AppTheme.neutral100,
         borderRadius: AppTheme.borderRadius8,
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 14),
+          Icon(icon, color: AppTheme.neutral600, size: 13),
           const SizedBox(width: 4),
-          Text(label, style: AppTheme.bodyMicro.copyWith(fontWeight: FontWeight.w500, color: color)),
+          Text(label,
+              style: Sa.label.copyWith(fontWeight: FontWeight.w600, color: AppTheme.neutral700)),
         ],
       ),
     );
@@ -999,40 +789,41 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
 
   Widget _buildActionsMenu(Student student) {
     return PopupMenuButton<String>(
-      icon: Icon(Icons.more_vert, size: 20, color: AppTheme.neutral600),
+      icon: const Icon(Icons.more_vert, size: 20, color: AppTheme.neutral600),
       padding: const EdgeInsets.all(4),
       onSelected: (value) async {
         switch (value) {
           case 'details':
             _showStudentDetails(student);
             break;
-          case 'delete':
-            final confirm = await _showDeleteConfirmation(student);
+          case 'deactivate':
+            final confirm = await _showDeactivateConfirmation(student);
             if (confirm == true) {
-              await _deleteStudent(student.id);
+              await _deactivateStudent(student.id);
             }
             break;
         }
       },
       itemBuilder: (context) => <PopupMenuEntry<String>>[
-        PopupMenuItem(
+        const PopupMenuItem(
           value: 'details',
           child: Row(
             children: [
-              Icon(Icons.visibility, size: 18, color: AppTheme.info),
-              const SizedBox(width: 12),
-              Text('View Details', style: AppTheme.bodySmall),
+              Icon(Icons.visibility, size: 18, color: AppTheme.greenPrimary),
+              SizedBox(width: 12),
+              Text('View Details', style: Sa.value),
             ],
           ),
         ),
         const PopupMenuDivider(),
+        // No "Delete" — deactivate instead (keeps the student + their academic history).
         PopupMenuItem(
-          value: 'delete',
+          value: 'deactivate',
           child: Row(
             children: [
-              Icon(Icons.delete_forever, size: 18, color: AppTheme.error),
+              const Icon(Icons.block, size: 18, color: AppTheme.error),
               const SizedBox(width: 12),
-              Text('Delete', style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
+              Text('Deactivate', style: Sa.value.copyWith(color: AppTheme.error)),
             ],
           ),
         ),
@@ -1040,53 +831,74 @@ class _StudentManagementScreenState extends State<StudentManagementScreen>
     );
   }
 
-  Future<bool?> _showDeleteConfirmation(Student student) {
+  Future<bool?> _showDeactivateConfirmation(Student student) {
+    final maxW = MediaQuery.of(context).size.width - 24;
     return showDialog<bool>(
       context: context,
       barrierColor: AppTheme.surfaceOverlay,
-      builder: (context) => AlertDialog(
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.warning, size: 40, color: AppTheme.error),
-            const SizedBox(height: 16),
-            Text(
-              'Delete Student',
-              style: AppTheme.labelLarge.copyWith(color: AppTheme.error, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Are you sure you want to delete ${student.fullName}?\n\nThis action cannot be undone.',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral700),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            Row(
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+        backgroundColor: Sa.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sa.radius)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxW > 420 ? 420 : maxW),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: Text('Cancel', style: AppTheme.bodySmall),
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppTheme.error.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
                   ),
+                  child: const Icon(Icons.warning_amber_rounded, size: 30, color: AppTheme.error),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.error,
-                      foregroundColor: Colors.white,
+                const SizedBox(height: Sa.gapLg),
+                Text(
+                  'Deactivate Student',
+                  style: Sa.cardTitle.copyWith(color: AppTheme.error, fontSize: 16),
+                ),
+                const SizedBox(height: Sa.gap),
+                Text(
+                  'Deactivate ${student.fullName}? They lose access immediately, but their '
+                  'record and academic history are kept. You can reactivate them anytime by '
+                  'editing their profile.',
+                  style: Sa.body,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: Sa.gapLg),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.neutral700,
+                          minimumSize: const Size(0, 48),
+                          side: const BorderSide(color: AppTheme.neutral300),
+                          shape: const RoundedRectangleBorder(
+                              borderRadius: AppTheme.borderRadius12),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
                     ),
-                    child: Text(
-                      'Delete',
-                      style: AppTheme.bodySmall.copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+                    const SizedBox(width: Sa.gap),
+                    Expanded(
+                      child: SaPrimaryButton(
+                        label: 'Deactivate',
+                        icon: Icons.block,
+                        color: AppTheme.error,
+                        onPressed: () => Navigator.pop(context, true),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

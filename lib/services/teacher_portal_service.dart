@@ -58,11 +58,12 @@ class TeacherPortalService {
     throw _err(r, 'Failed to load classes');
   }
 
-  /// Class roster: students actively enrolled in a class (with names/roll).
+  /// Class roster: members actively enrolled in a class (with names/roll).
   /// GET /api/v1/school_authority/classes/{classId}/students
-  /// NOTE id-field convention here is the OPPOSITE of the attendance endpoints:
-  ///   `id`         = students table UUID (the canonical student PK / marks user_id)
-  ///   `student_id` = the human-readable school code (e.g. STU001)
+  /// Member model — each roster item:
+  ///   `member_id`   = members table UUID (the canonical member PK / marks user_id)
+  ///   `member_hrid` = the human-readable school code (member.staff_id, e.g. STU001)
+  ///   `member_name` = first + last name
   static Future<Map<String, dynamic>> getClassRoster({required String classId}) async {
     final uri = Uri.parse(
       '$_base/api/v1/school_authority/classes/$classId/students',
@@ -109,7 +110,7 @@ class TeacherPortalService {
               'attendance_updates': updates,
               'attendance_date': date,
               'marked_by': teacherId,
-              'marked_by_type': 'teacher',
+              'marked_by_type': 'staff',
             }))
         .timeout(const Duration(seconds: 15));
     if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;

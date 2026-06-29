@@ -11,6 +11,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/quiz_admin_service.dart';
 import '../../../services/teacher_portal_service.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 const _qTypes = <MapEntry<String, String>>[
   MapEntry('multiple_choice', 'Multiple choice'),
@@ -191,7 +192,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Quiz created'),
-        backgroundColor: AppTheme.success,
+        backgroundColor: AppTheme.greenPrimary,
         behavior: SnackBarBehavior.floating,
       ));
       _goBack();
@@ -214,98 +215,133 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          IconButton(
-            onPressed: _goBack,
-            icon: const Icon(Icons.arrow_back),
-            color: AppTheme.greenPrimary,
-            tooltip: 'Back',
-          ),
-          Expanded(child: Text('Create Quiz', style: AppTheme.headingMedium)),
-        ]),
-        const SizedBox(height: 8),
-        Expanded(
-          child: ListView(
-            children: [
-              _metaCard(),
-              const SizedBox(height: 16),
-              Row(children: [
-                Text('Questions', style: AppTheme.headingSmall),
-                const SizedBox(width: 8),
-                Text('${_questions.length}',
-                    style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500)),
-              ]),
-              const SizedBox(height: 8),
-              ..._questions.asMap().entries.map((e) => _questionCard(e.key, e.value)),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _addQuestion,
-                icon: const Icon(Icons.add, size: AppTheme.iconSmall),
-                label: const Text('Add question'),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: AppTheme.bodyMedium.copyWith(color: AppTheme.error)),
-              ],
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _saving ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.check),
-                  label: Text(_saving ? 'Creating…' : 'Create quiz'),
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Create Quiz',
+          subtitle: 'Build questions and publish to students',
+          icon: Icons.edit_note,
+          leading: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _goBack,
+              borderRadius: AppTheme.borderRadius12,
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.18),
+                  borderRadius: AppTheme.borderRadius12,
                 ),
+                child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
               ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
         ),
-      ],
+      ),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+        children: [
+          _metaCard(),
+          const SizedBox(height: Sa.gapLg),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Row(children: [
+              Text('Questions', style: Sa.cardTitle.copyWith(fontSize: 16)),
+              const SizedBox(width: 8),
+              SaStatusPill(text: '${_questions.length}'),
+            ]),
+          ),
+          const SizedBox(height: Sa.gap),
+          ..._questions.asMap().entries.map((e) => _questionCard(e.key, e.value)),
+          const SizedBox(height: 4),
+          OutlinedButton.icon(
+            onPressed: _addQuestion,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add question'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Sa.accent,
+              minimumSize: const Size(0, 46),
+              side: const BorderSide(color: Sa.accent, width: 1.5),
+              shape: const RoundedRectangleBorder(
+                  borderRadius: AppTheme.borderRadius12),
+            ),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: Sa.gap),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.error.withValues(alpha: 0.08),
+                borderRadius: AppTheme.borderRadius12,
+              ),
+              child: Row(children: [
+                const Icon(Icons.error_outline_rounded,
+                    size: 18, color: AppTheme.error),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(_error!,
+                      style: Sa.body.copyWith(color: AppTheme.error)),
+                ),
+              ]),
+            ),
+          ],
+          const SizedBox(height: Sa.gapLg),
+          SaPrimaryButton(
+            label: _saving ? 'Creating…' : 'Create quiz',
+            icon: Icons.check_rounded,
+            busy: _saving,
+            expand: true,
+            onPressed: _saving ? null : _save,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _metaCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
+    final gradeField = TextField(
+      controller: _grade,
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(labelText: 'Grade (1-12)', isDense: true),
+    );
+    final timeField = TextField(
+      controller: _time,
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(labelText: 'Time (min)', isDense: true),
+    );
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SaCardHeader(icon: Icons.quiz_outlined, title: 'Quiz details'),
+          const SizedBox(height: Sa.gap),
           TextField(
             controller: _title,
             decoration: const InputDecoration(labelText: 'Quiz title *', isDense: true),
           ),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(
-              child: TextField(
-                controller: _subject,
-                decoration: const InputDecoration(labelText: 'Subject *', isDense: true),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _grade,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Grade (1-12)', isDense: true),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: TextField(
-                controller: _time,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Time (min)', isDense: true),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 12),
+          const SizedBox(height: Sa.gap),
+          TextField(
+            controller: _subject,
+            decoration: const InputDecoration(labelText: 'Subject *', isDense: true),
+          ),
+          const SizedBox(height: Sa.gap),
+          LayoutBuilder(builder: (context, c) {
+            final oneCol = c.maxWidth < 600;
+            return oneCol
+                ? Column(children: [
+                    gradeField,
+                    const SizedBox(height: Sa.gap),
+                    timeField,
+                  ])
+                : Row(children: [
+                    Expanded(child: gradeField),
+                    const SizedBox(width: Sa.gap),
+                    Expanded(child: timeField),
+                  ]);
+          }),
+          const SizedBox(height: Sa.gap),
           TextField(
             controller: _instructions,
             minLines: 1,
@@ -313,8 +349,8 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
             decoration: const InputDecoration(labelText: 'Instructions (optional)', isDense: true),
           ),
           if (_classes.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            Text('Assign to classes (optional)', style: AppTheme.labelMedium),
+            const SizedBox(height: Sa.gapLg),
+            const Text('Assign to classes (optional)', style: Sa.label),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -330,7 +366,7 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
                   showCheckmark: false,
                   selectedColor: AppTheme.greenPrimary,
                   backgroundColor: AppTheme.neutral100,
-                  labelStyle: AppTheme.bodySmall.copyWith(
+                  labelStyle: Sa.label.copyWith(
                       color: sel ? Colors.white : AppTheme.neutral700,
                       fontWeight: FontWeight.w600),
                   onSelected: (v) => setState(() {
@@ -344,14 +380,14 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
               }).toList(),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           SwitchListTile(
             value: _publishNow,
             onChanged: (v) => setState(() => _publishNow = v),
-            activeColor: AppTheme.greenPrimary,
+            activeThumbColor: AppTheme.greenPrimary,
             contentPadding: EdgeInsets.zero,
-            title: Text('Make available to students immediately',
-                style: AppTheme.bodyMedium),
+            title: const Text('Make available to students immediately',
+                style: Sa.value),
           ),
         ],
       ),
@@ -359,69 +395,84 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
   }
 
   Widget _questionCard(int index, _QDraft q) {
+    final typeField = DropdownButtonFormField<String>(
+      initialValue: q.type,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Type', isDense: true),
+      items: _qTypes
+          .map((t) => DropdownMenuItem(value: t.key, child: Text(t.value)))
+          .toList(),
+      onChanged: (v) => setState(() => q.type = v ?? 'multiple_choice'),
+    );
+    final pointsField = TextField(
+      controller: q.points,
+      keyboardType: TextInputType.number,
+      decoration: const InputDecoration(labelText: 'Points', isDense: true),
+    );
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              width: 26, height: 26,
-              decoration: BoxDecoration(
-                  color: AppTheme.green50, borderRadius: AppTheme.borderRadius8),
-              child: Center(
-                child: Text('${index + 1}',
-                    style: AppTheme.bodySmall.copyWith(
-                        color: AppTheme.greenPrimary, fontWeight: FontWeight.w700)),
+      margin: const EdgeInsets.only(bottom: Sa.gap),
+      child: SaCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                    color: Sa.accent.withValues(alpha: 0.10),
+                    borderRadius: AppTheme.borderRadius8),
+                child: Center(
+                  child: Text('${index + 1}',
+                      style: Sa.value.copyWith(
+                          color: AppTheme.greenPrimary,
+                          fontWeight: FontWeight.w700)),
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: q.type,
-                isExpanded: true,
-                decoration: const InputDecoration(isDense: true),
-                items: _qTypes
-                    .map((t) => DropdownMenuItem(value: t.key, child: Text(t.value)))
-                    .toList(),
-                onChanged: (v) => setState(() => q.type = v ?? 'multiple_choice'),
+              const SizedBox(width: 10),
+              Expanded(child: Text('Question ${index + 1}', style: Sa.cardTitle)),
+              IconButton(
+                onPressed:
+                    _questions.length == 1 ? null : () => _removeQuestion(index),
+                icon: const Icon(Icons.delete_outline, size: 22),
+                color: AppTheme.error,
+                tooltip: 'Remove',
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 70,
-              child: TextField(
-                controller: q.points,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Pts', isDense: true),
-              ),
-            ),
-            IconButton(
-              onPressed: _questions.length == 1 ? null : () => _removeQuestion(index),
-              icon: const Icon(Icons.close, size: AppTheme.iconMedium),
-              color: AppTheme.error,
-              tooltip: 'Remove',
-            ),
-          ]),
-          const SizedBox(height: 10),
-          TextField(
-            controller: q.text,
-            minLines: 1,
-            maxLines: 3,
-            decoration: const InputDecoration(labelText: 'Question', isDense: true),
-          ),
-          const SizedBox(height: 10),
-          if (q.type == 'multiple_choice') _mcqEditor(q),
-          if (q.type == 'true_false') _tfEditor(q),
-          if (q.type == 'short_answer')
+            ]),
+            const SizedBox(height: Sa.gap),
+            LayoutBuilder(builder: (context, c) {
+              final oneCol = c.maxWidth < 600;
+              return oneCol
+                  ? Column(children: [
+                      typeField,
+                      const SizedBox(height: Sa.gap),
+                      pointsField,
+                    ])
+                  : Row(children: [
+                      Expanded(flex: 2, child: typeField),
+                      const SizedBox(width: Sa.gap),
+                      Expanded(child: pointsField),
+                    ]);
+            }),
+            const SizedBox(height: Sa.gap),
             TextField(
-              controller: q.shortAnswer,
-              decoration: const InputDecoration(
-                  labelText: 'Expected answer (graded manually)', isDense: true),
+              controller: q.text,
+              minLines: 1,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Question', isDense: true),
             ),
-        ],
+            const SizedBox(height: Sa.gap),
+            if (q.type == 'multiple_choice') _mcqEditor(q),
+            if (q.type == 'true_false') _tfEditor(q),
+            if (q.type == 'short_answer')
+              TextField(
+                controller: q.shortAnswer,
+                decoration: const InputDecoration(
+                    labelText: 'Expected answer (graded manually)', isDense: true),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -430,8 +481,8 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Tap the circle to mark the correct option',
-            style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+        const Text('Tap the circle to mark the correct option',
+            style: Sa.label),
         const SizedBox(height: 6),
         ...List.generate(q.options.length, (k) {
           final key = _optionKeys[k];
@@ -441,18 +492,21 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
             child: Row(children: [
               InkWell(
                 onTap: () => setState(() => q.correctKey = key),
-                borderRadius: AppTheme.borderRadius8,
-                child: Icon(
-                  isCorrect ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: isCorrect ? AppTheme.success : AppTheme.neutral400,
+                borderRadius: BorderRadius.circular(22),
+                child: SizedBox(
+                  width: 44,
+                  height: 44,
+                  child: Icon(
+                    isCorrect ? Icons.check_circle : Icons.radio_button_unchecked,
+                    color: isCorrect ? AppTheme.greenPrimary : AppTheme.neutral400,
+                  ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Container(
-                width: 24,
-                alignment: Alignment.center,
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 20,
                 child: Text(key,
-                    style: AppTheme.labelMedium.copyWith(
+                    style: Sa.value.copyWith(
                         color: AppTheme.greenPrimary, fontWeight: FontWeight.w700)),
               ),
               const SizedBox(width: 6),
@@ -470,11 +524,14 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
   }
 
   Widget _tfEditor(_QDraft q) {
-    return Row(children: [
-      _tfChip(q, true, 'True'),
-      const SizedBox(width: 8),
-      _tfChip(q, false, 'False'),
-    ]);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _tfChip(q, true, 'True'),
+        _tfChip(q, false, 'False'),
+      ],
+    );
   }
 
   Widget _tfChip(_QDraft q, bool value, String label) {
@@ -483,9 +540,9 @@ class _QuizBuilderScreenState extends State<QuizBuilderScreen> {
       label: Text(label),
       selected: sel,
       showCheckmark: false,
-      selectedColor: AppTheme.success,
+      selectedColor: AppTheme.greenPrimary,
       backgroundColor: AppTheme.neutral100,
-      labelStyle: AppTheme.bodyMedium.copyWith(
+      labelStyle: Sa.value.copyWith(
           color: sel ? Colors.white : AppTheme.neutral700, fontWeight: FontWeight.w600),
       onSelected: (_) => setState(() => q.tfAnswer = value),
     );

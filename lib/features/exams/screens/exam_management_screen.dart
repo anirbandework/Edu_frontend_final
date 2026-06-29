@@ -9,6 +9,7 @@ import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/grades_service.dart';
 import '../../../services/teacher_portal_service.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 const _examTypes = <MapEntry<String, String>>[
   MapEntry('unit_test', 'Unit Test'),
@@ -71,7 +72,7 @@ class _ExamManagementScreenState extends State<ExamManagementScreen> {
 
   Future<void> _createExam() async {
     if (_classes.isEmpty) {
-      _toast('No classes available to attach an exam to', AppTheme.warning);
+      _toast('No classes available to attach an exam to', AppTheme.error);
       return;
     }
     final created = await showDialog<bool>(
@@ -87,7 +88,7 @@ class _ExamManagementScreenState extends State<ExamManagementScreen> {
     setState(() => e['_busy'] = true);
     try {
       await GradesService.publishExam(examId: id);
-      _toast('Results published to students', AppTheme.success);
+      _toast('Results published to students', AppTheme.greenPrimary);
       _load();
     } catch (err) {
       if (!mounted) return;
@@ -117,7 +118,7 @@ class _ExamManagementScreenState extends State<ExamManagementScreen> {
     if (ok != true) return;
     try {
       await GradesService.deleteExam(examId: id);
-      _toast('Exam deleted', AppTheme.success);
+      _toast('Exam deleted', AppTheme.greenPrimary);
       _load();
     } catch (err) {
       _toast(err.toString().replaceAll('Exception: ', ''), AppTheme.error);
@@ -135,93 +136,45 @@ class _ExamManagementScreenState extends State<ExamManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Exams', style: AppTheme.headingMedium),
-                  Text(_loading ? 'Loading…' : '${_exams.length} exams',
-                      style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
-                ],
-              ),
-            ),
-            ElevatedButton.icon(
-              onPressed: _createExam,
-              icon: const Icon(Icons.add, size: AppTheme.iconSmall),
-              label: const Text('New Exam'),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: _loading ? null : _load,
-              icon: const Icon(Icons.refresh),
-              color: AppTheme.greenPrimary,
-              tooltip: 'Refresh',
-            ),
-          ],
+    // NO Scaffold / AppBar — the shell provides them.
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Exam Management',
+          subtitle: _loading ? 'Loading…' : '${_exams.length} exams',
+          icon: Icons.fact_check_outlined,
+          trailing: SaHeaderAction(
+            icon: Icons.add,
+            tooltip: 'New exam',
+            onPressed: _createExam,
+          ),
         ),
-        const SizedBox(height: 16),
-        Expanded(child: _body()),
-      ],
+      ),
+      child: _body(),
     );
   }
 
   Widget _body() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(_error!,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh, size: AppTheme.iconSmall),
-              label: const Text('Retry')),
-        ]),
-      );
-    }
+    if (_loading) return const SaLoading(message: 'Loading exams…');
+    if (_error != null) return SaStateView.error(message: _error!, onRetry: _load);
     if (_exams.isEmpty) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.assignment_outlined, size: 40, color: AppTheme.neutral400),
-          const SizedBox(height: 12),
-          Text('No exams yet',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500)),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-              onPressed: _createExam,
-              icon: const Icon(Icons.add, size: AppTheme.iconSmall),
-              label: const Text('Create your first exam')),
-        ]),
+      return SaStateView(
+        icon: Icons.fact_check_outlined,
+        title: 'No exams yet',
+        subtitle: 'Create your first exam to start tracking marks.',
+        action: SaPrimaryButton(
+          label: 'Create your first exam',
+          icon: Icons.add,
+          onPressed: _createExam,
+        ),
       );
     }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _load,
-      child: LayoutBuilder(builder: (context, c) {
-        final cols = c.maxWidth > 1000 ? 3 : (c.maxWidth > 620 ? 2 : 1);
-        return GridView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 184,
-          ),
-          itemCount: _exams.length,
-          itemBuilder: (context, i) => _examCard(_exams[i]),
-        );
-      }),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 96),
+      itemCount: _exams.length,
+      separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
+      itemBuilder: (context, i) => _examCard(_exams[i]),
     );
   }
 
@@ -234,66 +187,86 @@ class _ExamManagementScreenState extends State<ExamManagementScreen> {
     final busy = e['_busy'] == true;
     final totalStudents = e['total_students'];
     final completed = e['completed_markings'];
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Container(
-                width: 42, height: 42,
-                decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient, borderRadius: AppTheme.borderRadius12),
-                child: const Icon(Icons.assignment, color: Colors.white, size: AppTheme.iconMedium),
+                width: 42,
+                height: 42,
+                decoration: const BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: AppTheme.borderRadius12),
+                child: const Icon(Icons.fact_check_outlined,
+                    color: Colors.white, size: 22),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: Sa.gap),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(name,
-                        style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                        style: Sa.cardTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                     if (code.isNotEmpty)
                       Text(code,
-                          style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+                          style: Sa.label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
-              _statusChip(published),
+              const SizedBox(width: Sa.gapXs),
+              SaStatusPill(
+                text: published ? 'Published' : 'Draft',
+                color: published ? AppTheme.greenPrimary : AppTheme.neutral500,
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          Wrap(spacing: 8, runSpacing: 6, children: [
-            if (type.isNotEmpty) _tag(_label(type)),
-            if (year.isNotEmpty) _tag(year),
-          ]),
-          const Spacer(),
-          Row(children: [
-            if (totalStudents != null) _meta(Icons.people_outline, '$totalStudents students'),
-            if (completed != null) ...[
-              const SizedBox(width: 12),
-              _meta(Icons.task_alt, '$completed marked'),
-            ],
-          ]),
-          const SizedBox(height: 8),
+          if (type.isNotEmpty || year.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 6, children: [
+              if (type.isNotEmpty) _tag(_label(type)),
+              if (year.isNotEmpty) _tag(year),
+            ]),
+          ],
+          if (totalStudents != null || completed != null) ...[
+            const SizedBox(height: 10),
+            Wrap(spacing: Sa.gap, runSpacing: 6, children: [
+              if (totalStudents != null)
+                _meta(Icons.people_outline, '$totalStudents students'),
+              if (completed != null) _meta(Icons.task_alt, '$completed marked'),
+            ]),
+          ],
+          const SizedBox(height: Sa.gap),
           Row(children: [
             if (!published)
               TextButton.icon(
                 onPressed: busy ? null : () => _publish(e),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.greenPrimary,
+                  minimumSize: const Size(0, 44),
+                ),
                 icon: busy
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.publish, size: AppTheme.iconSmall, color: AppTheme.success),
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppTheme.greenPrimary))
+                    : const Icon(Icons.publish,
+                        size: 18, color: AppTheme.greenPrimary),
                 label: const Text('Publish'),
               ),
             const Spacer(),
             IconButton(
               onPressed: () => _delete(e),
-              icon: const Icon(Icons.delete_outline, size: AppTheme.iconMedium),
+              icon: const Icon(Icons.delete_outline, size: 22),
               color: AppTheme.error,
               tooltip: 'Delete',
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             ),
           ]),
         ],
@@ -308,36 +281,26 @@ class _ExamManagementScreenState extends State<ExamManagementScreen> {
     return type.replaceAll('_', ' ');
   }
 
-  Widget _statusChip(bool published) {
-    final color = published ? AppTheme.success : AppTheme.warning;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-          color: color.withOpacity(0.12), borderRadius: AppTheme.borderRadius8),
-      child: Text(published ? 'Published' : 'Draft',
-          style: AppTheme.bodyMicro.copyWith(color: color, fontWeight: FontWeight.w700)),
-    );
-  }
-
   Widget _tag(String text) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
           color: AppTheme.green50, borderRadius: AppTheme.borderRadius8),
       child: Text(text,
-          style: AppTheme.bodyMicro.copyWith(
+          style: Sa.label.copyWith(
               color: AppTheme.greenPrimary, fontWeight: FontWeight.w600)),
     );
   }
 
   Widget _meta(IconData icon, String text) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
+      Icon(icon, size: 16, color: AppTheme.neutral500),
       const SizedBox(width: 4),
       Flexible(
         child: Text(text,
-            style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+            style: Sa.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
       ),
     ]);
   }
@@ -416,113 +379,163 @@ class _CreateExamDialogState extends State<_CreateExamDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('New Exam'),
-      content: SizedBox(
-        width: 460,
-        child: SingleChildScrollView(
+    final maxW = MediaQuery.of(context).size.width - 24;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Sa.radius)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW > 460 ? 460 : maxW,
+          maxHeight: MediaQuery.of(context).size.height - 80,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: _name,
-                decoration: const InputDecoration(labelText: 'Exam name *', isDense: true),
+              Text('New Exam', style: Sa.cardTitle.copyWith(fontSize: 17)),
+              const SizedBox(height: Sa.gapLg),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: _name,
+                        decoration: const InputDecoration(
+                            labelText: 'Exam name *', isDense: true),
+                      ),
+                      const SizedBox(height: Sa.gap),
+                      LayoutBuilder(builder: (context, c) {
+                        final typeField = DropdownButtonFormField<String>(
+                          initialValue: _type,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                              labelText: 'Type', isDense: true),
+                          items: _examTypes
+                              .map((t) => DropdownMenuItem(
+                                  value: t.key, child: Text(t.value)))
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _type = v ?? 'unit_test'),
+                        );
+                        final yearField = TextField(
+                          controller: _year,
+                          decoration: const InputDecoration(
+                              labelText: 'Academic year', isDense: true),
+                        );
+                        return c.maxWidth < 600
+                            ? Column(children: [
+                                typeField,
+                                const SizedBox(height: Sa.gap),
+                                yearField,
+                              ])
+                            : Row(children: [
+                                Expanded(child: typeField),
+                                const SizedBox(width: Sa.gap),
+                                Expanded(child: yearField),
+                              ]);
+                      }),
+                      const SizedBox(height: Sa.gap),
+                      LayoutBuilder(builder: (context, c) {
+                        final subjectField = TextField(
+                          controller: _subject,
+                          decoration: const InputDecoration(
+                              labelText: 'Subject', isDense: true),
+                        );
+                        final durationField = TextField(
+                          controller: _duration,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                              labelText: 'Duration (min)', isDense: true),
+                        );
+                        return c.maxWidth < 600
+                            ? Column(children: [
+                                subjectField,
+                                const SizedBox(height: Sa.gap),
+                                durationField,
+                              ])
+                            : Row(children: [
+                                Expanded(child: subjectField),
+                                const SizedBox(width: Sa.gap),
+                                Expanded(child: durationField),
+                              ]);
+                      }),
+                      const SizedBox(height: Sa.gap),
+                      TextField(
+                        controller: _code,
+                        decoration: const InputDecoration(
+                            labelText: 'Exam code (auto if blank)',
+                            isDense: true),
+                      ),
+                      const SizedBox(height: Sa.gapLg),
+                      const Text('Classes *', style: Sa.label),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.classes.map((c) {
+                          final id = c['id']?.toString() ?? '';
+                          final name = (c['class_name'] ?? 'Class').toString();
+                          final sec = (c['section'] ?? '').toString();
+                          final sel = _selectedClasses.contains(id);
+                          return FilterChip(
+                            label: Text(sec.isEmpty ? name : '$name • $sec'),
+                            selected: sel,
+                            checkmarkColor: Colors.white,
+                            selectedColor: AppTheme.greenPrimary,
+                            backgroundColor: AppTheme.neutral100,
+                            labelStyle: Sa.value.copyWith(
+                                color: sel ? Colors.white : AppTheme.neutral700),
+                            onSelected: (v) => setState(() {
+                              if (v) {
+                                _selectedClasses.add(id);
+                              } else {
+                                _selectedClasses.remove(id);
+                              }
+                            }),
+                          );
+                        }).toList(),
+                      ),
+                      if (_err != null) ...[
+                        const SizedBox(height: Sa.gap),
+                        Text(_err!,
+                            style: Sa.body.copyWith(color: AppTheme.error)),
+                      ],
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _type,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Type', isDense: true),
-                    items: _examTypes
-                        .map((t) => DropdownMenuItem(value: t.key, child: Text(t.value)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _type = v ?? 'unit_test'),
+              const SizedBox(height: Sa.gapLg),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed:
+                        _saving ? null : () => Navigator.pop(context, false),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.neutral600,
+                      minimumSize: const Size(0, 48),
+                    ),
+                    child: const Text('Cancel'),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _year,
-                    decoration: const InputDecoration(labelText: 'Academic year', isDense: true),
+                  const SizedBox(width: Sa.gapXs),
+                  SaPrimaryButton(
+                    label: _saving ? 'Creating…' : 'Create',
+                    icon: Icons.check,
+                    busy: _saving,
+                    onPressed: _saving ? null : _submit,
                   ),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: _subject,
-                    decoration: const InputDecoration(labelText: 'Subject', isDense: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextField(
-                    controller: _duration,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Duration (min)', isDense: true),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _code,
-                decoration: const InputDecoration(
-                    labelText: 'Exam code (auto if blank)', isDense: true),
+                ],
               ),
-              const SizedBox(height: 16),
-              Text('Classes *', style: AppTheme.labelMedium),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: widget.classes.map((c) {
-                  final id = c['id']?.toString() ?? '';
-                  final name = (c['class_name'] ?? 'Class').toString();
-                  final sec = (c['section'] ?? '').toString();
-                  final sel = _selectedClasses.contains(id);
-                  return FilterChip(
-                    label: Text(sec.isEmpty ? name : '$name • $sec'),
-                    selected: sel,
-                    showCheckmark: false,
-                    selectedColor: AppTheme.greenPrimary,
-                    backgroundColor: AppTheme.neutral100,
-                    labelStyle: AppTheme.bodySmall.copyWith(
-                        color: sel ? Colors.white : AppTheme.neutral700,
-                        fontWeight: FontWeight.w600),
-                    onSelected: (v) => setState(() {
-                      if (v) {
-                        _selectedClasses.add(id);
-                      } else {
-                        _selectedClasses.remove(id);
-                      }
-                    }),
-                  );
-                }).toList(),
-              ),
-              if (_err != null) ...[
-                const SizedBox(height: 12),
-                Text(_err!, style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
-              ],
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context, false),
-            child: const Text('Cancel')),
-        ElevatedButton.icon(
-          onPressed: _saving ? null : _submit,
-          icon: _saving
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.check, size: AppTheme.iconSmall),
-          label: Text(_saving ? 'Creating…' : 'Create'),
-        ),
-      ],
     );
   }
 }

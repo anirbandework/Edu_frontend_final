@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_theme.dart';
 import '../../../../core/models/timetable_models.dart';
 import '../../../../services/timetable_service.dart';
 import '../../../../services/class_service.dart';
 import '../../../../core/models/class_model.dart';
+import '../../../super_admin/widgets/sa_widgets.dart';
 
 class CreateClassTimetableDialog extends StatefulWidget {
   const CreateClassTimetableDialog({
@@ -124,18 +127,18 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
       final startTime = s.start.text.trim();
       final endTime = s.end.text.trim();
       final p = s.periodText.text.trim();
-      
+
       // Validate time format (HH:mm)
       final timeRegex = RegExp(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$');
       if (!timeRegex.hasMatch(startTime) || !timeRegex.hasMatch(endTime)) {
-        throw FormatException('Invalid time format. Use HH:mm format (e.g., 08:00)');
+        throw const FormatException('Invalid time format. Use HH:mm format (e.g., 08:00)');
       }
-      
+
       final int? period = int.tryParse(p);
       if (period == null) {
-        throw FormatException('Period must be a number for extended timetable creation');
+        throw const FormatException('Period must be a number for extended timetable creation');
       }
-      
+
       return {
         'start_time': startTime,
         'end_time': endTime,
@@ -152,10 +155,10 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
         if (r.subject.text.trim().isEmpty) continue;
         final periodText = r.period.text.trim();
         if (periodText.isEmpty) continue; // Skip entries without period
-        
+
         final int? period = int.tryParse(periodText);
         if (period == null) continue; // Skip non-numeric periods
-        
+
         dayList.add({
           'subject': r.subject.text.trim(),
           'period': period,
@@ -205,7 +208,7 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Time slots error: ${e.toString()}')));
       return;
     }
-    
+
     final weeklySchedule = _buildWeekly();
 
     final payload = ClassTimetableCreate(
@@ -240,6 +243,7 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(errorMsg),
           backgroundColor: AppTheme.error,
+          behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 5),
         ));
       }
@@ -252,151 +256,341 @@ class _CreateClassTimetableDialogState extends State<CreateClassTimetableDialog>
   void _addWeeklyRow(String day) => setState(() => weekly[day]!.add(_WeeklyRow()));
   void _removeWeeklyRow(String day, int idx) => setState(() => weekly[day]!.removeAt(idx));
 
+  // Compact, brand-consistent field decoration.
+  InputDecoration _dec(String label) => InputDecoration(
+        labelText: label,
+        labelStyle: Sa.label,
+        isDense: true,
+        filled: true,
+        fillColor: AppTheme.neutral50,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: AppTheme.borderRadius12,
+          borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: AppTheme.borderRadius12,
+          borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: AppTheme.borderRadius12,
+          borderSide: BorderSide(color: Sa.accent, width: 1.6),
+        ),
+      );
+
+  /// Lays out [children] in a single column when narrow, else an even row.
+  Widget _responsiveFields(List<Widget> children) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        if (c.maxWidth < 600) {
+          final out = <Widget>[];
+          for (var i = 0; i < children.length; i++) {
+            if (i > 0) out.add(const SizedBox(height: Sa.gap));
+            out.add(children[i]);
+          }
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: out);
+        }
+        final out = <Widget>[];
+        for (var i = 0; i < children.length; i++) {
+          if (i > 0) out.add(const SizedBox(width: Sa.gap));
+          out.add(Expanded(child: children[i]));
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: out);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Create Class Timetable'),
-      content: SizedBox(
-        width: 760,
-        child: loading
-            ? const SizedBox(height: 80, child: Center(child: CircularProgressIndicator()))
-            : SingleChildScrollView(
+    final media = MediaQuery.of(context);
+    final maxW = math.min(media.size.width - 24, 560.0);
+    final maxH = media.size.height - 80;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sa.radius)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _header(),
+            Flexible(
+              child: loading
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 48),
+                      child: SaLoading(message: 'Loading…'),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                      child: _form(),
+                    ),
+            ),
+            _footer(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _header() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+      decoration: const BoxDecoration(
+        gradient: AppTheme.primaryGradient,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Sa.radius)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: AppTheme.borderRadius12,
+            ),
+            child: const Icon(Icons.calendar_view_week_rounded, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: Sa.gap),
+          const Expanded(
+            child: Text(
+              'Create Class Timetable',
+              style: Sa.headerTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Close',
+            onPressed: loading ? null : () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.close_rounded, color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _form() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (error != null)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            margin: const EdgeInsets.only(bottom: Sa.gap),
+            decoration: BoxDecoration(
+              color: AppTheme.error.withValues(alpha: 0.10),
+              borderRadius: AppTheme.borderRadius12,
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: AppTheme.error, size: 18),
+                const SizedBox(width: 8),
+                Expanded(child: Text(error!, style: Sa.body.copyWith(color: AppTheme.error))),
+              ],
+            ),
+          ),
+
+        // Core selection
+        DropdownButtonFormField<String>(
+          isExpanded: true,
+          initialValue: classId,
+          style: Sa.value,
+          items: classes
+              .map((e) => DropdownMenuItem(
+                    value: e['id'],
+                    child: Text(e['name'] ?? e['id']!, overflow: TextOverflow.ellipsis),
+                  ))
+              .toList(),
+          onChanged: (v) => setState(() => classId = v),
+          decoration: _dec('Class'),
+        ),
+        const SizedBox(height: Sa.gapLg),
+
+        // Meta fields
+        _responsiveFields([
+          TextFormField(controller: termCtrl, style: Sa.value, decoration: _dec('Term (optional)')),
+          TextFormField(controller: classNameCtrl, style: Sa.value, decoration: _dec('Class name (optional)')),
+          TextFormField(controller: gradeLevelCtrl, style: Sa.value, decoration: _dec('Grade level (optional)')),
+        ]),
+        const SizedBox(height: Sa.gapLg),
+
+        // Audit fields
+        _sectionCard(
+          icon: Icons.history_rounded,
+          title: 'Audit',
+          child: Column(
+            children: [
+              _responsiveFields([
+                TextFormField(controller: createdByCtrl, style: Sa.value, decoration: _dec('created_by')),
+                TextFormField(controller: createdAtCtrl, style: Sa.value, decoration: _dec('created_at (ISO)')),
+              ]),
+              const SizedBox(height: Sa.gap),
+              _responsiveFields([
+                TextFormField(controller: lastModifiedByCtrl, style: Sa.value, decoration: _dec('last_modified_by')),
+                TextFormField(controller: lastModifiedAtCtrl, style: Sa.value, decoration: _dec('last_modified_at (ISO)')),
+              ]),
+            ],
+          ),
+        ),
+        const SizedBox(height: Sa.gapLg),
+
+        // Time slots editor
+        _sectionCard(
+          icon: Icons.schedule_rounded,
+          title: 'Time slots',
+          trailing: _addButton('Add slot', _addSlot),
+          child: Column(
+            children: List.generate(slots.length, (i) {
+              final s = slots[i];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: Sa.gap),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _responsiveFields([
+                        TextFormField(controller: s.start, style: Sa.value, decoration: _dec('Start (HH:mm)')),
+                        TextFormField(controller: s.end, style: Sa.value, decoration: _dec('End (HH:mm)')),
+                        TextFormField(controller: s.periodText, style: Sa.value, decoration: _dec('Period')),
+                      ]),
+                    ),
+                    _deleteButton(() => _removeSlot(i)),
+                  ],
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: Sa.gapLg),
+
+        // Weekly schedule editor
+        _sectionCard(
+          icon: Icons.view_week_rounded,
+          title: 'Weekly schedule',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: weekly.keys.map((day) {
+              final list = weekly[day]!;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: Sa.gapLg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (error != null)
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(color: AppTheme.error.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-                        child: Text(error!, style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
-                      ),
-
-                    // Core selection
-                    DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: classId,
-                      items: classes.map((e) => DropdownMenuItem(value: e['id'], child: Text(e['name'] ?? e['id']!))).toList(),
-                      onChanged: (v) => setState(() => classId = v),
-                      decoration: const InputDecoration(labelText: 'Class'),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Meta fields
                     Row(
                       children: [
-                        Expanded(child: TextFormField(controller: termCtrl, decoration: const InputDecoration(labelText: 'Term (optional)'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextFormField(controller: classNameCtrl, decoration: const InputDecoration(labelText: 'Class name (optional)'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextFormField(controller: gradeLevelCtrl, decoration: const InputDecoration(labelText: 'Grade level (optional)'))),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Audit fields
-                    Text('Audit', style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(child: TextFormField(controller: createdByCtrl, decoration: const InputDecoration(labelText: 'created_by'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextFormField(controller: createdAtCtrl, decoration: const InputDecoration(labelText: 'created_at (ISO)'))),
+                        Expanded(
+                          child: Text(
+                            day[0].toUpperCase() + day.substring(1),
+                            style: Sa.cardTitle.copyWith(fontSize: 13.5),
+                          ),
+                        ),
+                        _addButton('Add', () => _addWeeklyRow(day)),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(child: TextFormField(controller: lastModifiedByCtrl, decoration: const InputDecoration(labelText: 'last_modified_by'))),
-                        const SizedBox(width: 8),
-                        Expanded(child: TextFormField(controller: lastModifiedAtCtrl, decoration: const InputDecoration(labelText: 'last_modified_at (ISO)'))),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Time slots editor
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Time slots', style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
-                        TextButton.icon(onPressed: _addSlot, icon: const Icon(Icons.add), label: const Text('Add slot')),
-                      ],
-                    ),
                     Column(
-                      children: List.generate(slots.length, (i) {
-                        final s = slots[i];
+                      children: List.generate(list.length, (idx) {
+                        final r = list[idx];
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.only(bottom: Sa.gap),
                           child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(child: TextFormField(controller: s.start, decoration: const InputDecoration(labelText: 'Start (HH:mm)'))),
-                              const SizedBox(width: 8),
-                              Expanded(child: TextFormField(controller: s.end, decoration: const InputDecoration(labelText: 'End (HH:mm)'))),
-                              const SizedBox(width: 8),
-                              Expanded(child: TextFormField(controller: s.periodText, decoration: const InputDecoration(labelText: 'Period (number or text)'))),
-                              IconButton(onPressed: () => _removeSlot(i), icon: const Icon(Icons.delete_outline)),
+                              Expanded(
+                                child: _responsiveFields([
+                                  TextFormField(controller: r.subject, style: Sa.value, decoration: _dec('Subject')),
+                                  TextFormField(controller: r.teacherId, style: Sa.value, decoration: _dec('Teacher ID')),
+                                  TextFormField(controller: r.room, style: Sa.value, decoration: _dec('Room')),
+                                  TextFormField(controller: r.period, style: Sa.value, decoration: _dec('Period')),
+                                ]),
+                              ),
+                              _deleteButton(() => _removeWeeklyRow(day, idx)),
                             ],
                           ),
                         );
                       }),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Weekly schedule editor
-                    Text('Weekly schedule', style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    ...weekly.keys.map((day) {
-                      final list = weekly[day]!;
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(day[0].toUpperCase() + day.substring(1), style: AppTheme.labelSmall.copyWith(fontWeight: FontWeight.w600)),
-                                const SizedBox(width: 8),
-                                TextButton.icon(onPressed: () => _addWeeklyRow(day), icon: const Icon(Icons.add), label: const Text('Add')),
-                              ],
-                            ),
-                            Column(
-                              children: List.generate(list.length, (idx) {
-                                final r = list[idx];
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Row(
-                                    children: [
-                                      Expanded(child: TextFormField(controller: r.subject, decoration: const InputDecoration(labelText: 'Subject'))),
-                                      const SizedBox(width: 6),
-                                      Expanded(child: TextFormField(controller: r.teacherId, decoration: const InputDecoration(labelText: 'Teacher ID'))),
-                                      const SizedBox(width: 6),
-                                      Expanded(child: TextFormField(controller: r.room, decoration: const InputDecoration(labelText: 'Room'))),
-                                      const SizedBox(width: 6),
-                                      SizedBox(
-                                        width: 90,
-                                        child: TextFormField(controller: r.period, decoration: const InputDecoration(labelText: 'Period')),
-                                      ),
-                                      IconButton(onPressed: () => _removeWeeklyRow(day, idx), icon: const Icon(Icons.delete_outline)),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
                   ],
                 ),
-              ),
-      ),
-      actions: [
-        TextButton(onPressed: loading ? null : () => Navigator.of(context).pop(), child: const Text('Cancel')),
-        ElevatedButton(
-          onPressed: loading ? null : _submit,
-          child: loading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Create'),
+              );
+            }).toList(),
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _sectionCard({
+    required IconData icon,
+    required String title,
+    Widget? trailing,
+    required Widget child,
+  }) {
+    return SaCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SaCardHeader(icon: icon, title: title, trailing: trailing),
+          const SizedBox(height: Sa.gap),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _addButton(String label, VoidCallback onPressed) {
+    return TextButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.add_rounded, size: 18),
+      label: Text(label),
+      style: TextButton.styleFrom(
+        foregroundColor: Sa.accent,
+        minimumSize: const Size(0, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        textStyle: const TextStyle(fontFamily: AppTheme.interFontFamily, fontWeight: FontWeight.w600, fontSize: 13),
+      ),
+    );
+  }
+
+  Widget _deleteButton(VoidCallback onPressed) {
+    return IconButton(
+      onPressed: onPressed,
+      tooltip: 'Remove',
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.error),
+    );
+  }
+
+  Widget _footer() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Sa.stroke.withValues(alpha: 0.7))),
+      ),
+      child: Row(
+        children: [
+          TextButton(
+            onPressed: loading ? null : () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.neutral600,
+              minimumSize: const Size(0, 48),
+            ),
+            child: const Text('Cancel'),
+          ),
+          const Spacer(),
+          SaPrimaryButton(
+            label: 'Create',
+            icon: Icons.check_rounded,
+            busy: loading,
+            onPressed: loading ? null : _submit,
+          ),
+        ],
+      ),
     );
   }
 }

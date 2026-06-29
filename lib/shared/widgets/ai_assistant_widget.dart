@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_theme.dart';
-import '../../core/utils/responsive.dart';
 import '../../services/ai_service.dart';
 import '../../core/services/ai_assistant_manager.dart';
 
@@ -147,7 +146,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: AppTheme.primaryGradient,
                     borderRadius: AppTheme.borderRadius12,
                   ),
@@ -185,7 +184,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
                     const SizedBox(width: 12),
                     Expanded(
                       child: Container(
-                        decoration: BoxDecoration(
+                        decoration: const BoxDecoration(
                           color: AppTheme.error,
                           borderRadius: AppTheme.borderRadius8,
                         ),
@@ -337,7 +336,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.greenPrimary.withOpacity(0.3),
+                  color: AppTheme.greenPrimary.withValues(alpha: 0.3),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),
@@ -425,7 +424,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
@@ -449,7 +448,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
                         Text(
                           'Online now',
                           style: AppTheme.bodyMicro.copyWith(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       ],
@@ -663,7 +662,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
           width: 6,
           height: 6,
           decoration: BoxDecoration(
-            color: AppTheme.neutral400.withOpacity(opacity),
+            color: AppTheme.neutral400.withValues(alpha: opacity),
             borderRadius: BorderRadius.circular(3),
           ),
         );

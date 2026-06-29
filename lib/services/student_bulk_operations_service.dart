@@ -117,23 +117,4 @@ class StudentBulkOperationsService {
   }
 
   // Bulk delete students
-  static Future<Map<String, dynamic>> deleteStudents({
-    required String tenantId,
-    required List<String> studentIds,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$_baseUrl/delete'),
-      headers: AuthSession.instance.headers(),
-      body: json.encode({
-        'tenant_id': tenantId,
-        'student_ids': studentIds,
-      }),
-    );
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to delete students: ${response.statusCode}');
-    }
   }
-}

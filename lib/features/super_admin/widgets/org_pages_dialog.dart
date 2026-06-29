@@ -1,14 +1,19 @@
 // lib/features/super_admin/widgets/org_pages_dialog.dart
 //
-// Super-admin grants a SET OF PAGES to an ORGANISATION (the "what they paid for"
-// ceiling). Each toggle writes immediately. Pages left off show as "Premium / not
-// in plan" in the admin's role picker and are unusable by the org's users.
-// Required pages (Profile) are always on. AppTheme only.
+// Per-organisation page control for the super-admin. TWO independent ceilings,
+// one tab each:
+//   • Admin pages       — which pages the ADMIN of this school sees in their own
+//                         sidebar/toolset (GET/PUT .../admin-page(s)).
+//   • Organisation pages — which pages the admin may GIVE to their staff/teacher/
+//                         student roles, "what they paid for" (.../page(s)).
+// Each toggle writes immediately (optimistic, reverts on error). Required pages
+// (Profile) are always on.
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
 import '../../../services/super_admin_service.dart';
 import '../../../shared/widgets/page_group_toggle.dart';
+import 'sa_widgets.dart';
 
 Future<void> showOrgPagesDialog(
   BuildContext context, {
@@ -21,22 +26,156 @@ Future<void> showOrgPagesDialog(
   );
 }
 
-class _OrgPagesDialog extends StatefulWidget {
+class _OrgPagesDialog extends StatelessWidget {
   final String tenantId;
   final String tenantName;
   const _OrgPagesDialog({required this.tenantId, required this.tenantName});
 
   @override
-  State<_OrgPagesDialog> createState() => _OrgPagesDialogState();
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final maxW = media.size.width - 24;
+    final maxH = media.size.height - 80;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sa.radius)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW > 520 ? 520 : maxW,
+          maxHeight: maxH,
+        ),
+        child: DefaultTabController(
+          length: 2,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _titleBar(context),
+              const TabBar(
+                labelColor: Sa.accent,
+                unselectedLabelColor: AppTheme.neutral500,
+                indicatorColor: Sa.accent,
+                labelStyle: Sa.value,
+                tabs: [
+                  Tab(text: 'Admin pages'),
+                  Tab(text: 'Organisation pages'),
+                ],
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: TabBarView(
+                  children: [
+                    _PageGrantList(
+                      key: const ValueKey('admin'),
+                      tenantId: tenantId,
+                      hint: 'Pages the admin of this school sees in their own menu.',
+                      load: SuperAdminService.getAdminPages,
+                      toggle: SuperAdminService.setAdminPage,
+                      bulk: SuperAdminService.setAllAdminPages,
+                    ),
+                    _PageGrantList(
+                      key: const ValueKey('org'),
+                      tenantId: tenantId,
+                      hint: 'Pages the admin can hand out to their staff / teacher / '
+                          'student roles.',
+                      load: SuperAdminService.getOrgPages,
+                      toggle: SuperAdminService.setOrgPage,
+                      bulk: SuperAdminService.setAllOrgPages,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Done'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _titleBar(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+      child: Row(children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Sa.accent.withValues(alpha: 0.10),
+            borderRadius: AppTheme.borderRadius8,
+          ),
+          child: const Icon(Icons.tune, color: Sa.accent, size: 20),
+        ),
+        const SizedBox(width: Sa.gap),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Page access', style: Sa.cardTitle),
+              const SizedBox(height: 2),
+              Text(tenantName,
+                  style: Sa.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.close, color: AppTheme.neutral500),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ]),
+    );
+  }
 }
 
-class _OrgPagesDialogState extends State<_OrgPagesDialog> {
+/// A toggleable list of pages driven by injected load/toggle/bulk calls, so the
+/// same UI serves both the Admin-pages and Organisation-pages tabs.
+class _PageGrantList extends StatefulWidget {
+  final String tenantId;
+  final String hint;
+  final Future<List<Map<String, dynamic>>> Function(String tenantId) load;
+  final Future<void> Function({
+    required String tenantId,
+    required String moduleKey,
+    required bool enabled,
+  }) toggle;
+  final Future<void> Function({required String tenantId, required bool enabled}) bulk;
+
+  const _PageGrantList({
+    super.key,
+    required this.tenantId,
+    required this.hint,
+    required this.load,
+    required this.toggle,
+    required this.bulk,
+  });
+
+  @override
+  State<_PageGrantList> createState() => _PageGrantListState();
+}
+
+class _PageGrantListState extends State<_PageGrantList>
+    with AutomaticKeepAliveClientMixin {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _pages = [];
   final Map<String, bool> _enabled = {};
   PageGroupMode _groupMode = PageGroupMode.function;
-  String? _busyKey; // page currently saving
+  String? _busyKey;
+
+  @override
+  bool get wantKeepAlive => true; // keep each tab's state across tab switches
 
   @override
   void initState() {
@@ -50,13 +189,14 @@ class _OrgPagesDialogState extends State<_OrgPagesDialog> {
       _error = null;
     });
     try {
-      final pages = await SuperAdminService.getOrgPages(widget.tenantId);
+      final pages = await widget.load(widget.tenantId);
       if (!mounted) return;
       setState(() {
         _pages = pages;
         _enabled
           ..clear()
-          ..addEntries(pages.map((m) => MapEntry(m['module_key'].toString(), m['enabled'] == true)));
+          ..addEntries(pages
+              .map((m) => MapEntry(m['module_key'].toString(), m['enabled'] == true)));
         _loading = false;
       });
     } catch (e) {
@@ -74,16 +214,16 @@ class _OrgPagesDialogState extends State<_OrgPagesDialog> {
         content: Text(m), backgroundColor: c, behavior: SnackBarBehavior.floating));
   }
 
-  Future<void> _toggle(String key, bool value) async {
+  Future<void> _toggleOne(String key, bool value) async {
     final prev = _enabled[key] ?? false;
     setState(() {
       _enabled[key] = value;
       _busyKey = key;
     });
     try {
-      await SuperAdminService.setOrgPage(tenantId: widget.tenantId, moduleKey: key, enabled: value);
+      await widget.toggle(tenantId: widget.tenantId, moduleKey: key, enabled: value);
     } catch (e) {
-      if (mounted) setState(() => _enabled[key] = prev); // revert
+      if (mounted) setState(() => _enabled[key] = prev);
       _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
     } finally {
       if (mounted) setState(() => _busyKey = null);
@@ -93,73 +233,81 @@ class _OrgPagesDialogState extends State<_OrgPagesDialog> {
   Future<void> _bulk(bool enabled) async {
     setState(() => _loading = true);
     try {
-      await SuperAdminService.setAllOrgPages(tenantId: widget.tenantId, enabled: enabled);
+      await widget.bulk(tenantId: widget.tenantId, enabled: enabled);
       await _load();
-      _toast(enabled ? 'All pages enabled' : 'All pages revoked', AppTheme.success);
+      _toast(enabled ? 'All pages enabled' : 'All pages revoked', AppTheme.greenPrimary);
     } catch (e) {
       if (mounted) setState(() => _loading = false);
       _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
     }
   }
 
-  int get _onCount => _enabled.values.where((v) => v).length;
-
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Row(children: [
-        const Icon(Icons.tune, color: AppTheme.greenPrimary),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text('Pages · ${widget.tenantName}',
-              maxLines: 1, overflow: TextOverflow.ellipsis),
-        ),
-      ]),
-      content: SizedBox(
-        width: 480,
-        height: 460,
-        child: _loading
-            ? const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary))
-            : _error != null
-                ? Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.error_outline, size: 36, color: AppTheme.error),
-                      const SizedBox(height: 10),
-                      Text(_error!, textAlign: TextAlign.center,
-                          style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600)),
-                      const SizedBox(height: 12),
-                      ElevatedButton(onPressed: _load, child: const Text('Retry')),
-                    ]),
-                  )
-                : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Text('$_onCount of ${_pages.length} pages enabled',
-                          style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
-                      const Spacer(),
-                      TextButton(onPressed: () => _bulk(true), child: const Text('Enable all')),
-                      TextButton(onPressed: () => _bulk(false), child: const Text('Revoke all')),
-                    ]),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: PageGroupToggle(
-                        mode: _groupMode,
-                        onChanged: (m) => setState(() => _groupMode = m),
-                      ),
-                    ),
-                    const Divider(height: 12),
-                    Expanded(
-                      child: ListView(
-                        children: groupCatalog(_pages, _groupMode)
-                            .entries
-                            .map(_groupSection)
-                            .toList(),
-                      ),
-                    ),
-                  ]),
+    super.build(context); // AutomaticKeepAliveClientMixin
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 60),
+        child: SaLoading(),
+      );
+    }
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: SaStateView.error(message: _error!, onRetry: _load),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.hint, style: Sa.label),
+          const SizedBox(height: 8),
+          // Enable all / Revoke all + the Group-by (Function | Audience) toggle,
+          // all on one line. Horizontally scrollable so it never overflows on
+          // narrow phones.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                TextButton(
+                  onPressed: () => _bulk(true),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Sa.accent,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('Enable all'),
+                ),
+                TextButton(
+                  onPressed: () => _bulk(false),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppTheme.neutral600,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: const Text('Revoke all'),
+                ),
+                const SizedBox(width: Sa.gap),
+                PageGroupToggle(
+                  mode: _groupMode,
+                  onChanged: (m) => setState(() => _groupMode = m),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 16),
+          Expanded(
+            child: ListView(
+              children: groupCatalog(_pages, _groupMode)
+                  .entries
+                  .map(_groupSection)
+                  .toList(),
+            ),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
-      ],
     );
   }
 
@@ -168,7 +316,7 @@ class _OrgPagesDialogState extends State<_OrgPagesDialog> {
       Padding(
         padding: const EdgeInsets.fromLTRB(2, 8, 2, 4),
         child: Text(e.key,
-            style: AppTheme.labelMedium.copyWith(
+            style: Sa.label.copyWith(
                 fontWeight: FontWeight.w700, color: AppTheme.neutral700)),
       ),
       ...e.value.map(_pageRow),
@@ -183,16 +331,16 @@ class _OrgPagesDialogState extends State<_OrgPagesDialog> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: on ? AppTheme.green50 : AppTheme.neutral50,
-          borderRadius: AppTheme.borderRadius8,
+          borderRadius: AppTheme.borderRadius12,
           border: Border.all(
-              color: on ? AppTheme.greenPrimary.withOpacity(0.4) : AppTheme.neutral200),
+              color: on ? Sa.accent.withValues(alpha: 0.4) : AppTheme.neutral200),
         ),
         child: Row(children: [
           Icon(on ? Icons.check_circle : Icons.circle_outlined,
-              size: 18, color: on ? AppTheme.greenPrimary : AppTheme.neutral400),
+              size: 18, color: on ? Sa.accent : AppTheme.neutral400),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -200,24 +348,24 @@ class _OrgPagesDialogState extends State<_OrgPagesDialog> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(m['module_name']?.toString() ?? key,
-                    style: AppTheme.bodyMedium.copyWith(
+                    style: Sa.value.copyWith(
                         color: on ? AppTheme.neutral800 : AppTheme.neutral600,
                         fontWeight: on ? FontWeight.w600 : FontWeight.w400),
                     maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (required)
                   Text('Always on',
-                      style: AppTheme.bodyMicro.copyWith(color: AppTheme.greenPrimary)),
+                      style: Sa.label.copyWith(color: Sa.accent, fontSize: 11)),
               ],
             ),
           ),
           if (_busyKey == key)
             const SizedBox(width: 18, height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.greenPrimary))
+                child: CircularProgressIndicator(strokeWidth: 2, color: Sa.accent))
           else
             Switch(
               value: on,
-              onChanged: required ? null : (v) => _toggle(key, v),
-              activeColor: AppTheme.greenPrimary,
+              onChanged: required ? null : (v) => _toggleOne(key, v),
+              activeThumbColor: Sa.accent,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
         ]),

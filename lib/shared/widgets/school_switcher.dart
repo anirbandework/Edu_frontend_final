@@ -137,9 +137,9 @@ class _SchoolSwitcherState extends State<SchoolSwitcher> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
+          color: Colors.white.withValues(alpha: 0.12),
           borderRadius: AppTheme.borderRadius8,
-          border: Border.all(color: Colors.white.withOpacity(0.25)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           const Icon(Icons.business, color: Colors.white, size: 16),

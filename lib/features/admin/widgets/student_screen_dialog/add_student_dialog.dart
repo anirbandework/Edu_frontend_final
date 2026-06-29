@@ -1,9 +1,11 @@
-// lib/features/school_authority/widgets/add_student_dialog.dart
+// lib/features/admin/widgets/student_screen_dialog/add_student_dialog.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_theme.dart';
-import '../../../../core/models/student.dart';
 import '../../../../core/utils/school_session.dart';
 import '../../../../services/student_management_service.dart';
+import '../../../super_admin/widgets/sa_widgets.dart';
 
 class AddStudentDialog extends StatefulWidget {
   final VoidCallback onStudentCreated;
@@ -82,13 +84,13 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
         'phone': _phoneController.text.trim().isNotEmpty ? _phoneController.text.trim() : null,
         'date_of_birth': _dateOfBirth?.toIso8601String(),
         'address': _addressController.text.trim().isNotEmpty ? _addressController.text.trim() : null,
-        'admission_number': _admissionNumberController.text.trim().isNotEmpty 
+        'admission_number': _admissionNumberController.text.trim().isNotEmpty
             ? _admissionNumberController.text.trim() : null,
-        'roll_number': _rollNumberController.text.trim().isNotEmpty 
+        'roll_number': _rollNumberController.text.trim().isNotEmpty
             ? _rollNumberController.text.trim() : null,
         'grade_level': _gradeLevel,
         'section': _section,
-        'academic_year': _academicYearController.text.trim().isNotEmpty 
+        'academic_year': _academicYearController.text.trim().isNotEmpty
             ? _academicYearController.text.trim() : null,
         'parent_info': {},
         'health_medical_info': {},
@@ -127,12 +129,12 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white)),
+            Expanded(child: Text(message, style: Sa.body.copyWith(color: Colors.white))),
           ],
         ),
-        backgroundColor: AppTheme.success,
+        backgroundColor: AppTheme.greenPrimary,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -143,9 +145,9 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
             const SizedBox(width: 12),
-            Expanded(child: Text(message, style: AppTheme.bodySmall.copyWith(color: Colors.white))),
+            Expanded(child: Text(message, style: Sa.body.copyWith(color: Colors.white))),
           ],
         ),
         backgroundColor: AppTheme.error,
@@ -154,348 +156,173 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
     );
   }
 
+  // Shared input styling so every field reads as the green+white system.
+  InputDecoration _fieldDecoration(
+    String label, {
+    String? hintText,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hintText,
+      labelStyle: Sa.label,
+      hintStyle: Sa.label,
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: AppTheme.neutral50,
+      border: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: Sa.stroke),
+      ),
+      enabledBorder: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: Sa.stroke),
+      ),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: AppTheme.greenPrimary, width: 1.6),
+      ),
+      errorBorder: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: AppTheme.error),
+      ),
+      focusedErrorBorder: const OutlineInputBorder(
+        borderRadius: AppTheme.borderRadius12,
+        borderSide: BorderSide(color: AppTheme.error, width: 1.6),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Sa.gap),
+      child: Text(title, style: Sa.cardTitle),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    
+    final size = MediaQuery.of(context).size;
+    final maxW = math.min(size.width - 24, 520.0);
+
     return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: screenSize.width > 600 ? 500 : screenSize.width * 0.9,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: screenSize.height * 0.9,
-        ),
-        decoration: AppTheme.getCompactDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppTheme.neutral200),
+          maxWidth: maxW,
+          maxHeight: size.height - 80,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header
+            // Gradient header
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
                 gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.person_add, color: Colors.white, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: AppTheme.borderRadius12,
+                    ),
+                    child: const Icon(Icons.person_add, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: Sa.gap),
+                  const Expanded(
                     child: Text(
                       'Add New Student',
-                      style: AppTheme.headingSmall.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: Sa.headerTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, color: Colors.white, size: 24),
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white, size: 24),
                   ),
                 ],
               ),
             ),
 
-            // Form Content
+            // Form content
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Form(
                   key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Basic Information Section
-                      Text(
-                        'Basic Information',
-                        style: AppTheme.bodyLarge.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.neutral800,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // First Name & Last Name Row
-                      Row(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final oneCol = constraints.maxWidth < 600;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _firstNameController,
-                              style: AppTheme.bodyMedium,
-                              decoration: InputDecoration(
-                                labelText: 'First Name *',
-                                labelStyle: AppTheme.bodySmall,
-                                border: OutlineInputBorder(
-                                  borderRadius: AppTheme.borderRadius12,
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'First name is required';
-                                }
-                                return null;
-                              },
-                            ),
+                          // Basic Information
+                          _sectionTitle('Basic Information'),
+
+                          _responsivePair(
+                            oneCol,
+                            _firstNameField(),
+                            _lastNameField(),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _lastNameController,
-                              style: AppTheme.bodyMedium,
-                              decoration: InputDecoration(
-                                labelText: 'Last Name *',
-                                labelStyle: AppTheme.bodySmall,
-                                border: OutlineInputBorder(
-                                  borderRadius: AppTheme.borderRadius12,
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Last name is required';
-                                }
-                                return null;
-                              },
-                            ),
+                          const SizedBox(height: Sa.gapLg),
+
+                          _responsivePair(
+                            oneCol,
+                            _studentIdField(),
+                            _rollNumberField(),
                           ),
+                          const SizedBox(height: Sa.gapLg),
+
+                          _responsivePair(
+                            oneCol,
+                            _gradeField(),
+                            _sectionField(),
+                          ),
+                          const SizedBox(height: Sa.gapLg),
+
+                          _dateOfBirthField(),
+                          const SizedBox(height: 24),
+
+                          // Contact Information
+                          _sectionTitle('Contact Information'),
+                          _emailField(),
+                          const SizedBox(height: Sa.gapLg),
+                          _phoneField(),
+                          const SizedBox(height: Sa.gapLg),
+                          _addressField(),
+                          const SizedBox(height: 24),
+
+                          // Academic Information
+                          _sectionTitle('Academic Information'),
+                          _admissionNumberField(),
+                          const SizedBox(height: Sa.gapLg),
+                          _academicYearField(),
                         ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Student ID & Roll Number Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: _studentIdController,
-                              style: AppTheme.bodyMedium,
-                              decoration: InputDecoration(
-                                labelText: 'Student ID *',
-                                labelStyle: AppTheme.bodySmall,
-                                border: OutlineInputBorder(
-                                  borderRadius: AppTheme.borderRadius12,
-                                ),
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) {
-                                  return 'Student ID is required';
-                                }
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TextFormField(
-                              controller: _rollNumberController,
-                              style: AppTheme.bodyMedium,
-                              decoration: InputDecoration(
-                                labelText: 'Roll Number',
-                                labelStyle: AppTheme.bodySmall,
-                                border: OutlineInputBorder(
-                                  borderRadius: AppTheme.borderRadius12,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Grade & Section Row
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              value: _gradeLevel,
-                              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
-                              decoration: InputDecoration(
-                                labelText: 'Grade *',
-                                labelStyle: AppTheme.bodySmall,
-                                border: OutlineInputBorder(
-                                  borderRadius: AppTheme.borderRadius12,
-                                ),
-                              ),
-                              items: _grades.map((grade) => DropdownMenuItem(
-                                value: grade,
-                                child: Text('Grade $grade'),
-                              )).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _gradeLevel = value!;
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _section,
-                              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800),
-                              decoration: InputDecoration(
-                                labelText: 'Section *',
-                                labelStyle: AppTheme.bodySmall,
-                                border: OutlineInputBorder(
-                                  borderRadius: AppTheme.borderRadius12,
-                                ),
-                              ),
-                              items: _sections.map((section) => DropdownMenuItem(
-                                value: section,
-                                child: Text('Section $section'),
-                              )).toList(),
-                              onChanged: (value) {
-                                setState(() {
-                                  _section = value!;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Date of Birth
-                      InkWell(
-                        onTap: _selectDateOfBirth,
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Date of Birth',
-                            labelStyle: AppTheme.bodySmall,
-                            border: OutlineInputBorder(
-                              borderRadius: AppTheme.borderRadius12,
-                            ),
-                            suffixIcon: Icon(Icons.calendar_today, color: AppTheme.greenPrimary),
-                          ),
-                          child: Text(
-                            _dateOfBirth != null 
-                                ? '${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'
-                                : 'Select date of birth',
-                            style: AppTheme.bodyMedium.copyWith(
-                              color: _dateOfBirth != null ? AppTheme.neutral800 : AppTheme.neutral400,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Contact Information Section
-                      Text(
-                        'Contact Information',
-                        style: AppTheme.bodyLarge.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.neutral800,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Email
-                      TextFormField(
-                        controller: _emailController,
-                        style: AppTheme.bodyMedium,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          labelStyle: AppTheme.bodySmall,
-                          border: OutlineInputBorder(
-                            borderRadius: AppTheme.borderRadius12,
-                          ),
-                          prefixIcon: Icon(Icons.email, color: AppTheme.greenPrimary),
-                        ),
-                        validator: (value) {
-                          if (value != null && value.trim().isNotEmpty) {
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                              return 'Please enter a valid email';
-                            }
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Phone
-                      TextFormField(
-                        controller: _phoneController,
-                        style: AppTheme.bodyMedium,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: 'Phone',
-                          labelStyle: AppTheme.bodySmall,
-                          border: OutlineInputBorder(
-                            borderRadius: AppTheme.borderRadius12,
-                          ),
-                          prefixIcon: Icon(Icons.phone, color: AppTheme.greenPrimary),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Address
-                      TextFormField(
-                        controller: _addressController,
-                        style: AppTheme.bodyMedium,
-                        maxLines: 3,
-                        decoration: InputDecoration(
-                          labelText: 'Address',
-                          labelStyle: AppTheme.bodySmall,
-                          border: OutlineInputBorder(
-                            borderRadius: AppTheme.borderRadius12,
-                          ),
-                          prefixIcon: Icon(Icons.home, color: AppTheme.greenPrimary),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Academic Information Section
-                      Text(
-                        'Academic Information',
-                        style: AppTheme.bodyLarge.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.neutral800,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Admission Number
-                      TextFormField(
-                        controller: _admissionNumberController,
-                        style: AppTheme.bodyMedium,
-                        decoration: InputDecoration(
-                          labelText: 'Admission Number',
-                          labelStyle: AppTheme.bodySmall,
-                          border: OutlineInputBorder(
-                            borderRadius: AppTheme.borderRadius12,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Academic Year
-                      TextFormField(
-                        controller: _academicYearController,
-                        style: AppTheme.bodyMedium,
-                        decoration: InputDecoration(
-                          labelText: 'Academic Year',
-                          labelStyle: AppTheme.bodySmall,
-                          hintText: 'e.g., 2024-2025',
-                          border: OutlineInputBorder(
-                            borderRadius: AppTheme.borderRadius12,
-                          ),
-                        ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),
             ),
 
-            // Action Buttons
+            // Action buttons
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppTheme.neutral200)),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Sa.stroke)),
               ),
               child: Row(
                 children: [
@@ -503,43 +330,23 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
                     child: TextButton(
                       onPressed: _isLoading ? null : () => Navigator.pop(context),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        foregroundColor: AppTheme.neutral600,
+                        minimumSize: const Size(0, 48),
                       ),
                       child: Text(
                         'Cancel',
-                        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
+                        style: Sa.value.copyWith(color: AppTheme.neutral600),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: Sa.gapLg),
                   Expanded(
-                    child: ElevatedButton(
+                    child: SaPrimaryButton(
+                      label: _isLoading ? 'Creating…' : 'Create Student',
+                      icon: Icons.check_rounded,
+                      busy: _isLoading,
+                      expand: true,
                       onPressed: _isLoading ? null : _createStudent,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.greenPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppTheme.borderRadius12,
-                        ),
-                      ),
-                      child: _isLoading
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text('Creating...', style: AppTheme.bodyMedium),
-                              ],
-                            )
-                          : Text('Create Student', style: AppTheme.bodyMedium),
                     ),
                   ),
                 ],
@@ -550,4 +357,169 @@ class _AddStudentDialogState extends State<AddStudentDialog> {
       ),
     );
   }
+
+  // Collapses a two-field row to a single column under ~600px.
+  Widget _responsivePair(bool oneCol, Widget a, Widget b) {
+    if (oneCol) {
+      return Column(
+        children: [a, const SizedBox(height: Sa.gapLg), b],
+      );
+    }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: a),
+        const SizedBox(width: Sa.gapLg),
+        Expanded(child: b),
+      ],
+    );
+  }
+
+  Widget _firstNameField() => TextFormField(
+        controller: _firstNameController,
+        style: Sa.value,
+        decoration: _fieldDecoration('First Name *'),
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'First name is required';
+          }
+          return null;
+        },
+      );
+
+  Widget _lastNameField() => TextFormField(
+        controller: _lastNameController,
+        style: Sa.value,
+        decoration: _fieldDecoration('Last Name *'),
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'Last name is required';
+          }
+          return null;
+        },
+      );
+
+  Widget _studentIdField() => TextFormField(
+        controller: _studentIdController,
+        style: Sa.value,
+        decoration: _fieldDecoration('Student ID *'),
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'Student ID is required';
+          }
+          return null;
+        },
+      );
+
+  Widget _rollNumberField() => TextFormField(
+        controller: _rollNumberController,
+        style: Sa.value,
+        decoration: _fieldDecoration('Roll Number'),
+      );
+
+  Widget _gradeField() => DropdownButtonFormField<int>(
+        initialValue: _gradeLevel,
+        style: Sa.value,
+        decoration: _fieldDecoration('Grade *'),
+        items: _grades
+            .map((grade) => DropdownMenuItem(
+                  value: grade,
+                  child: Text('Grade $grade'),
+                ))
+            .toList(),
+        onChanged: (value) {
+          setState(() {
+            _gradeLevel = value!;
+          });
+        },
+      );
+
+  Widget _sectionField() => DropdownButtonFormField<String>(
+        initialValue: _section,
+        style: Sa.value,
+        decoration: _fieldDecoration('Section *'),
+        items: _sections
+            .map((section) => DropdownMenuItem(
+                  value: section,
+                  child: Text('Section $section'),
+                ))
+            .toList(),
+        onChanged: (value) {
+          setState(() {
+            _section = value!;
+          });
+        },
+      );
+
+  Widget _dateOfBirthField() => InkWell(
+        onTap: _selectDateOfBirth,
+        borderRadius: AppTheme.borderRadius12,
+        child: InputDecorator(
+          decoration: _fieldDecoration(
+            'Date of Birth',
+            suffixIcon: const Icon(Icons.calendar_today, color: AppTheme.greenPrimary),
+          ),
+          child: Text(
+            _dateOfBirth != null
+                ? '${_dateOfBirth!.day}/${_dateOfBirth!.month}/${_dateOfBirth!.year}'
+                : 'Select date of birth',
+            style: Sa.value.copyWith(
+              color: _dateOfBirth != null ? AppTheme.neutral800 : AppTheme.neutral400,
+            ),
+          ),
+        ),
+      );
+
+  Widget _emailField() => TextFormField(
+        controller: _emailController,
+        style: Sa.value,
+        keyboardType: TextInputType.emailAddress,
+        decoration: _fieldDecoration(
+          'Email',
+          prefixIcon: const Icon(Icons.email, color: AppTheme.greenPrimary),
+        ),
+        validator: (value) {
+          if (value != null && value.trim().isNotEmpty) {
+            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              return 'Please enter a valid email';
+            }
+          }
+          return null;
+        },
+      );
+
+  Widget _phoneField() => TextFormField(
+        controller: _phoneController,
+        style: Sa.value,
+        keyboardType: TextInputType.phone,
+        decoration: _fieldDecoration(
+          'Phone',
+          prefixIcon: const Icon(Icons.phone, color: AppTheme.greenPrimary),
+        ),
+      );
+
+  Widget _addressField() => TextFormField(
+        controller: _addressController,
+        style: Sa.value,
+        maxLines: 3,
+        decoration: _fieldDecoration(
+          'Address',
+          prefixIcon: const Icon(Icons.home, color: AppTheme.greenPrimary),
+        ),
+      );
+
+  Widget _admissionNumberField() => TextFormField(
+        controller: _admissionNumberController,
+        style: Sa.value,
+        decoration: _fieldDecoration('Admission Number'),
+      );
+
+  Widget _academicYearField() => TextFormField(
+        controller: _academicYearController,
+        style: Sa.value,
+        decoration: _fieldDecoration(
+          'Academic Year',
+          hintText: 'e.g., 2024-2025',
+        ),
+      );
 }

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/auth/auth_session.dart';
 import '../../../core/auth/permission_store.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 /// Map a module key to a representative icon (the permissions API ships a string
 /// icon name; we keep a small local map so the hub looks intentional).
@@ -69,102 +70,79 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
-    }
     // Exclude the dashboard tile itself; show every other enabled page.
     final pages = PermissionStore.instance.modules
         .where((m) => m.enabled && m.key != 'dashboard' && m.path.isNotEmpty)
         .toList();
 
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: () async {
-        await PermissionStore.instance.load();
-        if (mounted) setState(() {});
-      },
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: AppTheme.borderRadius16,
-            ),
-            child: Row(children: [
-              const Icon(Icons.badge, color: Colors.white, size: 30),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Welcome',
-                      style: AppTheme.bodySmall.copyWith(color: Colors.white70)),
-                  const SizedBox(height: 2),
-                  Text('Your workspace',
-                      style: AppTheme.labelLarge.copyWith(
-                          color: Colors.white, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 2),
-                  Text('${pages.length} page${pages.length == 1 ? '' : 's'} available to you',
-                      style: AppTheme.bodySmall.copyWith(color: Colors.white70)),
-                ]),
-              ),
-            ]),
-          ),
-          const SizedBox(height: 18),
-          if (pages.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 48),
-              child: Column(children: [
-                Icon(Icons.lock_outline, size: 44, color: AppTheme.neutral400),
-                const SizedBox(height: 12),
-                Text('No pages assigned yet',
-                    style: AppTheme.labelLarge.copyWith(color: AppTheme.neutral600)),
-                const SizedBox(height: 4),
-                Text('Ask your administrator to grant your role access.',
-                    textAlign: TextAlign.center,
-                    style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
-              ]),
-            )
-          else
-            LayoutBuilder(builder: (context, c) {
-              final cross = c.maxWidth > 720 ? 3 : (c.maxWidth > 460 ? 2 : 1);
-              return GridView.count(
-                crossAxisCount: cross,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 2.6,
-                children: pages.map(_pageCard).toList(),
-              );
-            }),
-        ],
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Your workspace',
+          subtitle:
+              '${pages.length} page${pages.length == 1 ? '' : 's'} available to you',
+          icon: Icons.badge_outlined,
+        ),
       ),
+      child: _body(pages),
+    );
+  }
+
+  Widget _body(List<ModulePerm> pages) {
+    if (_loading) return const SaLoading(message: 'Loading…');
+    if (pages.isEmpty) {
+      return const SaStateView(
+        icon: Icons.lock_outline,
+        title: 'No pages assigned yet',
+        subtitle: 'Ask your administrator to grant your role access.',
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+      children: [
+        LayoutBuilder(builder: (context, c) {
+          final cross = c.maxWidth > 720 ? 3 : (c.maxWidth > 460 ? 2 : 1);
+          return GridView.count(
+            crossAxisCount: cross,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: Sa.gap,
+            crossAxisSpacing: Sa.gap,
+            childAspectRatio: 2.6,
+            children: pages.map(_pageCard).toList(),
+          );
+        }),
+      ],
     );
   }
 
   Widget _pageCard(ModulePerm m) {
-    return InkWell(
-      borderRadius: AppTheme.borderRadius12,
+    return SaCard(
+      padding: const EdgeInsets.all(14),
       onTap: () => _open(m),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: AppTheme.glassCardDecoration,
-        child: Row(children: [
-          Container(
-            width: 42, height: 42,
-            decoration: BoxDecoration(color: AppTheme.green50, borderRadius: AppTheme.borderRadius12),
-            child: Icon(_moduleIcons[m.key] ?? Icons.widgets_outlined, color: AppTheme.greenPrimary),
+      child: Row(children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Sa.accent.withValues(alpha: 0.12),
+            borderRadius: AppTheme.borderRadius12,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(m.name.isEmpty ? m.key : m.name,
-                maxLines: 2, overflow: TextOverflow.ellipsis,
-                style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700)),
+          child: Icon(_moduleIcons[m.key] ?? Icons.widgets_outlined,
+              color: Sa.accent),
+        ),
+        const SizedBox(width: Sa.gap),
+        Expanded(
+          child: Text(
+            m.name.isEmpty ? m.key : m.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Sa.cardTitle,
           ),
-          const Icon(Icons.chevron_right, color: AppTheme.neutral400),
-        ]),
-      ),
+        ),
+        const Icon(Icons.chevron_right, color: AppTheme.neutral400),
+      ]),
     );
   }
 }

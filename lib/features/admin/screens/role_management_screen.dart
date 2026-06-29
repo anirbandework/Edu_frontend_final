@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/roles_service.dart';
 import '../../../shared/widgets/page_group_toggle.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class RoleManagementScreen extends StatefulWidget {
   const RoleManagementScreen({super.key});
@@ -70,7 +71,8 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.error, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -80,7 +82,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
     if (ok != true) return;
     try {
       await RolesService.deleteRole(role['id'].toString());
-      _snack('Role deleted', AppTheme.success);
+      _snack('Role deleted', AppTheme.greenPrimary);
       _load();
     } catch (e) {
       _snack(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
@@ -89,118 +91,101 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundPrimary,
-      appBar: AppBar(
-        title: const Text('Roles & Access'),
-        backgroundColor: AppTheme.greenPrimary,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-              tooltip: 'Refresh', onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
-        ],
+    // NO Scaffold / AppBar — the shell provides them.
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Roles & Access',
+          subtitle: 'Define roles and the pages they can reach',
+          icon: Icons.admin_panel_settings_outlined,
+          trailing: SaHeaderAction(
+            icon: Icons.add,
+            tooltip: 'New role',
+            onPressed: _catalog.isEmpty ? null : () => _openEditor(),
+          ),
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppTheme.greenPrimary,
-        onPressed: _catalog.isEmpty ? null : () => _openEditor(),
-        icon: const Icon(Icons.add),
-        label: const Text('New role'),
-      ),
-      body: _body(),
+      child: _body(),
     );
   }
 
   Widget _body() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(_error!, textAlign: TextAlign.center,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600)),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Retry')),
-        ]),
-      );
-    }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _load,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-                color: AppTheme.green50, borderRadius: AppTheme.borderRadius12),
-            child: Row(children: [
-              const Icon(Icons.info_outline, color: AppTheme.greenPrimary, size: 20),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Create any role your school needs and pick exactly which pages it can '
-                  'see — across every section. Grant a role the right to add users into '
-                  'other roles to delegate user management.',
-                  style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral700),
-                ),
+    if (_loading) return const SaLoading(message: 'Loading roles…');
+    if (_error != null) return SaStateView.error(message: _error!, onRetry: _load);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 96),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+              color: AppTheme.green50, borderRadius: BorderRadius.circular(Sa.radius)),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.info_outline, color: Sa.accent, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Create any role your school needs and pick exactly which pages it can '
+                'see — across every section. Grant a role the right to add users into '
+                'other roles to delegate user management.',
+                style: Sa.body.copyWith(color: AppTheme.neutral700),
               ),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          if (_roles.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 48),
-              child: Column(children: [
-                Icon(Icons.shield_outlined, size: 44, color: AppTheme.neutral400),
-                const SizedBox(height: 12),
-                Text('No roles yet',
-                    style: AppTheme.labelLarge.copyWith(color: AppTheme.neutral600)),
-                const SizedBox(height: 4),
-                Text('Tap “New role” to define your first one.',
-                    style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
-              ]),
-            )
-          else
-            ..._roles.map(_roleCard),
-        ],
-      ),
+            ),
+          ]),
+        ),
+        const SizedBox(height: Sa.gapLg),
+        if (_roles.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 24),
+            child: SaStateView(
+              icon: Icons.shield_outlined,
+              title: 'No roles yet',
+              subtitle: 'Tap “New role” to define your first one.',
+            ),
+          )
+        else
+          ..._roles.map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: Sa.gap),
+                child: _roleCard(r),
+              )),
+      ],
     );
   }
 
   Widget _roleCard(Map<String, dynamic> role) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: AppTheme.glassCardDecoration,
+    final desc = (role['description'] ?? '').toString();
+    return SaCard(
       child: Row(children: [
         Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(color: AppTheme.green50, borderRadius: AppTheme.borderRadius12),
-          child: const Icon(Icons.badge_outlined, color: AppTheme.greenPrimary),
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+              color: Sa.accent.withValues(alpha: 0.12), borderRadius: AppTheme.borderRadius12),
+          child: const Icon(Icons.badge_outlined, color: Sa.accent),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(role['role_name']?.toString() ?? 'Role',
-                style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700)),
-            if ((role['description'] ?? '').toString().isNotEmpty) ...[
+                style: Sa.cardTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (desc.isNotEmpty) ...[
               const SizedBox(height: 2),
-              Text(role['description'].toString(),
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+              Text(desc,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Sa.label),
             ],
           ]),
         ),
         IconButton(
             tooltip: 'Edit',
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: () => _openEditor(existing: role),
-            icon: const Icon(Icons.edit_outlined, color: AppTheme.greenPrimary, size: 20)),
+            icon: const Icon(Icons.edit_outlined, color: Sa.accent, size: 20)),
         IconButton(
             tooltip: 'Delete',
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             onPressed: () => _delete(role),
             icon: const Icon(Icons.delete_outline, color: AppTheme.error, size: 20)),
       ]),
@@ -245,113 +230,139 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setLocal) {
-        return AlertDialog(
-          titlePadding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-          contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          title: Row(children: [
-            Icon(isEdit ? Icons.edit : Icons.add_moderator, color: AppTheme.greenPrimary),
-            const SizedBox(width: 10),
-            Text(isEdit ? 'Edit role' : 'New role'),
-          ]),
-          content: SizedBox(
-            width: 560,
-            child: SingleChildScrollView(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                TextField(
-                  controller: nameCtl,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                      labelText: 'Role name *', hintText: 'e.g. Faculty, Principal, Parent',
-                      border: OutlineInputBorder(), isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: descCtl,
-                  decoration: const InputDecoration(
-                      labelText: 'Description (optional)',
-                      border: OutlineInputBorder(), isDense: true),
-                ),
-                const SizedBox(height: 18),
-                Row(children: [
-                  Expanded(child: _sectionLabel('Pages this role can access')),
-                  PageGroupToggle(
-                    mode: groupMode,
-                    onChanged: (m) => setLocal(() => groupMode = m),
+        final media = MediaQuery.of(ctx).size;
+        final maxW = media.width - 24;
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          backgroundColor: Sa.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Sa.radius)),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: maxW > 520 ? 520 : maxW,
+              maxHeight: media.height - 80,
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                child: Row(children: [
+                  Icon(isEdit ? Icons.edit : Icons.add_moderator, color: Sa.accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(isEdit ? 'Edit role' : 'New role',
+                        style: Sa.cardTitle.copyWith(fontSize: 17)),
                   ),
                 ]),
-                const SizedBox(height: 8),
-                ...groupCatalog(_catalog, groupMode).entries.map((e) => _moduleSection(
-                      e.key, e.value, selectedModules, setLocal)),
-                const SizedBox(height: 18),
-                _sectionLabel('Can add users into these roles'),
-                Text('Holders of this role may create users assigned to the roles you tick.',
-                    style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral500)),
-                const SizedBox(height: 8),
-                if (otherRoles.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Text('No other roles yet — create more, then come back to delegate.',
-                        style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
-                  )
-                else
-                  ...otherRoles.map((r) {
-                    final id = r['id'].toString();
-                    return CheckboxListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: AppTheme.greenPrimary,
-                      value: selectedCreatable.contains(id),
-                      title: Text(r['role_name']?.toString() ?? 'Role', style: AppTheme.bodyMedium),
-                      onChanged: (v) => setLocal(() =>
-                          v == true ? selectedCreatable.add(id) : selectedCreatable.remove(id)),
-                    );
-                  }),
-                const SizedBox(height: 8),
-              ]),
-            ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    TextField(
+                      controller: nameCtl,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                          labelText: 'Role name *', hintText: 'e.g. Faculty, Principal, Parent',
+                          border: OutlineInputBorder(), isDense: true),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: descCtl,
+                      decoration: const InputDecoration(
+                          labelText: 'Description (optional)',
+                          border: OutlineInputBorder(), isDense: true),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(children: [
+                      Expanded(child: _sectionLabel('Pages this role can access')),
+                      const SizedBox(width: Sa.gapXs),
+                      PageGroupToggle(
+                        mode: groupMode,
+                        onChanged: (m) => setLocal(() => groupMode = m),
+                      ),
+                    ]),
+                    const SizedBox(height: 8),
+                    ...groupCatalog(_catalog, groupMode).entries.map((e) => _moduleSection(
+                          e.key, e.value, selectedModules, setLocal)),
+                    const SizedBox(height: 18),
+                    _sectionLabel('Can add users into these roles'),
+                    const Text('Holders of this role may create users assigned to the roles you tick.',
+                        style: Sa.label),
+                    const SizedBox(height: 8),
+                    if (otherRoles.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 6),
+                        child: Text('No other roles yet — create more, then come back to delegate.',
+                            style: Sa.label),
+                      )
+                    else
+                      ...otherRoles.map((r) {
+                        final id = r['id'].toString();
+                        return CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          activeColor: Sa.accent,
+                          value: selectedCreatable.contains(id),
+                          title: Text(r['role_name']?.toString() ?? 'Role', style: Sa.value),
+                          onChanged: (v) => setLocal(() =>
+                              v == true ? selectedCreatable.add(id) : selectedCreatable.remove(id)),
+                        );
+                      }),
+                    const SizedBox(height: 8),
+                  ]),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  TextButton(
+                      onPressed: saving ? null : () => Navigator.pop(ctx),
+                      child: const Text('Cancel')),
+                  const SizedBox(width: Sa.gapXs),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Sa.accent, foregroundColor: Colors.white),
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            final name = nameCtl.text.trim();
+                            if (name.isEmpty) {
+                              _snack('Role name is required', AppTheme.error);
+                              return;
+                            }
+                            setLocal(() => saving = true);
+                            try {
+                              if (isEdit) {
+                                await RolesService.updateRole(
+                                  roleId: existing['id'].toString(),
+                                  roleName: name,
+                                  description: descCtl.text.trim(),
+                                  modules: selectedModules.toList(),
+                                  creatableRoleIds: selectedCreatable.toList(),
+                                );
+                              } else {
+                                await RolesService.createRole(
+                                  roleName: name,
+                                  description: descCtl.text.trim(),
+                                  modules: selectedModules.toList(),
+                                  creatableRoleIds: selectedCreatable.toList(),
+                                );
+                              }
+                              if (ctx.mounted) Navigator.pop(ctx);
+                              _snack(isEdit ? 'Role updated' : 'Role created',
+                                  AppTheme.greenPrimary);
+                              _load();
+                            } catch (e) {
+                              setLocal(() => saving = false);
+                              _snack(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
+                            }
+                          },
+                    child: Text(saving ? 'Saving…' : (isEdit ? 'Save' : 'Create')),
+                  ),
+                ]),
+              ),
+            ]),
           ),
-          actions: [
-            TextButton(onPressed: saving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.greenPrimary),
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final name = nameCtl.text.trim();
-                      if (name.isEmpty) {
-                        _snack('Role name is required', AppTheme.error);
-                        return;
-                      }
-                      setLocal(() => saving = true);
-                      try {
-                        if (isEdit) {
-                          await RolesService.updateRole(
-                            roleId: existing['id'].toString(),
-                            roleName: name,
-                            description: descCtl.text.trim(),
-                            modules: selectedModules.toList(),
-                            creatableRoleIds: selectedCreatable.toList(),
-                          );
-                        } else {
-                          await RolesService.createRole(
-                            roleName: name,
-                            description: descCtl.text.trim(),
-                            modules: selectedModules.toList(),
-                            creatableRoleIds: selectedCreatable.toList(),
-                          );
-                        }
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        _snack(isEdit ? 'Role updated' : 'Role created', AppTheme.success);
-                        _load();
-                      } catch (e) {
-                        setLocal(() => saving = false);
-                        _snack(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
-                      }
-                    },
-              child: Text(saving ? 'Saving…' : (isEdit ? 'Save' : 'Create')),
-            ),
-          ],
         );
       }),
     );
@@ -361,17 +372,17 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(children: [
-          const Icon(Icons.workspace_premium, color: AppTheme.warning),
-          const SizedBox(width: 10),
-          const Expanded(child: Text('Premium feature')),
+        title: const Row(children: [
+          Icon(Icons.workspace_premium, color: AppTheme.neutral600),
+          SizedBox(width: 10),
+          Expanded(child: Text('Premium feature')),
         ]),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('“$pageName” is not included in your organisation’s current plan.',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral800)),
+              style: Sa.value.copyWith(color: AppTheme.neutral800)),
           const SizedBox(height: 10),
-          Text('Ask your platform administrator to enable it for your organisation to start assigning it to your staff and students.',
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral600)),
+          const Text('Ask your platform administrator to enable it for your organisation to start assigning it to your staff and students.',
+              style: Sa.body),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Got it')),
@@ -381,7 +392,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
   }
 
   Widget _sectionLabel(String t) => Text(t,
-      style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700, color: AppTheme.neutral800));
+      style: Sa.cardTitle.copyWith(color: AppTheme.neutral800));
 
   Widget _moduleSection(String section, List<Map<String, dynamic>> mods,
       Set<String> selected, void Function(void Function()) setLocal) {
@@ -395,23 +406,23 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: AppTheme.borderRadius12,
-          border: Border.all(color: AppTheme.neutral200)),
+          border: Border.all(color: Sa.stroke)),
       child: Column(children: [
         Container(
           padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
               color: AppTheme.neutral100,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12))),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
           child: Row(children: [
             Expanded(
                 child: Text(section,
-                    style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w700))),
+                    style: Sa.value.copyWith(fontWeight: FontWeight.w700))),
             if (toggleable.isNotEmpty)
               TextButton(
                 onPressed: () => setLocal(() =>
                     allOn ? selected.removeAll(toggleable) : selected.addAll(toggleable)),
                 child: Text(allOn ? 'Clear' : 'Select all',
-                    style: AppTheme.bodySmall.copyWith(color: AppTheme.greenPrimary)),
+                    style: Sa.label.copyWith(color: Sa.accent, fontWeight: FontWeight.w600)),
               ),
           ]),
         ),
@@ -427,19 +438,22 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 12),
               leading: const Icon(Icons.lock_outline, size: 20, color: AppTheme.neutral400),
               title: Text(name,
-                  style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500)),
+                  style: Sa.value.copyWith(color: AppTheme.neutral500)),
               subtitle: Text("Not in your plan",
-                  style: AppTheme.bodyMicro.copyWith(color: AppTheme.warning)),
+                  style: Sa.label.copyWith(color: AppTheme.neutral600)),
               trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                    color: AppTheme.warning.withOpacity(0.12), borderRadius: AppTheme.borderRadius8),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.workspace_premium, size: 13, color: AppTheme.warning),
-                  const SizedBox(width: 3),
+                decoration: const BoxDecoration(
+                    color: AppTheme.neutral200, borderRadius: AppTheme.borderRadius8),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.workspace_premium, size: 13, color: AppTheme.neutral600),
+                  SizedBox(width: 3),
                   Text('Premium',
-                      style: AppTheme.bodyMicro.copyWith(
-                          color: AppTheme.warning, fontWeight: FontWeight.w700)),
+                      style: TextStyle(
+                          fontFamily: AppTheme.interFontFamily,
+                          fontSize: 11,
+                          color: AppTheme.neutral600,
+                          fontWeight: FontWeight.w700)),
                 ]),
               ),
               onTap: () => _showUpgradeDialog(name),
@@ -449,13 +463,13 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
             dense: true,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
             controlAffinity: ListTileControlAffinity.leading,
-            activeColor: AppTheme.greenPrimary,
+            activeColor: Sa.accent,
             value: required ? true : selected.contains(key),
-            title: Text(name, style: AppTheme.bodyMedium),
+            title: Text(name, style: Sa.value),
             subtitle: Text(required ? 'Always on — every user keeps this'
                 : (m['path']?.toString() ?? ''),
-                style: AppTheme.bodyMicro.copyWith(
-                    color: required ? AppTheme.greenPrimary : AppTheme.neutral400)),
+                style: Sa.label.copyWith(
+                    color: required ? Sa.accent : AppTheme.neutral400)),
             // Required pages (Profile) can't be switched off.
             onChanged: required
                 ? null

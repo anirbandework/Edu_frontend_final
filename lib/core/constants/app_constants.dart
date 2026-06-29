@@ -1,7 +1,18 @@
 // lib/core/constants/app_constants.dart
 class AppConstants {
-  // API Configuration
-  static const String apiBaseUrl = 'http://localhost:8000';
+  // API Configuration.
+  // On a physical device "localhost" is the PHONE, not your Mac — so point at the
+  // Mac's LAN IP. Override per-network without editing code via:
+  //   flutter run --dart-define=API_BASE_URL=http://<your-mac-ip>:8000
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    // The Mac's mDNS/Bonjour name — resolves to the Mac's CURRENT IP automatically, so it
+    // survives DHCP/network changes (the mobile equivalent of a web app's `localhost`).
+    // The phone + Mac must be on the same Wi-Fi, and iOS must have local-network permission.
+    // If mDNS is blocked on your network, override with the raw IP:
+    //   flutter run --dart-define=API_BASE_URL=http://<mac-ip>:8000   (ipconfig getifaddr en0)
+    defaultValue: 'http://Anirbans-MacBook-Air.local:8000',
+  );
   // static const String apiVersion = '/api/v1';
 
   // Public Routes
@@ -11,7 +22,6 @@ class AppConstants {
   static const String loginRoute = '/login';
   static const String signupRoute = '/signup';
   static const String forgotPasswordRoute = '/forgot-password';
-  static const String inviteRoute = '/invite';
   static const String createSchoolRoute = '/create-school';
   static const String tenantManagementRoute = '/tenant-management';
   static const String schoolManagementRoute = '/school-management';
@@ -20,36 +30,17 @@ class AppConstants {
   static const String globalAnalyticsRoute = '/global/analytics';
   static const String systemSettingsRoute = '/global/settings';
 
-  // Student Routes
-  static const String studentDashboardRoute = '/student/dashboard';
-  static const String studentAssignmentsRoute = '/student/assignments';
-  static const String studentGradesRoute = '/student/grades';
-  static const String studentAttendanceRoute = '/student/attendance';
-  static const String studentTimetableRoute = '/student/timetable';
-  static const String studentProfileRoute = '/student/profile';
-  static const String studentNotificationsRoute = '/student/notifications';
-  static const String studentQuizRoute = '/student/quiz';
-  static const String studentChatRoute = '/student/chat';
-  static const String studentReportCardRoute = '/student/report-card';
+  // Student routes removed — students are dynamic `members`; their pages are served
+  // through the RBAC sidebar, not hardcoded /student/* routes.
 
-  // Teacher Routes
-  static const String teacherDashboardRoute = '/teacher/dashboard';
-  static const String teacherClassesRoute = '/teacher/classes';
-  static const String teacherScheduleRoute = '/teacher/schedule';
-  static const String teacherStudentsRoute = '/teacher/students';
-  static const String teacherAssignmentsRoute = '/teacher/assignments';
-  static const String teacherAttendanceRoute = '/teacher/attendance';
-  static const String teacherGradesRoute = '/teacher/grades';
-  static const String teacherExamsRoute = '/teacher/exams';
+  // Teacher routes: only the surviving grantable-page screens (quizzes / notifications).
+  // The other /teacher/* routes were removed with the legacy teacher portal teardown.
   static const String teacherQuizzesRoute = '/teacher/quizzes';
   static const String teacherQuizBuilderRoute = '/teacher/quizzes/new';
   static const String teacherQuizResultsRoute = '/teacher/quizzes/results';
-  static const String teacherChatRoute = '/teacher/chat';
-  static const String teacherReportsRoute = '/teacher/reports';
-  static const String teacherProfileRoute = '/teacher/profile';
   static const String teacherNotificationsRoute = '/teacher/notifications';
   static const String teacherSendNotificationRoute = '/teacher/send-notification';
-  
+
   // Admin Routes (School-level)
   static const String adminDashboardRoute = '/admin/dashboard';
   static const String adminOnboardingRoute = '/admin/onboarding';

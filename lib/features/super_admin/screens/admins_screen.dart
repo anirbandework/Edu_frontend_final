@@ -8,9 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
 import '../../../services/super_admin_service.dart';
-import '../widgets/admin_modules_dialog.dart';
-import '../widgets/super_admin_action_bar.dart';
-import '../widgets/super_admin_header.dart';
+import '../widgets/sa_widgets.dart';
 
 class AdminsScreen extends StatefulWidget {
   const AdminsScreen({super.key});
@@ -76,7 +74,7 @@ class _AdminsScreenState extends State<AdminsScreen> {
     );
     if (created == true) {
       _load();
-      _toast('Admin created', AppTheme.success);
+      _toast('Admin created', AppTheme.greenPrimary);
     }
   }
 
@@ -87,19 +85,8 @@ class _AdminsScreenState extends State<AdminsScreen> {
     );
     if (saved == true) {
       _load();
-      _toast('Admin updated', AppTheme.success);
+      _toast('Admin updated', AppTheme.greenPrimary);
     }
-  }
-
-  Future<void> _editAccess(Map<String, dynamic> a) async {
-    final mods = ((a['modules'] as List?) ?? const []).map((e) => e.toString()).toList();
-    final saved = await showAdminModulesDialog(
-      context,
-      adminId: a['id'].toString(),
-      adminName: '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.trim(),
-      currentModules: mods,
-    );
-    if (saved == true) _load();
   }
 
   Future<void> _toggleStatus(Map<String, dynamic> a) async {
@@ -116,7 +103,7 @@ class _AdminsScreenState extends State<AdminsScreen> {
     if (ok != true) return;
     try {
       await SuperAdminService.setAdminStatus(adminId: a['id'].toString(), isActive: !active);
-      _toast(active ? 'Admin deactivated' : 'Admin activated', AppTheme.success);
+      _toast(active ? 'Admin deactivated' : 'Admin activated', AppTheme.greenPrimary);
       _load();
     } catch (e) {
       _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
@@ -131,7 +118,7 @@ class _AdminsScreenState extends State<AdminsScreen> {
         adminName: '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.trim(),
       ),
     );
-    if (done == true) _toast('Password reset', AppTheme.success);
+    if (done == true) _toast('Password reset', AppTheme.greenPrimary);
   }
 
   Future<void> _delete(Map<String, dynamic> a) async {
@@ -148,7 +135,7 @@ class _AdminsScreenState extends State<AdminsScreen> {
     if (ok != true) return;
     try {
       await SuperAdminService.deleteAdmin(adminId: a['id'].toString());
-      _toast('Admin deleted', AppTheme.success);
+      _toast('Admin deleted', AppTheme.greenPrimary);
       _load();
     } catch (e) {
       _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
@@ -180,43 +167,39 @@ class _AdminsScreenState extends State<AdminsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SuperAdminHeader(
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
           title: 'Admin Management',
           subtitle: 'Create admins and grant their page access',
           icon: Icons.admin_panel_settings,
+          trailing: SaHeaderAction(
+            icon: Icons.person_add_alt_1,
+            tooltip: 'Create admin',
+            onPressed: _create,
+          ),
         ),
-        const SizedBox(height: 12),
-        SuperAdminActionBar(
-          actions: [
-            SaActionButton(
-              icon: Icons.person_add_alt_1,
-              label: 'Create Admin',
-              onPressed: _create,
-              primary: true,
-            ),
-            SaActionButton(
-              icon: Icons.refresh,
-              label: 'Refresh',
-              onPressed: _loading ? null : _load,
-            ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _searchBar(),
+            const SizedBox(height: 12),
+            Expanded(child: _body()),
           ],
         ),
-        const SizedBox(height: 12),
-        _searchBar(),
-        const SizedBox(height: 12),
-        Expanded(child: _body()),
-      ],
+      ),
     );
   }
 
   Widget _searchBar() {
     return TextField(
-      decoration: InputDecoration(
+      decoration: const InputDecoration(
         hintText: 'Search by name, phone or email',
-        prefixIcon: const Icon(Icons.search),
+        prefixIcon: Icon(Icons.search),
         isDense: true,
         filled: true,
         fillColor: AppTheme.neutral50,
@@ -229,35 +212,35 @@ class _AdminsScreenState extends State<AdminsScreen> {
 
   Widget _body() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
+      return const SaLoading(message: 'Loading admins…');
     }
     if (_error != null) {
-      return _state(Icons.error_outline, AppTheme.error, _error!, _load);
+      return SaStateView.error(message: _error!, onRetry: _load);
     }
     final list = _filtered;
     if (list.isEmpty) {
       return _admins.isEmpty
-          ? _state(Icons.group_outlined, AppTheme.neutral400,
-              'No admins yet — create your first admin', _create, action: 'Create Admin')
-          : _state(Icons.search_off, AppTheme.neutral400, 'No admins match your search', null);
+          ? SaStateView(
+              icon: Icons.group_outlined,
+              title: 'No admins yet',
+              subtitle: 'Create your first admin to get started.',
+              action: SaPrimaryButton(
+                  label: 'Create admin',
+                  icon: Icons.person_add_alt_1,
+                  onPressed: _create),
+            )
+          : const SaStateView(
+              icon: Icons.search_off,
+              title: 'No matches',
+              subtitle: 'No admins match your search.',
+            );
     }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _load,
-      child: LayoutBuilder(builder: (context, c) {
-        final cols = c.maxWidth > 1100 ? 3 : (c.maxWidth > 680 ? 2 : 1);
-        return GridView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 196,
-          ),
-          itemCount: list.length,
-          itemBuilder: (context, i) => _adminCard(list[i]),
-        );
-      }),
+    // Single-column list of cards: intrinsic height avoids overflow at large text.
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: list.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, i) => _adminCard(list[i]),
     );
   }
 
@@ -267,14 +250,11 @@ class _AdminsScreenState extends State<AdminsScreen> {
     final email = (a['email'] ?? '').toString();
     final active = (a['status'] ?? '') == 'active';
     final schools = a['school_count'] ?? 0;
-    final modules = ((a['modules'] as List?) ?? const []).length;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             CircleAvatar(
               radius: 22,
               backgroundColor: AppTheme.green50,
@@ -287,37 +267,41 @@ class _AdminsScreenState extends State<AdminsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name.isEmpty ? 'Admin' : name,
-                      style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700),
+                      style: Sa.cardTitle,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
-                  if (phone.isNotEmpty)
+                  if (phone.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(phone,
-                        style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
+                        style: Sa.label,
                         maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
                   if (email.isNotEmpty)
                     Text(email,
-                        style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral400),
+                        style: Sa.label.copyWith(fontSize: 11.5, color: AppTheme.neutral400),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
-            _statusBadge(active),
-          ]),
-          const SizedBox(height: 12),
-          Row(children: [
-            _stat(Icons.business, '$schools', schools == 1 ? 'school' : 'schools'),
-            const SizedBox(width: 16),
-            _stat(Icons.lock_open, '$modules', 'pages'),
-          ]),
-          const Spacer(),
-          Row(children: [
-            TextButton.icon(
-              onPressed: () => _editAccess(a),
-              icon: const Icon(Icons.tune, size: AppTheme.iconSmall),
-              label: const Text('Page access'),
+            const SizedBox(width: 8),
+            SaStatusPill(
+              text: active ? 'Active' : 'Inactive',
+              color: active ? AppTheme.greenPrimary : AppTheme.neutral400,
+              icon: active ? Icons.check_circle : Icons.remove_circle_outline,
             ),
-            const Spacer(),
-            _actionsMenu(a, active),
           ]),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
+            children: [
+              _stat(Icons.business, '$schools', schools == 1 ? 'school' : 'schools'),
+            ],
+          ),
+          const Divider(height: 22),
+          Align(
+            alignment: Alignment.centerRight,
+            child: _actionsMenu(a, active),
+          ),
         ],
       ),
     );
@@ -348,7 +332,7 @@ class _AdminsScreenState extends State<AdminsScreen> {
           Icon(Icons.edit, size: 18, color: AppTheme.neutral600), SizedBox(width: 10), Text('Edit')])),
         PopupMenuItem(value: 'status', child: Row(children: [
           Icon(active ? Icons.block : Icons.check_circle, size: 18,
-              color: active ? AppTheme.warning : AppTheme.success),
+              color: active ? AppTheme.neutral600 : AppTheme.greenPrimary),
           const SizedBox(width: 10),
           Text(active ? 'Deactivate' : 'Activate')])),
         const PopupMenuItem(value: 'reset', child: Row(children: [
@@ -361,46 +345,14 @@ class _AdminsScreenState extends State<AdminsScreen> {
     );
   }
 
-  Widget _statusBadge(bool active) {
-    final color = active ? AppTheme.success : AppTheme.neutral400;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-          color: color.withOpacity(0.12), borderRadius: AppTheme.borderRadius8),
-      child: Text(active ? 'Active' : 'Inactive',
-          style: AppTheme.bodyMicro.copyWith(color: color, fontWeight: FontWeight.w700)),
-    );
-  }
-
   Widget _stat(IconData icon, String value, String label) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
       const SizedBox(width: 6),
-      Text(value, style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w700)),
+      Text(value, style: Sa.value.copyWith(fontWeight: FontWeight.w700)),
       const SizedBox(width: 4),
-      Text(label, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+      Text(label, style: Sa.label),
     ]);
-  }
-
-  Widget _state(IconData icon, Color color, String msg, VoidCallback? onTap,
-      {String action = 'Retry'}) {
-    return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 40, color: color),
-        const SizedBox(height: 12),
-        Text(msg,
-            style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-            textAlign: TextAlign.center),
-        if (onTap != null) ...[
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: onTap,
-              icon: Icon(action == 'Retry' ? Icons.refresh : Icons.person_add_alt_1,
-                  size: AppTheme.iconSmall),
-              label: Text(action)),
-        ],
-      ]),
-    );
   }
 }
 
@@ -424,22 +376,16 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
       TextEditingController(text: widget.existing?['phone']?.toString() ?? '');
   late final TextEditingController _email =
       TextEditingController(text: widget.existing?['email']?.toString() ?? '');
-  final _password = TextEditingController();
-  bool _obscure = true;
   bool _saving = false;
   String? _err;
 
   // module picker (create only)
-  bool _loadingCatalog = true;
-  List<Map<String, dynamic>> _catalog = [];
-  final Set<String> _modules = {};
 
   bool get _isEdit => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
-    if (!_isEdit) _loadCatalog();
   }
 
   @override
@@ -448,21 +394,7 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
     _last.dispose();
     _phone.dispose();
     _email.dispose();
-    _password.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadCatalog() async {
-    try {
-      final cat = await SuperAdminService.getModuleCatalog();
-      if (!mounted) return;
-      setState(() {
-        _catalog = cat;
-        _loadingCatalog = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loadingCatalog = false);
-    }
   }
 
   Future<void> _save() async {
@@ -472,10 +404,6 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
     }
     if (_phone.text.trim().isEmpty) {
       setState(() => _err = 'Phone is required (used to log in)');
-      return;
-    }
-    if (!_isEdit && _password.text.length < 6) {
-      setState(() => _err = 'Password must be at least 6 characters');
       return;
     }
     setState(() {
@@ -496,9 +424,7 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
           firstName: _first.text.trim(),
           lastName: _last.text.trim(),
           phone: _phone.text.trim(),
-          password: _password.text,
           email: _email.text.trim(),
-          modules: _modules.toList(),
         );
       }
       if (!mounted) return;
@@ -514,22 +440,36 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final dialogW = screenW - 48 < 460 ? screenW - 48 : 460.0;
+    final firstField = TextField(controller: _first,
+        decoration: const InputDecoration(labelText: 'First name *', isDense: true));
+    final lastField = TextField(controller: _last,
+        decoration: const InputDecoration(labelText: 'Last name *', isDense: true));
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(_isEdit ? 'Edit Admin' : 'Create Admin'),
       content: SizedBox(
-        width: 460,
+        width: dialogW,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                Expanded(child: TextField(controller: _first,
-                    decoration: const InputDecoration(labelText: 'First name *', isDense: true))),
-                const SizedBox(width: 12),
-                Expanded(child: TextField(controller: _last,
-                    decoration: const InputDecoration(labelText: 'Last name *', isDense: true))),
-              ]),
+              LayoutBuilder(builder: (context, c) {
+                if (c.maxWidth < 360) {
+                  return Column(children: [
+                    firstField,
+                    const SizedBox(height: 12),
+                    lastField,
+                  ]);
+                }
+                return Row(children: [
+                  Expanded(child: firstField),
+                  const SizedBox(width: 12),
+                  Expanded(child: lastField),
+                ]);
+              }),
               const SizedBox(height: 12),
               TextField(
                 controller: _phone,
@@ -539,18 +479,9 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
               ),
               const SizedBox(height: 12),
               if (!_isEdit) ...[
-                TextField(
-                  controller: _password,
-                  obscureText: _obscure,
-                  decoration: InputDecoration(
-                    labelText: 'Password *',
-                    prefixIcon: const Icon(Icons.lock),
-                    isDense: true,
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off, size: 18),
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                    ),
-                  ),
+                Text(
+                  'No password needed — the admin sets their own at first login (phone + OTP).',
+                  style: TextStyle(fontSize: 12, color: AppTheme.neutral600),
                 ),
                 const SizedBox(height: 12),
               ],
@@ -560,45 +491,6 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
                 decoration: const InputDecoration(
                     labelText: 'Email (optional)', prefixIcon: Icon(Icons.email), isDense: true),
               ),
-              if (!_isEdit) ...[
-                const SizedBox(height: 16),
-                Text('Page access (optional — also editable later)',
-                    style: AppTheme.labelMedium),
-                const SizedBox(height: 8),
-                if (_loadingCatalog)
-                  const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: LinearProgressIndicator(color: AppTheme.greenPrimary),
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _catalog.map((m) {
-                      final key = m['module_key'].toString();
-                      final name = (m['module_name'] ?? key).toString();
-                      final sel = _modules.contains(key);
-                      return FilterChip(
-                        label: Text(name),
-                        selected: sel,
-                        showCheckmark: true,
-                        checkmarkColor: Colors.white,
-                        selectedColor: AppTheme.greenPrimary,
-                        backgroundColor: AppTheme.neutral100,
-                        labelStyle: AppTheme.bodySmall.copyWith(
-                            color: sel ? Colors.white : AppTheme.neutral700,
-                            fontWeight: FontWeight.w600),
-                        onSelected: (v) => setState(() {
-                          if (v) {
-                            _modules.add(key);
-                          } else {
-                            _modules.remove(key);
-                          }
-                        }),
-                      );
-                    }).toList(),
-                  ),
-              ],
               if (_err != null) ...[
                 const SizedBox(height: 12),
                 Text(_err!, style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
@@ -670,11 +562,14 @@ class _ResetPasswordDialogState extends State<_ResetPasswordDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final dialogW = screenW - 48 < 360 ? screenW - 48 : 360.0;
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text('Reset password · ${widget.adminName}',
           maxLines: 1, overflow: TextOverflow.ellipsis),
       content: SizedBox(
-        width: 360,
+        width: dialogW,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(
             controller: _password,

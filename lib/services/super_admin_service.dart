@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/constants/app_constants.dart';
 import '../core/auth/auth_session.dart';
+import '../core/auth/permission_store.dart';
 
 class SuperAdminService {
   static const String _base = AppConstants.apiBaseUrl;
@@ -21,30 +22,14 @@ class SuperAdminService {
     return Exception('$fallback (${r.statusCode})');
   }
 
-  // ---- Module catalog (for the access picker) ----
-  /// GET /api/access/catalog -> [{module_key, module_name, icon, path, ...}]
-  static Future<List<Map<String, dynamic>>> getModuleCatalog() async {
-    final uri = Uri.parse('$_base/api/access/catalog');
-    final r = await http
-        .get(uri, headers: AuthSession.instance.headers(json: false))
-        .timeout(const Duration(seconds: 12));
-    if (r.statusCode == 200) {
-      final d = json.decode(r.body);
-      final list = (d is List ? d : (d is Map ? (d['modules'] ?? d['items']) : null)) as List? ?? const [];
-      return list.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
-    }
-    throw _err(r, 'Failed to load module catalog');
-  }
-
   // ---- Admins ----
-  /// Create an admin (school-less). Login is by phone+password (both required);
-  /// email is optional. modules = granted page keys.
+  /// Create an admin (school-less). Password-less: the admin sets their own
+  /// password at first login (phone + OTP). email is optional. modules = granted page keys.
   /// POST /api/auth/admins
   static Future<Map<String, dynamic>> createAdmin({
     required String firstName,
     required String lastName,
     required String phone,
-    required String password,
     String? email,
     List<String> modules = const [],
   }) async {
@@ -56,7 +41,6 @@ class SuperAdminService {
               'first_name': firstName,
               'last_name': lastName,
               'phone': phone,
-              'password': password,
               if (email != null && email.isNotEmpty) 'email': email,
               'modules': modules,
             }))
@@ -143,21 +127,6 @@ class SuperAdminService {
     throw _err(r, 'Failed to load admins');
   }
 
-  /// PUT /api/auth/admins/{id}/modules  body {modules}
-  static Future<void> updateAdminModules({
-    required String adminId,
-    required List<String> modules,
-  }) async {
-    final uri = Uri.parse('$_base/api/auth/admins/$adminId/modules');
-    final r = await http
-        .put(uri,
-            headers: AuthSession.instance.headers(),
-            body: json.encode({'modules': modules}))
-        .timeout(const Duration(seconds: 12));
-    if (r.statusCode == 200) return;
-    throw _err(r, 'Failed to update module access');
-  }
-
   /// Platform-wide analytics (super-admin): school/admin/student/teacher totals,
   /// active-inactive, capacity, school-type distribution.
   /// GET /api/v1/tenants/analytics/comprehensive
@@ -214,6 +183,50 @@ class SuperAdminService {
     throw _err(r, 'Failed to update pages');
   }
 
+  // ---- Per-organisation ADMIN page grant (which pages the ADMIN themselves see
+  //      in their OWN sidebar — separate from the distributable org pages above) --
+  /// GET /api/access/org/{tenantId}/admin-pages -> same shape as getOrgPages.
+  static Future<List<Map<String, dynamic>>> getAdminPages(String tenantId) async {
+    final uri = Uri.parse('$_base/api/access/org/$tenantId/admin-pages');
+    final r = await http
+        .get(uri, headers: AuthSession.instance.headers(json: false))
+        .timeout(const Duration(seconds: 12));
+    if (r.statusCode == 200) {
+      final d = json.decode(r.body);
+      final list = (d is List ? d : (d is Map ? d['modules'] : null)) as List? ?? const [];
+      return list.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
+    }
+    throw _err(r, 'Failed to load admin pages');
+  }
+
+  /// PUT /api/access/org/{tenantId}/admin-page/{moduleKey} {enabled}
+  static Future<void> setAdminPage({
+    required String tenantId,
+    required String moduleKey,
+    required bool enabled,
+  }) async {
+    final uri = Uri.parse('$_base/api/access/org/$tenantId/admin-page/$moduleKey');
+    final r = await http
+        .put(uri,
+            headers: AuthSession.instance.headers(),
+            body: json.encode({'enabled': enabled}))
+        .timeout(const Duration(seconds: 12));
+    if (r.statusCode == 200) return;
+    throw _err(r, 'Failed to update admin page');
+  }
+
+  /// POST /api/access/org/{tenantId}/admin-pages/bulk {enabled} — show/hide all.
+  static Future<void> setAllAdminPages({required String tenantId, required bool enabled}) async {
+    final uri = Uri.parse('$_base/api/access/org/$tenantId/admin-pages/bulk');
+    final r = await http
+        .post(uri,
+            headers: AuthSession.instance.headers(),
+            body: json.encode({'enabled': enabled}))
+        .timeout(const Duration(seconds: 15));
+    if (r.statusCode == 200) return;
+    throw _err(r, 'Failed to update admin pages');
+  }
+
   // ---- Tenants (schools) ----
   /// GET /api/v1/tenants/ -> ALL schools (each carries owner_authority_id).
   /// The backend caps page `size` at 100, so we page through until every school
@@ -268,6 +281,11 @@ class SuperAdminService {
         .timeout(const Duration(seconds: 12));
     if (r.statusCode == 200) {
       AuthSession.instance.setFromLogin(json.decode(r.body) as Map<String, dynamic>);
+      // The admin/role page ceilings (admin_enabled + role grants) are PER-TENANT,
+      // so re-fetch permissions for the new active org — otherwise the sidebar
+      // shows the previous school's pages until the next login.
+      PermissionStore.instance.clear();
+      await PermissionStore.instance.load();
       return;
     }
     throw _err(r, 'Failed to switch school');

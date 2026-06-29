@@ -8,8 +8,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/super_admin_service.dart';
 import '../widgets/org_pages_dialog.dart';
-import '../widgets/super_admin_action_bar.dart';
-import '../widgets/super_admin_header.dart';
+import '../widgets/sa_widgets.dart';
 
 class ModuleAccessScreen extends StatefulWidget {
   const ModuleAccessScreen({super.key});
@@ -60,118 +59,85 @@ class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SuperAdminHeader(
+    return SaScreen(
+      header: const Padding(
+        padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
           title: 'Module Access',
           subtitle: 'Choose which pages each organisation can use',
           icon: Icons.tune,
         ),
-        const SizedBox(height: 12),
-        SuperAdminActionBar(
-          actions: [
-            SaActionButton(
-              icon: Icons.refresh,
-              label: 'Refresh',
-              onPressed: _loading ? null : _load,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Expanded(child: _body()),
-      ],
+      ),
+      child: _body(),
     );
   }
 
   Widget _body() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
+      return const SaLoading(message: 'Loading organisations…');
     }
     if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(_error!,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh, size: AppTheme.iconSmall),
-              label: const Text('Retry')),
-        ]),
-      );
+      return SaStateView.error(message: _error!, onRetry: _load);
     }
     if (_orgs.isEmpty) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.tune, size: 40, color: AppTheme.neutral400),
-          const SizedBox(height: 12),
-          Text('No organisations yet',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500)),
-          const SizedBox(height: 4),
-          Text('Once an admin creates a school, grant its pages here.',
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral400),
-              textAlign: TextAlign.center),
-        ]),
+      return const SaStateView(
+        icon: Icons.tune,
+        title: 'No organisations yet',
+        subtitle: 'Once an admin creates a school, grant its pages here.',
       );
     }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _load,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: _orgs.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) => _orgRow(_orgs[i]),
-      ),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: _orgs.length,
+      separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
+      itemBuilder: (context, i) => _orgRow(_orgs[i]),
     );
   }
 
   Widget _orgRow(Map<String, dynamic> org) {
     final name = (org['school_name'] ?? org['name'] ?? 'Organisation').toString();
     final code = (org['school_code'] ?? '').toString();
-    return InkWell(
-      borderRadius: AppTheme.borderRadius12,
+    return SaCard(
       onTap: () => _edit(org),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: AppTheme.glassCardDecoration,
-        child: Row(children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppTheme.green50,
-            child: const Icon(Icons.school, color: AppTheme.greenPrimary, size: 20),
+      padding: const EdgeInsets.all(14),
+      child: Row(children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Sa.accent.withValues(alpha: 0.10),
+            borderRadius: AppTheme.borderRadius12,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w700),
+          child: const Icon(Icons.school, color: Sa.accent, size: 22),
+        ),
+        const SizedBox(width: Sa.gap),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(name,
+                  style: Sa.cardTitle,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (code.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(code,
+                    style: Sa.label,
                     maxLines: 1, overflow: TextOverflow.ellipsis),
-                if (code.isNotEmpty)
-                  Text(code,
-                      style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
-            ),
+            ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-                color: AppTheme.green50, borderRadius: AppTheme.borderRadius8),
-            child: Text('Manage pages',
-                style: AppTheme.bodySmall.copyWith(
-                    color: AppTheme.greenPrimary, fontWeight: FontWeight.w700)),
-          ),
-          const SizedBox(width: 8),
-          const Icon(Icons.chevron_right, color: AppTheme.neutral400),
-        ]),
-      ),
+        ),
+        const SizedBox(width: Sa.gapXs),
+        const SaStatusPill(
+          text: 'Manage pages',
+          color: Sa.accent,
+          icon: Icons.tune,
+        ),
+        const SizedBox(width: 4),
+        const Icon(Icons.chevron_right, color: AppTheme.neutral400),
+      ]),
     );
   }
 }

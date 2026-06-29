@@ -7,8 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
 import '../../../services/super_admin_service.dart';
-import '../widgets/super_admin_action_bar.dart';
-import '../widgets/super_admin_header.dart';
+import '../widgets/sa_widgets.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -60,68 +59,39 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SuperAdminHeader(
+    return SaScreen(
+      header: const Padding(
+        padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
           title: 'Analytics',
           subtitle: 'Platform overview across all schools',
           icon: Icons.insights,
         ),
-        const SizedBox(height: 12),
-        SuperAdminActionBar(
-          actions: [
-            SaActionButton(
-              icon: Icons.refresh,
-              label: 'Refresh',
-              onPressed: _loading ? null : _load,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Expanded(child: _body()),
-      ],
+      ),
+      child: _body(),
     );
   }
 
   Widget _body() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
+      return const SaLoading(message: 'Loading analytics…');
     }
     if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(_error!,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh, size: AppTheme.iconSmall),
-              label: const Text('Retry')),
-        ]),
-      );
+      return SaStateView.error(message: _error!, onRetry: _load);
     }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          _kpiGrid(),
-          const SizedBox(height: 16),
-          _ratiosCard(),
-          const SizedBox(height: 16),
-          _capacityCard(),
-          const SizedBox(height: 16),
-          _distributionCard(),
-          const SizedBox(height: 16),
-          _topAdminsCard(),
-          const SizedBox(height: 8),
-        ],
-      ),
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
+      children: [
+        _kpiGrid(),
+        const SizedBox(height: Sa.gapLg),
+        _ratiosCard(),
+        const SizedBox(height: Sa.gapLg),
+        _capacityCard(),
+        const SizedBox(height: Sa.gapLg),
+        _distributionCard(),
+        const SizedBox(height: Sa.gapLg),
+        _topAdminsCard(),
+      ],
     );
   }
 
@@ -131,9 +101,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       _Kpi('Schools', _i('total_tenants'), '${_i('active_tenants')} active',
           Icons.business, AppTheme.greenPrimary),
       _Kpi('Admins', _i('total_admins'), '${_i('active_admins')} active',
-          Icons.admin_panel_settings, AppTheme.info),
-      _Kpi('Students', _i('total_students'), 'enrolled', Icons.school, AppTheme.warning),
-      _Kpi('Teachers', _i('total_teachers'), 'platform-wide', Icons.person, AppTheme.success),
+          Icons.admin_panel_settings, AppTheme.greenPrimary),
+      _Kpi('Students', _i('total_students'), 'enrolled', Icons.school, AppTheme.greenPrimary),
+      _Kpi('Teachers', _i('total_teachers'), 'platform-wide', Icons.person, AppTheme.greenPrimary),
     ];
     return LayoutBuilder(builder: (context, c) {
       final cols = c.maxWidth > 900 ? 4 : (c.maxWidth > 480 ? 2 : 1);
@@ -150,9 +120,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _kpiCard(_Kpi k) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -161,18 +129,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             Container(
               width: 38, height: 38,
               decoration: BoxDecoration(
-                  color: k.color.withOpacity(0.12), borderRadius: AppTheme.borderRadius12),
+                  color: k.color.withValues(alpha: 0.12), borderRadius: AppTheme.borderRadius12),
               child: Icon(k.icon, color: k.color, size: AppTheme.iconMedium),
             ),
             const Spacer(),
-            Text(_fmt(k.value),
-                style: AppTheme.headingMedium.copyWith(
-                    color: AppTheme.neutral900, fontWeight: FontWeight.w800)),
+            Flexible(
+              child: Text(_fmt(k.value),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.headingMedium.copyWith(
+                      color: AppTheme.neutral900, fontWeight: FontWeight.w800)),
+            ),
           ]),
           const SizedBox(height: 8),
           Text(k.label,
-              style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w700)),
-          Text(k.sub, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Sa.cardTitle),
+          Text(k.sub,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Sa.label),
         ],
       ),
     );
@@ -183,7 +160,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return _section('Active vs inactive', Icons.toggle_on, [
       _ratioRow('Schools', _i('active_tenants'), _i('inactive_tenants'), AppTheme.greenPrimary),
       const SizedBox(height: 12),
-      _ratioRow('Admins', _i('active_admins'), _i('inactive_admins'), AppTheme.info),
+      _ratioRow('Admins', _i('active_admins'), _i('inactive_admins'), AppTheme.greenPrimary),
     ]);
   }
 
@@ -194,12 +171,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Expanded(
-            child: Text(label,
-                style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w600)),
-          ),
+          Expanded(child: Text(label, style: Sa.value)),
           Text('$active / $total  (${(pct * 100).round()}%)',
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+              style: Sa.label),
         ]),
         const SizedBox(height: 6),
         ClipRRect(
@@ -212,11 +186,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         ),
         const SizedBox(height: 4),
-        Row(children: [
-          _legend('Active $active', color),
-          const SizedBox(width: 14),
-          _legend('Inactive $inactive', AppTheme.neutral400),
-        ]),
+        Wrap(
+          spacing: 14,
+          runSpacing: 4,
+          children: [
+            _legend('Active $active', color),
+            _legend('Inactive $inactive', AppTheme.neutral400),
+          ],
+        ),
       ],
     );
   }
@@ -226,7 +203,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       Container(width: 9, height: 9,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
       const SizedBox(width: 5),
-      Text(text, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+      Text(text, style: Sa.label),
     ]);
   }
 
@@ -237,19 +214,28 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final util = (_n('capacity_utilization')).toDouble();
     final avgTuition = _n('average_tuition');
     return _section('Capacity & finance', Icons.donut_large, [
+      LayoutBuilder(builder: (context, c) {
+        final twoCol = c.maxWidth < 360;
+        final itemW = twoCol
+            ? (c.maxWidth - Sa.gap) / 2
+            : (c.maxWidth - Sa.gap * 2) / 3;
+        return Wrap(
+          spacing: Sa.gap,
+          runSpacing: Sa.gap,
+          children: [
+            SizedBox(width: itemW, child: _miniStat('Total capacity', _fmt(cap), Icons.event_seat)),
+            SizedBox(width: itemW, child: _miniStat('Enrolled', _fmt(students), Icons.groups)),
+            SizedBox(width: itemW, child: _miniStat('Avg tuition', '₹${_fmt(avgTuition.round())}', Icons.payments)),
+          ],
+        );
+      }),
+      const SizedBox(height: Sa.gap),
       Row(children: [
-        Expanded(child: _miniStat('Total capacity', _fmt(cap), Icons.event_seat)),
-        Expanded(child: _miniStat('Enrolled', _fmt(students), Icons.groups)),
-        Expanded(child: _miniStat('Avg tuition', '₹${_fmt(avgTuition.round())}', Icons.payments)),
-      ]),
-      const SizedBox(height: 12),
-      Row(children: [
-        Expanded(
-          child: Text('Capacity utilisation',
-              style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w600)),
+        const Expanded(
+          child: Text('Capacity utilisation', style: Sa.value),
         ),
         Text('${util.round()}%',
-            style: AppTheme.labelMedium.copyWith(
+            style: Sa.value.copyWith(
                 color: AppTheme.greenPrimary, fontWeight: FontWeight.w700)),
       ]),
       const SizedBox(height: 6),
@@ -272,8 +258,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
         const SizedBox(height: 4),
         Text(value,
-            style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w800)),
-        Text(label, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Sa.cardTitle),
+        Text(label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Sa.label),
       ],
     );
   }
@@ -283,14 +274,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final dist = (_stats['school_type_distribution'] as Map?)?.cast<String, dynamic>() ?? {};
     if (dist.isEmpty) {
       return _section('Schools by type', Icons.category, [
-        Text('No schools yet', style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+        const Text('No schools yet', style: Sa.body),
       ]);
     }
     final entries = dist.entries.toList()
       ..sort((a, b) => ((b.value as num?) ?? 0).compareTo((a.value as num?) ?? 0));
     final maxV = entries.fold<int>(1, (m, e) => ((e.value as num?)?.toInt() ?? 0) > m ? (e.value as num).toInt() : m);
     return _section('Schools by type', Icons.category,
-        entries.map((e) => _barRow(e.key, (e.value as num?)?.toInt() ?? 0, maxV, AppTheme.info)).toList());
+        entries.map((e) => _barRow(e.key, (e.value as num?)?.toInt() ?? 0, maxV, AppTheme.greenPrimary)).toList());
   }
 
   // ---- top admins by school count ----
@@ -300,8 +291,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final top = admins.take(6).where((a) => ((a['school_count'] as num?) ?? 0) > 0).toList();
     if (top.isEmpty) {
       return _section('Top admins by schools', Icons.leaderboard, [
-        Text('No admin owns a school yet',
-            style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+        const Text('No admin owns a school yet', style: Sa.body),
       ]);
     }
     final maxV = top.fold<int>(1, (m, a) => ((a['school_count'] as num?)?.toInt() ?? 0) > m ? (a['school_count'] as num).toInt() : m);
@@ -317,9 +307,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(children: [
         SizedBox(
-          width: 110,
+          width: 104,
           child: Text(label,
-              style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral700),
+              style: Sa.value,
               maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
         const SizedBox(width: 8),
@@ -330,32 +320,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               value: maxV > 0 ? (value / maxV).clamp(0, 1).toDouble() : 0,
               minHeight: 14,
               backgroundColor: AppTheme.neutral100,
-              valueColor: AlwaysStoppedAnimation(color.withOpacity(0.85)),
+              valueColor: AlwaysStoppedAnimation(color.withValues(alpha: 0.85)),
             ),
           ),
         ),
         const SizedBox(width: 10),
         Text('$value',
-            style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w700)),
+            style: Sa.value.copyWith(fontWeight: FontWeight.w700)),
       ]),
     );
   }
 
   // ---- shared section card ----
   Widget _section(String title, IconData icon, List<Widget> children) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            Icon(icon, size: AppTheme.iconSmall, color: AppTheme.greenPrimary),
-            const SizedBox(width: 8),
-            Text(title, style: AppTheme.labelLarge),
-          ]),
-          const SizedBox(height: 12),
+          SaCardHeader(icon: icon, title: title),
+          const SizedBox(height: Sa.gap),
           ...children,
         ],
       ),

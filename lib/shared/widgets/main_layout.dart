@@ -52,7 +52,7 @@ class _MainLayoutState extends State<MainLayout>
   bool? _wasMobile;
   late AnimationController _overlayController;
   late Animation<double> _overlayAnimation;
-  int _notificationCount = 0;
+  final int _notificationCount = 0;
 
 @override
 void initState() {
@@ -274,7 +274,7 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
                           return GestureDetector(
                             onTap: _closeSidebar,
                             child: Container(
-                              color: AppTheme.surfaceOverlay.withOpacity(
+                              color: AppTheme.surfaceOverlay.withValues(alpha: 
                                 _overlayAnimation.value * 0.5,
                               ),
                             ),
@@ -292,9 +292,10 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
                       onLogout: _handleLogout,
                     ),
 
-                    // Micro FAB (Mobile)
-                    if (context.isMobile && !_isSidebarOpen && _shouldShowFAB())
-                      _buildMicroFAB(),
+                    // NOTE: No bottom-right floating button here. The sidebar is
+                    // toggled from the hamburger in the NavigationHeader, and the
+                    // bottom-right corner is reserved for the global AI assistant
+                    // (see ai_assistant_widget.dart) so nothing collides with it.
                   ],
                 ),
               ),
@@ -313,12 +314,12 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
       decoration: BoxDecoration(
         color: AppTheme.green50,
         border: Border(
-          bottom: BorderSide(color: AppTheme.neutral200.withOpacity(0.5)),
+          bottom: BorderSide(color: AppTheme.neutral200.withValues(alpha: 0.5)),
         ),
       ),
       child: Row(
         children: [
-          Icon(Icons.home, size: 12, color: AppTheme.greenPrimary),
+          const Icon(Icons.home, size: 12, color: AppTheme.greenPrimary),
           const SizedBox(width: 4),
           Expanded(
             child: ListView.builder(
@@ -344,7 +345,7 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
                     ),
                     if (!isLast) ...[
                       const SizedBox(width: 3),
-                      Icon(
+                      const Icon(
                         Icons.chevron_right,
                         size: 10,
                         color: AppTheme.neutral400,
@@ -389,50 +390,6 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
   );
 }
 
-  bool _shouldShowFAB() {
-    // Show floating menu button based on user role
-    return [
-      'admin',
-      'teacher',
-      'school_authority',
-    ].contains(widget.userRole.toLowerCase());
-  }
-
-  Widget _buildMicroFAB() {
-    return Positioned(
-      bottom: 16,
-      right: 12,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppTheme.greenPrimary,
-          borderRadius: AppTheme.borderRadius8,
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.greenPrimary.withOpacity(0.3),
-              offset: const Offset(0, 4),
-              blurRadius: 8,
-            ),
-          ],
-        ),
-        child: InkWell(
-          onTap: _toggleSidebar,
-          borderRadius: AppTheme.borderRadius8,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 150),
-            child: Icon(
-              _isSidebarOpen ? Icons.close : Icons.menu,
-              key: ValueKey(_isSidebarOpen),
-              size: 20,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildLogoutDialog() {
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -449,10 +406,10 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppTheme.error.withOpacity(0.1),
+                color: AppTheme.error.withValues(alpha: 0.1),
                 borderRadius: AppTheme.borderRadius8,
               ),
-              child: Icon(Icons.logout, size: 24, color: AppTheme.error),
+              child: const Icon(Icons.logout, size: 24, color: AppTheme.error),
             ),
 
             const SizedBox(height: 12),

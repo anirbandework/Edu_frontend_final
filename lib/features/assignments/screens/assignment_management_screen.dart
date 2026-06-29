@@ -8,6 +8,7 @@ import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/assignment_service.dart';
 import '../../../services/teacher_portal_service.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class AssignmentManagementScreen extends StatefulWidget {
   final String? tenantId;
@@ -121,43 +122,54 @@ class _AssignmentManagementScreenState extends State<AssignmentManagementScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Expanded(child: Text('Assignments', style: AppTheme.headingMedium)),
-          ElevatedButton.icon(
+    // NO Scaffold / AppBar — the shell provides them.
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'Assignments',
+          subtitle: 'Create assignments and grade submissions',
+          icon: Icons.assignment_outlined,
+          trailing: SaHeaderAction(
+            icon: Icons.add,
+            tooltip: 'New assignment',
             onPressed: (_classId == null) ? null : _create,
-            icon: const Icon(Icons.add, size: AppTheme.iconSmall),
-            label: const Text('New'),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: _loadingList ? null : _loadAssignments,
-            icon: const Icon(Icons.refresh),
-            color: AppTheme.greenPrimary,
-            tooltip: 'Refresh',
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            child: _classPicker(),
           ),
-        ]),
-        const SizedBox(height: 12),
-        _classPicker(),
-        const SizedBox(height: 12),
-        Expanded(child: _body()),
-      ],
+          const SizedBox(height: Sa.gap),
+          Expanded(child: _body()),
+        ],
+      ),
     );
   }
 
   Widget _classPicker() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: AppTheme.glassCardDecoration,
+    return SaCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: _loadingClasses
-          ? const LinearProgressIndicator(color: AppTheme.greenPrimary)
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(
+                color: AppTheme.greenPrimary,
+                backgroundColor: AppTheme.neutral200,
+              ),
+            )
           : DropdownButtonFormField<String>(
-              value: _classId,
+              initialValue: _classId,
               isExpanded: true,
               decoration: const InputDecoration(
-                  labelText: 'Class', prefixIcon: Icon(Icons.class_), isDense: true),
+                  labelText: 'Class',
+                  prefixIcon: Icon(Icons.class_, color: AppTheme.neutral500),
+                  isDense: true,
+                  border: InputBorder.none),
               items: _classes.map((c) {
                 final name = (c['class_name'] ?? 'Class').toString();
                 final sec = (c['section'] ?? '').toString();
@@ -176,48 +188,28 @@ class _AssignmentManagementScreenState extends State<AssignmentManagementScreen>
 
   Widget _body() {
     if (_loadingClasses || _loadingList) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
+      return const SaLoading(message: 'Loading…');
     }
     if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(_error!,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: _loadClasses,
-              icon: const Icon(Icons.refresh, size: AppTheme.iconSmall),
-              label: const Text('Retry')),
-        ]),
-      );
+      return SaStateView.error(message: _error!, onRetry: _loadClasses);
     }
     if (_assignments.isEmpty) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.assignment_outlined, size: 40, color: AppTheme.neutral400),
-          const SizedBox(height: 12),
-          Text('No assignments for this class yet',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500)),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-              onPressed: _create,
-              icon: const Icon(Icons.add, size: AppTheme.iconSmall),
-              label: const Text('Create assignment')),
-        ]),
+      return SaStateView(
+        icon: Icons.assignment_outlined,
+        title: 'No assignments yet',
+        subtitle: 'Assignments for this class will appear here once created.',
+        action: SaPrimaryButton(
+          label: 'Create assignment',
+          icon: Icons.add,
+          onPressed: _classId == null ? null : _create,
+        ),
       );
     }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _loadAssignments,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        itemCount: _assignments.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) => _card(_assignments[i]),
-      ),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 96),
+      itemCount: _assignments.length,
+      separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
+      itemBuilder: (context, i) => _card(_assignments[i]),
     );
   }
 
@@ -227,57 +219,51 @@ class _AssignmentManagementScreenState extends State<AssignmentManagementScreen>
     final type = (a['assessment_type'] ?? '').toString();
     final due = (a['due_date'] ?? '').toString();
     final max = a['max_marks'];
-    return InkWell(
-      borderRadius: AppTheme.borderRadius12,
+    return SaCard(
+      padding: const EdgeInsets.all(14),
       onTap: () => _openSubmissions(a),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: AppTheme.glassCardDecoration,
-        child: Row(children: [
-          Container(
-            width: 42, height: 42,
-            decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient, borderRadius: AppTheme.borderRadius12),
-            child: const Icon(Icons.assignment, color: Colors.white, size: AppTheme.iconMedium),
+      child: Row(children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: const BoxDecoration(
+              gradient: AppTheme.primaryGradient,
+              borderRadius: AppTheme.borderRadius12),
+          child: const Icon(Icons.assignment,
+              color: Colors.white, size: AppTheme.iconMedium),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: Sa.cardTitle,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 4),
+              Wrap(spacing: 10, runSpacing: 4, children: [
+                if (subject.isNotEmpty) _meta(Icons.menu_book, subject),
+                if (max != null) _meta(Icons.star_outline, '$max marks'),
+                if (due.isNotEmpty) _meta(Icons.event, due.split('T').first),
+              ]),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700),
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Wrap(spacing: 10, children: [
-                  if (subject.isNotEmpty) _meta(Icons.menu_book, subject),
-                  if (max != null) _meta(Icons.star_outline, '$max marks'),
-                  if (due.isNotEmpty) _meta(Icons.event, due.split('T').first),
-                ]),
-              ],
-            ),
-          ),
-          if (type.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                  color: AppTheme.green50, borderRadius: AppTheme.borderRadius8),
-              child: Text(type,
-                  style: AppTheme.bodyMicro.copyWith(
-                      color: AppTheme.greenPrimary, fontWeight: FontWeight.w700)),
-            ),
+        ),
+        if (type.isNotEmpty) ...[
           const SizedBox(width: 6),
-          const Icon(Icons.chevron_right, color: AppTheme.neutral400),
-        ]),
-      ),
+          SaStatusPill(text: type),
+        ],
+        const SizedBox(width: 6),
+        const Icon(Icons.chevron_right, color: AppTheme.neutral400),
+      ]),
     );
   }
 
   Widget _meta(IconData icon, String text) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
+      Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral500),
       const SizedBox(width: 4),
-      Text(text, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+      Text(text, style: Sa.label),
     ]);
   }
 }
@@ -360,87 +346,143 @@ class _CreateAssignmentDialogState extends State<_CreateAssignmentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('New Assignment'),
-      content: SizedBox(
-        width: 440,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _title,
-                decoration: const InputDecoration(labelText: 'Title *', isDense: true),
+    final maxW = MediaQuery.of(context).size.width - 24;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Sa.radius)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW > 440 ? 440 : maxW,
+          maxHeight: MediaQuery.of(context).size.height - 80,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 18, 20, 4),
+              child: Text('New Assignment', style: Sa.cardTitle),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _title,
+                      decoration: const InputDecoration(
+                          labelText: 'Title *', isDense: true),
+                    ),
+                    const SizedBox(height: Sa.gap),
+                    LayoutBuilder(builder: (context, c) {
+                      final subjectField = TextField(
+                        controller: _subject,
+                        decoration: const InputDecoration(
+                            labelText: 'Subject *', isDense: true),
+                      );
+                      final typeField = DropdownButtonFormField<String>(
+                        initialValue: _type,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                            labelText: 'Type', isDense: true),
+                        items: _types
+                            .map((t) =>
+                                DropdownMenuItem(value: t, child: Text(t)))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _type = v ?? 'assignment'),
+                      );
+                      return c.maxWidth < 600
+                          ? Column(children: [
+                              subjectField,
+                              const SizedBox(height: Sa.gap),
+                              typeField,
+                            ])
+                          : Row(children: [
+                              Expanded(child: subjectField),
+                              const SizedBox(width: Sa.gap),
+                              Expanded(child: typeField),
+                            ]);
+                    }),
+                    const SizedBox(height: Sa.gap),
+                    LayoutBuilder(builder: (context, c) {
+                      final marksField = TextField(
+                        controller: _maxMarks,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                            labelText: 'Max marks', isDense: true),
+                      );
+                      final dueField = OutlinedButton.icon(
+                        onPressed: _pickDue,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Sa.accent,
+                          minimumSize: const Size(0, 48),
+                          side: const BorderSide(color: Sa.accent),
+                        ),
+                        icon:
+                            const Icon(Icons.event, size: AppTheme.iconSmall),
+                        label: Text(_due == null
+                            ? 'Due date'
+                            : _due!.toIso8601String().split('T').first),
+                      );
+                      return c.maxWidth < 600
+                          ? Column(children: [
+                              marksField,
+                              const SizedBox(height: Sa.gap),
+                              SizedBox(width: double.infinity, child: dueField),
+                            ])
+                          : Row(children: [
+                              Expanded(child: marksField),
+                              const SizedBox(width: Sa.gap),
+                              Expanded(child: dueField),
+                            ]);
+                    }),
+                    const SizedBox(height: Sa.gap),
+                    TextField(
+                      controller: _desc,
+                      minLines: 1,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                          labelText: 'Instructions (optional)', isDense: true),
+                    ),
+                    if (_err != null) ...[
+                      const SizedBox(height: Sa.gap),
+                      Text(_err!,
+                          style: Sa.body.copyWith(color: AppTheme.error)),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: _subject,
-                    decoration: const InputDecoration(labelText: 'Subject *', isDense: true),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed:
+                        _saving ? null : () => Navigator.pop(context, false),
+                    style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.neutral600),
+                    child: const Text('Cancel'),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _type,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Type', isDense: true),
-                    items: _types
-                        .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _type = v ?? 'assignment'),
+                  const SizedBox(width: Sa.gapXs),
+                  SaPrimaryButton(
+                    label: _saving ? 'Creating…' : 'Create',
+                    icon: Icons.check_rounded,
+                    busy: _saving,
+                    onPressed: _saving ? null : _save,
                   ),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: _maxMarks,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Max marks', isDense: true),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickDue,
-                    icon: const Icon(Icons.event, size: AppTheme.iconSmall),
-                    label: Text(_due == null
-                        ? 'Due date'
-                        : _due!.toIso8601String().split('T').first),
-                  ),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _desc,
-                minLines: 1,
-                maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Instructions (optional)', isDense: true),
+                ],
               ),
-              if (_err != null) ...[
-                const SizedBox(height: 12),
-                Text(_err!, style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context, false),
-            child: const Text('Cancel')),
-        ElevatedButton.icon(
-          onPressed: _saving ? null : _save,
-          icon: _saving
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.check, size: AppTheme.iconSmall),
-          label: Text(_saving ? 'Creating…' : 'Create'),
-        ),
-      ],
     );
   }
 }
@@ -524,13 +566,14 @@ class _SubmissionsSheetState extends State<_SubmissionsSheet> {
           child: Column(
             children: [
               Container(width: 40, height: 4,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                       color: AppTheme.neutral300, borderRadius: AppTheme.borderRadius8)),
               const SizedBox(height: 12),
-              Text(widget.title, style: AppTheme.headingSmall,
+              Text(widget.title, style: Sa.cardTitle.copyWith(fontSize: 17),
                   maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 2),
               Text('${_subs.length} submission${_subs.length == 1 ? '' : 's'}',
-                  style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+                  style: Sa.label),
               const SizedBox(height: 12),
               Expanded(child: _list(controller)),
             ],
@@ -542,20 +585,22 @@ class _SubmissionsSheetState extends State<_SubmissionsSheet> {
 
   Widget _list(ScrollController controller) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
+      return const SaLoading(message: 'Loading…');
     }
     if (_error != null) {
-      return Center(child: Text(_error!,
-          style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600)));
+      return SaStateView.error(message: _error!, onRetry: _load);
     }
     if (_subs.isEmpty) {
-      return Center(child: Text('No submissions yet',
-          style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500)));
+      return const SaStateView(
+        icon: Icons.inbox_outlined,
+        title: 'No submissions yet',
+        subtitle: 'Student submissions will appear here.',
+      );
     }
     return ListView.separated(
       controller: controller,
       itemCount: _subs.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
       itemBuilder: (context, i) {
         final s = _subs[i];
         final name = (s['student_name'] ?? 'Student').toString();
@@ -563,14 +608,14 @@ class _SubmissionsSheetState extends State<_SubmissionsSheet> {
         final graded = s['marks_obtained'] != null || s['grade'] != null;
         final marks = s['marks_obtained'];
         final grade = (s['grade'] ?? '').toString();
-        return Container(
+        return SaCard(
           padding: const EdgeInsets.all(12),
-          decoration: AppTheme.glassCardDecoration,
           child: Row(children: [
-            CircleAvatar(
+            const CircleAvatar(
               radius: 18,
               backgroundColor: AppTheme.green50,
-              child: Icon(Icons.picture_as_pdf, color: AppTheme.greenPrimary, size: AppTheme.iconMedium),
+              child: Icon(Icons.picture_as_pdf,
+                  color: AppTheme.greenPrimary, size: AppTheme.iconMedium),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -578,21 +623,27 @@ class _SubmissionsSheetState extends State<_SubmissionsSheet> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name,
-                      style: AppTheme.labelMedium.copyWith(fontWeight: FontWeight.w600),
+                      style: Sa.value,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   if (filename.isNotEmpty)
                     Text(filename,
-                        style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500),
+                        style: Sa.label,
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                   if (graded)
                     Text('Graded: $marks ${grade.isNotEmpty ? '($grade)' : ''}',
-                        style: AppTheme.bodySmall.copyWith(
-                            color: AppTheme.success, fontWeight: FontWeight.w600)),
+                        style: Sa.label.copyWith(
+                            color: AppTheme.greenPrimary,
+                            fontWeight: FontWeight.w600)),
                 ],
               ),
             ),
+            const SizedBox(width: 6),
             TextButton(
               onPressed: () => _grade(s),
+              style: TextButton.styleFrom(
+                foregroundColor: Sa.accent,
+                minimumSize: const Size(0, 44),
+              ),
               child: Text(graded ? 'Re-grade' : 'Grade'),
             ),
           ]),
@@ -674,60 +725,103 @@ class _GradeDialogState extends State<_GradeDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text('Grade · ${widget.studentName}',
-          maxLines: 1, overflow: TextOverflow.ellipsis),
-      content: SizedBox(
-        width: 380,
+    final maxW = MediaQuery.of(context).size.width - 24;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Sa.radius)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: maxW > 420 ? 420 : maxW,
+          maxHeight: MediaQuery.of(context).size.height - 80,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _marks,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                      labelText: 'Marks',
-                      suffixText: '/${widget.maxMarks.toStringAsFixed(0)}',
-                      isDense: true),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextField(
-                  controller: _grade,
-                  decoration: const InputDecoration(
-                      labelText: 'Grade (auto)', isDense: true),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _feedback,
-              minLines: 1,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Feedback (optional)', isDense: true),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+              child: Text('Grade · ${widget.studentName}',
+                  style: Sa.cardTitle,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
-            if (_err != null) ...[
-              const SizedBox(height: 12),
-              Text(_err!, style: AppTheme.bodySmall.copyWith(color: AppTheme.error)),
-            ],
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    LayoutBuilder(builder: (context, c) {
+                      final marksField = TextField(
+                        controller: _marks,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration: InputDecoration(
+                            labelText: 'Marks',
+                            suffixText:
+                                '/${widget.maxMarks.toStringAsFixed(0)}',
+                            isDense: true),
+                      );
+                      final gradeField = TextField(
+                        controller: _grade,
+                        decoration: const InputDecoration(
+                            labelText: 'Grade (auto)', isDense: true),
+                      );
+                      return c.maxWidth < 600
+                          ? Column(children: [
+                              marksField,
+                              const SizedBox(height: Sa.gap),
+                              gradeField,
+                            ])
+                          : Row(children: [
+                              Expanded(child: marksField),
+                              const SizedBox(width: Sa.gap),
+                              Expanded(child: gradeField),
+                            ]);
+                    }),
+                    const SizedBox(height: Sa.gap),
+                    TextField(
+                      controller: _feedback,
+                      minLines: 1,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                          labelText: 'Feedback (optional)', isDense: true),
+                    ),
+                    if (_err != null) ...[
+                      const SizedBox(height: Sa.gap),
+                      Text(_err!,
+                          style: Sa.body.copyWith(color: AppTheme.error)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed:
+                        _saving ? null : () => Navigator.pop(context, false),
+                    style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.neutral600),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: Sa.gapXs),
+                  SaPrimaryButton(
+                    label: _saving ? 'Saving…' : 'Save grade',
+                    icon: Icons.check_rounded,
+                    busy: _saving,
+                    onPressed: _saving ? null : _save,
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context, false),
-            child: const Text('Cancel')),
-        ElevatedButton.icon(
-          onPressed: _saving ? null : _save,
-          icon: _saving
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.check, size: AppTheme.iconSmall),
-          label: Text(_saving ? 'Saving…' : 'Save grade'),
-        ),
-      ],
     );
   }
 }

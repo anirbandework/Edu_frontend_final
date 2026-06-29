@@ -9,6 +9,7 @@ import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/quiz_admin_service.dart';
+import '../../super_admin/widgets/sa_widgets.dart';
 
 class QuizListScreen extends StatefulWidget {
   final String? teacherId;
@@ -92,7 +93,8 @@ class _QuizListScreenState extends State<QuizListScreen> {
     try {
       await QuizAdminService.setStatus(
           quizId: id, isActive: !active, teacherId: _teacherId, tenantId: _tenantId);
-      _toast(active ? 'Quiz hidden from students' : 'Quiz published to students', AppTheme.success);
+      _toast(active ? 'Quiz hidden from students' : 'Quiz published to students',
+          AppTheme.greenPrimary);
       _load();
     } catch (e) {
       if (!mounted) return;
@@ -122,7 +124,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
     if (ok != true) return;
     try {
       await QuizAdminService.deleteQuiz(quizId: id, teacherId: _teacherId, tenantId: _tenantId);
-      _toast('Quiz deleted', AppTheme.success);
+      _toast('Quiz deleted', AppTheme.greenPrimary);
       _load();
     } catch (e) {
       _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
@@ -140,91 +142,45 @@ class _QuizListScreenState extends State<QuizListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('My Quizzes', style: AppTheme.headingMedium),
-                Text(_loading ? 'Loading…' : '${_quizzes.length} quizzes',
-                    style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
-              ],
-            ),
-          ),
-          ElevatedButton.icon(
+    // NO Scaffold / AppBar — the shell provides them.
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: SaGradientHeader(
+          title: 'My Quizzes',
+          subtitle: _loading ? 'Loading…' : '${_quizzes.length} quizzes',
+          icon: Icons.quiz_outlined,
+          trailing: SaHeaderAction(
+            icon: Icons.add,
+            tooltip: 'New quiz',
             onPressed: _newQuiz,
-            icon: const Icon(Icons.add, size: AppTheme.iconSmall),
-            label: const Text('New Quiz'),
           ),
-          const SizedBox(width: 8),
-          IconButton(
-            onPressed: _loading ? null : _load,
-            icon: const Icon(Icons.refresh),
-            color: AppTheme.greenPrimary,
-            tooltip: 'Refresh',
-          ),
-        ]),
-        const SizedBox(height: 16),
-        Expanded(child: _body()),
-      ],
+        ),
+      ),
+      child: _body(),
     );
   }
 
   Widget _body() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(_error!,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-              textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh, size: AppTheme.iconSmall),
-              label: const Text('Retry')),
-        ]),
-      );
-    }
+    if (_loading) return const SaLoading(message: 'Loading…');
+    if (_error != null) return SaStateView.error(message: _error!, onRetry: _load);
     if (_quizzes.isEmpty) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.quiz_outlined, size: 40, color: AppTheme.neutral400),
-          const SizedBox(height: 12),
-          Text('No quizzes yet',
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral500)),
-          const SizedBox(height: 12),
-          ElevatedButton.icon(
-              onPressed: _newQuiz,
-              icon: const Icon(Icons.add, size: AppTheme.iconSmall),
-              label: const Text('Create your first quiz')),
-        ]),
+      return SaStateView(
+        icon: Icons.quiz_outlined,
+        title: 'No quizzes yet',
+        subtitle: 'Create your first quiz to get started.',
+        action: SaPrimaryButton(
+          label: 'Create your first quiz',
+          icon: Icons.add,
+          onPressed: _newQuiz,
+        ),
       );
     }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _load,
-      child: LayoutBuilder(builder: (context, c) {
-        final cols = c.maxWidth > 1000 ? 3 : (c.maxWidth > 620 ? 2 : 1);
-        return GridView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: cols,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 176,
-          ),
-          itemCount: _quizzes.length,
-          itemBuilder: (context, i) => _quizCard(_quizzes[i]),
-        );
-      }),
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 96),
+      itemCount: _quizzes.length,
+      separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
+      itemBuilder: (context, i) => _quizCard(_quizzes[i]),
     );
   }
 
@@ -236,18 +192,19 @@ class _QuizListScreenState extends State<QuizListScreen> {
     final totalQ = q['total_questions'];
     final points = q['total_points'];
     final time = q['time_limit'];
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
+    return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
             Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                  gradient: AppTheme.primaryGradient, borderRadius: AppTheme.borderRadius12),
-              child: const Icon(Icons.quiz, color: Colors.white, size: AppTheme.iconMedium),
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: AppTheme.borderRadius12),
+              child:
+                  const Icon(Icons.quiz, color: Colors.white, size: AppTheme.iconMedium),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -255,50 +212,60 @@ class _QuizListScreenState extends State<QuizListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                      style: Sa.cardTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
                   if (subject.isNotEmpty)
                     Text(subject,
-                        style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+                        style: Sa.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
+            const SizedBox(width: Sa.gapXs),
             _statusChip(active),
           ]),
           const SizedBox(height: 10),
-          Row(children: [
+          Wrap(spacing: 12, runSpacing: 8, children: [
             if (totalQ != null) _meta(Icons.help_outline, '$totalQ Qs'),
-            if (points != null) ...[
-              const SizedBox(width: 12),
-              _meta(Icons.star_outline, '$points pts'),
-            ],
-            if (time != null) ...[
-              const SizedBox(width: 12),
-              _meta(Icons.timer_outlined, '$time min'),
-            ],
+            if (points != null) _meta(Icons.star_outline, '$points pts'),
+            if (time != null) _meta(Icons.timer_outlined, '$time min'),
           ]),
-          const Spacer(),
-          Row(children: [
+          const SizedBox(height: Sa.gap),
+          Wrap(spacing: 4, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
             TextButton.icon(
               onPressed: busy ? null : () => _toggle(q),
               icon: busy
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : Icon(active ? Icons.visibility_off : Icons.publish,
                       size: AppTheme.iconSmall,
-                      color: active ? AppTheme.warning : AppTheme.success),
+                      color: active ? AppTheme.neutral500 : AppTheme.greenPrimary),
               label: Text(active ? 'Hide' : 'Publish'),
+              style: TextButton.styleFrom(
+                foregroundColor: active ? AppTheme.neutral600 : AppTheme.greenPrimary,
+                minimumSize: const Size(0, 44),
+              ),
             ),
             TextButton.icon(
               onPressed: () => _openResults(q),
-              icon: const Icon(Icons.bar_chart, size: AppTheme.iconSmall, color: AppTheme.info),
+              icon: const Icon(Icons.bar_chart,
+                  size: AppTheme.iconSmall, color: AppTheme.greenPrimary),
               label: const Text('Results'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.greenPrimary,
+                minimumSize: const Size(0, 44),
+              ),
             ),
-            const Spacer(),
             IconButton(
               onPressed: () => _delete(q),
               icon: const Icon(Icons.delete_outline, size: AppTheme.iconMedium),
               color: AppTheme.error,
               tooltip: 'Delete',
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             ),
           ]),
         ],
@@ -307,21 +274,17 @@ class _QuizListScreenState extends State<QuizListScreen> {
   }
 
   Widget _statusChip(bool active) {
-    final color = active ? AppTheme.success : AppTheme.neutral400;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-          color: color.withOpacity(0.12), borderRadius: AppTheme.borderRadius8),
-      child: Text(active ? 'Live' : 'Draft',
-          style: AppTheme.bodyMicro.copyWith(color: color, fontWeight: FontWeight.w700)),
+    return SaStatusPill(
+      text: active ? 'Live' : 'Draft',
+      color: active ? AppTheme.greenPrimary : AppTheme.neutral400,
     );
   }
 
   Widget _meta(IconData icon, String text) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
+      Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral500),
       const SizedBox(width: 4),
-      Text(text, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
+      Text(text, style: Sa.label),
     ]);
   }
 }

@@ -57,27 +57,13 @@ class AuthApiService {
     PermissionStore.instance.clear();
   }
 
-  // ---- invite (public read) ----
-  static Future<AuthResult> getInvite(String token) async {
-    try {
-      final r = await http.get(_u('/api/auth/invites/$token'));
-      if (r.statusCode == 200) {
-        return AuthResult(true, data: jsonDecode(r.body) as Map<String, dynamic>);
-      }
-      return AuthResult(false, error: _err(r, 'Invalid invitation'));
-    } catch (e) {
-      return AuthResult(false, error: 'Could not reach server: $e');
-    }
-  }
-
-  // ---- signup ----
-  static Future<AuthResult> signupRequestOtp(String token, String phone) async {
-    return _post('/api/auth/signup/request-otp', {'token': token, 'phone': phone.trim()},
+  // ---- first-login signup (phone + OTP, NO invite) ----
+  static Future<AuthResult> signupRequestOtp(String phone) async {
+    return _post('/api/auth/signup/request-otp', {'phone': phone.trim()},
         'Could not send code');
   }
 
   static Future<AuthResult> signupVerify({
-    required String token,
     required String phone,
     required String otp,
     required String password,
@@ -88,7 +74,6 @@ class AuthApiService {
       final r = await http.post(_u('/api/auth/signup/verify'),
           headers: _json,
           body: jsonEncode({
-            'token': token,
             'phone': phone.trim(),
             'otp': otp.trim(),
             'password': password,
@@ -128,36 +113,6 @@ class AuthApiService {
         'first_name': firstName,
         'last_name': lastName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
-      });
-
-  static Future<AuthResult> inviteTeacher({
-    required String firstName,
-    required String lastName,
-    String? email,
-    String? phone,
-  }) =>
-      _authedPost('/api/auth/invites/teacher', {
-        'first_name': firstName,
-        'last_name': lastName,
-        if (email != null && email.isNotEmpty) 'email': email,
-        if (phone != null && phone.isNotEmpty) 'phone': phone,
-      });
-
-  static Future<AuthResult> inviteStudent({
-    required String firstName,
-    required String lastName,
-    String? email,
-    String? phone,
-    int? gradeLevel,
-    String? section,
-  }) =>
-      _authedPost('/api/auth/invites/student', {
-        'first_name': firstName,
-        'last_name': lastName,
-        if (email != null && email.isNotEmpty) 'email': email,
-        if (phone != null && phone.isNotEmpty) 'phone': phone,
-        if (gradeLevel != null) 'grade_level': gradeLevel,
-        if (section != null && section.isNotEmpty) 'section': section,
       });
 
   // ---- helpers ----

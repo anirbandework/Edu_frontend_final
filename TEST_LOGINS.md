@@ -14,6 +14,7 @@ Seeded from `.env`. Logs in via the login card (no school). Sees Tenant manageme
 
 | Phone | Password |
 |---|---|
+
 | `9999999999` | `SuperAdmin123!` |
 
 flutter run --release -d 00008140-0012644026D8801C

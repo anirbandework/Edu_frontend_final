@@ -1,7 +1,10 @@
-// lib/features/school_authority/widgets/student_details_dialog.dart
+// lib/features/admin/widgets/student_screen_dialog/student_details_dialog.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_theme.dart';
 import '../../../../core/models/student.dart';
+import '../../../super_admin/widgets/sa_widgets.dart';
 
 class StudentDetailsDialog extends StatelessWidget {
   final Student student;
@@ -13,18 +16,20 @@ class StudentDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    
+    final size = MediaQuery.of(context).size;
+    final maxW = math.min(size.width - 24, 520.0);
+
     return Dialog(
-      backgroundColor: Colors.transparent,
-      child: Container(
-        width: screenSize.width > 600 ? 500 : screenSize.width * 0.9,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+      backgroundColor: Sa.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: screenSize.height * 0.9,
-        ),
-        decoration: AppTheme.getCompactDecoration(
-          color: Colors.white,
-          border: Border.all(color: AppTheme.neutral200),
+          maxWidth: maxW,
+          maxHeight: size.height - 80,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -32,48 +37,52 @@ class StudentDetailsDialog extends StatelessWidget {
             // Header
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
                 gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
               ),
               child: Row(
                 children: [
                   CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.white.withOpacity(0.2),
+                    radius: 22,
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
                     child: Text(
-                      student.firstName.isNotEmpty ? student.firstName[0].toUpperCase() : 'S',
-                      style: AppTheme.labelLarge.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      student.firstName.isNotEmpty
+                          ? student.firstName[0].toUpperCase()
+                          : 'S',
+                      style: Sa.headerTitle,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: Sa.gap),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           student.fullName,
-                          style: AppTheme.headingSmall.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Sa.headerTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 3),
                         Text(
                           student.gradeText,
-                          style: AppTheme.bodyMedium.copyWith(
-                            color: Colors.white70,
-                          ),
+                          style: Sa.headerSubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, color: Colors.white, size: 24),
+                    icon: const Icon(Icons.close, color: Colors.white, size: 24),
+                    splashRadius: 22,
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
                   ),
                 ],
               ),
@@ -82,84 +91,114 @@ class StudentDetailsDialog extends StatelessWidget {
             // Content
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Basic Information
                     _buildSection(
                       'Basic Information',
+                      Icons.badge_outlined,
                       [
-                        _buildInfoRow('Student ID', student.studentId),
-                        if (student.rollNumber != null) 
-                          _buildInfoRow('Roll Number', student.rollNumber!),
+                        SaInfoRow(label: 'Student ID', value: student.studentId),
+                        if (student.rollNumber != null)
+                          SaInfoRow(
+                              label: 'Roll Number',
+                              value: student.rollNumber!),
                         if (student.admissionNumber != null)
-                          _buildInfoRow('Admission Number', student.admissionNumber!),
+                          SaInfoRow(
+                              label: 'Admission Number',
+                              value: student.admissionNumber!),
                         if (student.dateOfBirth != null)
-                          _buildInfoRow('Date of Birth', 
-                            '${student.dateOfBirth!.day}/${student.dateOfBirth!.month}/${student.dateOfBirth!.year}'),
+                          SaInfoRow(
+                            label: 'Date of Birth',
+                            value:
+                                '${student.dateOfBirth!.day}/${student.dateOfBirth!.month}/${student.dateOfBirth!.year}',
+                          ),
                         if (student.age > 0)
-                          _buildInfoRow('Age', '${student.age} years'),
-                        _buildInfoRow('Status', student.statusText),
+                          SaInfoRow(label: 'Age', value: '${student.age} years'),
+                        SaInfoRow(label: 'Status', value: student.statusText),
                         if (student.academicYear != null)
-                          _buildInfoRow('Academic Year', student.academicYear!),
+                          SaInfoRow(
+                              label: 'Academic Year',
+                              value: student.academicYear!),
                       ],
                     ),
-                    const SizedBox(height: 24),
 
                     // Contact Information
-                    if (student.email != null || student.phone != null || student.address != null)
+                    if (student.email != null ||
+                        student.phone != null ||
+                        student.address != null) ...[
+                      const SizedBox(height: Sa.gapLg),
                       _buildSection(
                         'Contact Information',
+                        Icons.contact_mail_outlined,
                         [
-                          if (student.email != null) 
-                            _buildInfoRow('Email', student.email!),
+                          if (student.email != null)
+                            SaInfoRow(label: 'Email', value: student.email!),
                           if (student.phone != null)
-                            _buildInfoRow('Phone', student.phone!),
+                            SaInfoRow(label: 'Phone', value: student.phone!),
                           if (student.address != null)
-                            _buildInfoRow('Address', student.address!),
+                            SaInfoRow(label: 'Address', value: student.address!),
                         ],
                       ),
+                    ],
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: Sa.gapLg),
 
                     // Academic Information
                     _buildSection(
                       'Academic Information',
+                      Icons.school_outlined,
                       [
-                        _buildInfoRow('Grade Level', 'Grade ${student.gradeLevel}'),
+                        SaInfoRow(
+                            label: 'Grade Level',
+                            value: 'Grade ${student.gradeLevel}'),
                         if (student.section != null)
-                          _buildInfoRow('Section', student.section!),
-                        _buildInfoRow('Enrollment Status', student.isActive ? 'Active' : 'Inactive'),
+                          SaInfoRow(label: 'Section', value: student.section!),
+                        SaInfoRow(
+                            label: 'Enrollment Status',
+                            value: student.isActive ? 'Active' : 'Inactive'),
                       ],
                     ),
 
-                    // Additional Information (if available)
-                    if (student.parentInfo != null && student.parentInfo!.isNotEmpty)
-                      ...[
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          'Parent Information',
-                          student.parentInfo!.entries
-                              .map((entry) => _buildInfoRow(entry.key, entry.value.toString()))
-                              .toList(),
-                        ),
-                      ],
+                    // Parent Information (if available)
+                    if (student.parentInfo != null &&
+                        student.parentInfo!.isNotEmpty) ...[
+                      const SizedBox(height: Sa.gapLg),
+                      _buildSection(
+                        'Parent Information',
+                        Icons.family_restroom_outlined,
+                        student.parentInfo!.entries
+                            .map((entry) => SaInfoRow(
+                                  label: entry.key,
+                                  value: entry.value.toString(),
+                                ))
+                            .toList(),
+                      ),
+                    ],
 
-                    if (student.createdAt != null)
-                      ...[
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          'System Information',
-                          [
-                            _buildInfoRow('Created At', 
-                              '${student.createdAt!.day}/${student.createdAt!.month}/${student.createdAt!.year}'),
-                            if (student.updatedAt != null)
-                              _buildInfoRow('Last Updated', 
-                                '${student.updatedAt!.day}/${student.updatedAt!.month}/${student.updatedAt!.year}'),
-                          ],
-                        ),
-                      ],
+                    // System Information (if available)
+                    if (student.createdAt != null) ...[
+                      const SizedBox(height: Sa.gapLg),
+                      _buildSection(
+                        'System Information',
+                        Icons.info_outline,
+                        [
+                          SaInfoRow(
+                            label: 'Created At',
+                            value:
+                                '${student.createdAt!.day}/${student.createdAt!.month}/${student.createdAt!.year}',
+                          ),
+                          if (student.updatedAt != null)
+                            SaInfoRow(
+                              label: 'Last Updated',
+                              value:
+                                  '${student.updatedAt!.day}/${student.updatedAt!.month}/${student.updatedAt!.year}',
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -167,9 +206,9 @@ class StudentDetailsDialog extends StatelessWidget {
 
             // Action Buttons
             Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: AppTheme.neutral200)),
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Sa.stroke)),
               ),
               child: Row(
                 children: [
@@ -177,30 +216,22 @@ class StudentDetailsDialog extends StatelessWidget {
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        foregroundColor: AppTheme.neutral600,
+                        minimumSize: const Size(0, 48),
                       ),
-                      child: Text(
-                        'Close',
-                        style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600),
-                      ),
+                      child: const Text('Close', style: Sa.value),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: Sa.gap),
                   Expanded(
-                    child: ElevatedButton(
+                    child: SaPrimaryButton(
+                      label: 'Edit Student',
+                      icon: Icons.edit_outlined,
+                      expand: true,
                       onPressed: () {
                         Navigator.pop(context);
                         // TODO: Navigate to edit student
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.greenPrimary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppTheme.borderRadius12,
-                        ),
-                      ),
-                      child: Text('Edit Student', style: AppTheme.bodyMedium),
                     ),
                   ),
                 ],
@@ -212,58 +243,14 @@ class StudentDetailsDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: AppTheme.labelLarge.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppTheme.neutral800,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.neutral50,
-            borderRadius: AppTheme.borderRadius12,
-            border: Border.all(color: AppTheme.neutral200),
-          ),
-          child: Column(
-            children: children,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
+  Widget _buildSection(String title, IconData icon, List<Widget> children) {
+    return SaCard(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              label,
-              style: AppTheme.labelSmall.copyWith(
-                fontWeight: FontWeight.w600,
-                color: AppTheme.neutral600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTheme.bodySmall.copyWith(
-                color: AppTheme.neutral800,
-              ),
-            ),
-          ),
+          SaCardHeader(icon: icon, title: title),
+          const SizedBox(height: Sa.gapXs),
+          ...children,
         ],
       ),
     );

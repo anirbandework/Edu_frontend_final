@@ -53,10 +53,7 @@ class TimetableService {
     if (!jsonPayload.containsKey('last_modified_by')) {
       jsonPayload['last_modified_by'] = payload.createdBy;
     }
-    
-    print('DEBUG: Using endpoint: $endpoint');
-    print('DEBUG: Payload: ${jsonEncode(jsonPayload)}');
-    
+
     final r = await http.post(
       _u(endpoint),
       headers: {
@@ -65,17 +62,13 @@ class TimetableService {
       },
       body: jsonEncode(jsonPayload),
     );
-    
-    print('DEBUG: Response status: ${r.statusCode}');
-    print('DEBUG: Response body: ${r.body}');
-    
+
     if (r.statusCode >= 200 && r.statusCode < 300) return jsonDecode(r.body) as Map<String, dynamic>;
     
     // The /class/extended route does not exist on the backend (returns 404), and
     // some payloads 400. Fall back to the basic /class endpoint on ANY failure so
     // timetable creation still succeeds instead of hard-erroring.
     if (useExtended) {
-      print('DEBUG: Extended endpoint failed (${r.statusCode}), trying basic endpoint');
       final basicPayload = {
         "tenant_id": payload.tenantId,
         "class_id": payload.classId,
@@ -95,10 +88,7 @@ class TimetableService {
         },
         body: jsonEncode(basicPayload),
       );
-      
-      print('DEBUG: Basic endpoint response: ${basicR.statusCode}');
-      print('DEBUG: Basic endpoint body: ${basicR.body}');
-      
+
       if (basicR.statusCode >= 200 && basicR.statusCode < 300) {
         return jsonDecode(basicR.body) as Map<String, dynamic>;
       }

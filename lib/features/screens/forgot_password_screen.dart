@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_theme.dart';
 import '../../services/auth_api_service.dart';
+import '../super_admin/widgets/sa_widgets.dart';
 
 /// Forgot password: phone -> OTP -> new password -> back to login.
 class ForgotPasswordScreen extends StatefulWidget {
@@ -74,7 +75,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password updated. Please log in.')),
+        const SnackBar(
+          content: Text('Password updated. Please log in.'),
+          backgroundColor: AppTheme.greenPrimary,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       context.go(AppConstants.loginRoute);
     }
@@ -82,78 +87,143 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const green = AppTheme.greenPrimary;
     return Scaffold(
       backgroundColor: AppTheme.backgroundPrimary,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: green,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go(AppConstants.loginRoute)),
+        foregroundColor: AppTheme.greenPrimary,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go(AppConstants.loginRoute),
+        ),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(Icons.lock_reset, size: 44, color: green),
-                    const SizedBox(height: 8),
-                    Text('Reset password',
-                        textAlign: TextAlign.center, style: AppTheme.headingSmall.copyWith(color: green)),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: _phone,
-                      enabled: !_otpSent,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]'))],
-                      decoration: const InputDecoration(labelText: 'Phone number', prefixIcon: Icon(Icons.phone_outlined), border: OutlineInputBorder()),
-                    ),
-                    if (!_otpSent) ...[
-                      const SizedBox(height: 16),
-                      _btn('Send OTP', _busy ? null : _sendOtp),
-                    ] else ...[
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _otp,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'OTP',
-                          prefixIcon: const Icon(Icons.sms_outlined),
-                          helperText: (kDebugMode && _devCode != null) ? 'Dev code: $_devCode' : null,
-                          border: const OutlineInputBorder(),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 360),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SaGradientHeader(
+                    title: 'Reset password',
+                    subtitle: 'Verify your phone, then set a new password.',
+                    icon: Icons.lock_reset_outlined,
+                  ),
+                  const SizedBox(height: Sa.gapLg),
+                  SaCard(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextField(
+                          controller: _phone,
+                          enabled: !_otpSent,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+                          ],
+                          decoration: _decoration(
+                            label: 'Phone number',
+                            icon: Icons.phone_outlined,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(controller: _password, obscureText: true, decoration: const InputDecoration(labelText: 'New password', prefixIcon: Icon(Icons.lock_outline), border: OutlineInputBorder())),
-                      const SizedBox(height: 16),
-                      _btn('Reset password', _busy ? null : _reset),
-                      TextButton(onPressed: _busy ? null : _sendOtp, child: const Text('Resend code')),
-                      TextButton(
-                        onPressed: _busy
-                            ? null
-                            : () => setState(() {
-                                  _otpSent = false;
-                                  _otp.clear();
-                                  _error = null;
-                                  _info = null;
-                                  _devCode = null;
-                                }),
-                        child: const Text('Change number'),
-                      ),
-                    ],
-                    if (_info != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_info!, style: AppTheme.bodyMicro.copyWith(color: AppTheme.neutral600))),
-                    if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: AppTheme.bodyMedium.copyWith(color: AppTheme.error))),
-                  ],
-                ),
+                        if (!_otpSent) ...[
+                          const SizedBox(height: Sa.gapLg),
+                          SaPrimaryButton(
+                            label: 'Send OTP',
+                            icon: Icons.sms_outlined,
+                            busy: _busy,
+                            expand: true,
+                            onPressed: _busy ? null : _sendOtp,
+                          ),
+                        ] else ...[
+                          const SizedBox(height: Sa.gap),
+                          TextField(
+                            controller: _otp,
+                            keyboardType: TextInputType.number,
+                            decoration: _decoration(
+                              label: 'OTP',
+                              icon: Icons.sms_outlined,
+                              helperText: (kDebugMode && _devCode != null)
+                                  ? 'Dev code: $_devCode'
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: Sa.gap),
+                          TextField(
+                            controller: _password,
+                            obscureText: true,
+                            decoration: _decoration(
+                              label: 'New password',
+                              icon: Icons.lock_outline,
+                            ),
+                          ),
+                          const SizedBox(height: Sa.gapLg),
+                          SaPrimaryButton(
+                            label: 'Reset password',
+                            icon: Icons.check_rounded,
+                            busy: _busy,
+                            expand: true,
+                            onPressed: _busy ? null : _reset,
+                          ),
+                          const SizedBox(height: Sa.gapXs),
+                          TextButton(
+                            onPressed: _busy ? null : _sendOtp,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.greenPrimary,
+                              minimumSize: const Size(0, 44),
+                            ),
+                            child: const Text('Resend code'),
+                          ),
+                          TextButton(
+                            onPressed: _busy
+                                ? null
+                                : () => setState(() {
+                                      _otpSent = false;
+                                      _otp.clear();
+                                      _error = null;
+                                      _info = null;
+                                      _devCode = null;
+                                    }),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.neutral600,
+                              minimumSize: const Size(0, 44),
+                            ),
+                            child: const Text('Change number'),
+                          ),
+                        ],
+                        if (_info != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: Sa.gap),
+                            child: Text(_info!, style: Sa.label),
+                          ),
+                        if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: Sa.gapXs),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.error_outline_rounded,
+                                    size: 16, color: AppTheme.error),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _error!,
+                                    style: Sa.body.copyWith(color: AppTheme.error),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -162,18 +232,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _btn(String label, VoidCallback? onTap) => SizedBox(
-        height: 48,
-        child: ElevatedButton(
-          onPressed: onTap,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.greenPrimary,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          child: _busy
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : Text(label, style: AppTheme.bodyMedium.copyWith(color: Colors.white)),
-        ),
-      );
+  InputDecoration _decoration({
+    required String label,
+    required IconData icon,
+    String? helperText,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      helperText: helperText,
+      prefixIcon: Icon(icon, color: AppTheme.neutral500),
+      filled: true,
+      fillColor: AppTheme.neutral50,
+      labelStyle: Sa.label,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+        borderSide: const BorderSide(color: Sa.stroke),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+        borderSide: const BorderSide(color: Sa.stroke),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(Sa.radius),
+        borderSide: const BorderSide(color: AppTheme.greenPrimary, width: 1.5),
+      ),
+    );
+  }
 }

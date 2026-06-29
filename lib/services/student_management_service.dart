@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import '../core/auth/auth_session.dart';
 import '../core/constants/app_constants.dart';
 import '../core/models/student.dart';
-import '../core/utils/school_session.dart';
 
 class StudentManagementService {
   static const String _baseUrl = '${AppConstants.apiBaseUrl}/api/v1/school_authority/students';
@@ -81,17 +80,7 @@ class StudentManagementService {
   }
 
   // Delete student (soft delete)
-  static Future<String> deleteStudent(String studentId) async {
-    final response = await http.delete(Uri.parse('$_baseUrl/$studentId'),
-        headers: AuthSession.instance.headers(json: false));
-
-    if (response.statusCode == 200) {
-      return json.decode(response.body);
-    } else {
-      throw Exception('Failed to delete student: ${response.statusCode}');
-    }
-  }
-
+  
   // Get students by tenant
   static Future<List<Student>> getStudentsByTenant(String tenantId) async {
     final response = await http.get(Uri.parse('$_baseUrl/tenant/$tenantId'),

@@ -3,9 +3,15 @@
 // Universal profile page — available to EVERY role (super-admin → student),
 // never gated by RBAC. Shows identity info + a change-password form. It is also
 // the default landing page when a user has no granted pages.
+//
+// Phone-first: no Scaffold/AppBar of its own (the MainLayout shell already
+// supplies the top bar, SafeArea and background), a gradient hero header, and
+// shared super-admin design-system widgets. No manual refresh / pull-to-refresh
+// — the page loads fresh on open; a failed load offers a "Try again".
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
+import '../../../features/super_admin/widgets/sa_widgets.dart';
 import '../../../services/profile_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -78,86 +84,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppTheme.backgroundPrimary,
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: AppTheme.greenPrimary,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-              tooltip: 'Refresh', onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
-        ],
-      ),
-      body: _body(),
-    );
-  }
-
-  Widget _body() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.greenPrimary));
-    }
+    // No Scaffold/AppBar — the MainLayout shell provides the top bar + SafeArea.
+    if (_loading) return const SaLoading(message: 'Loading your profile…');
     if (_error != null) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.error_outline, size: 40, color: AppTheme.error),
-          const SizedBox(height: 12),
-          Text(_error!, textAlign: TextAlign.center,
-              style: AppTheme.bodyMedium.copyWith(color: AppTheme.neutral600)),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-              onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Retry')),
-        ]),
-      );
+      return SaStateView.error(message: _error!, onRetry: _load);
     }
-    return RefreshIndicator(
-      color: AppTheme.greenPrimary,
-      onRefresh: _load,
+    return SaScreen(
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        child: _hero(),
+      ),
       child: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(8, Sa.gap, 8, 28),
         children: [
-          _header(),
-          const SizedBox(height: 16),
           _infoCard(),
-          const SizedBox(height: 16),
-          _passwordCard(),
+          const SizedBox(height: Sa.gap),
+          _ChangePasswordCard(
+            onChanged: (msg) => _snack(msg, AppTheme.greenPrimary),
+            onError: (msg) => _snack(msg, AppTheme.error),
+          ),
         ],
       ),
     );
   }
 
-  Widget _header() {
-    final role = (_profile['role'] ?? '').toString();
+  Widget _hero() {
+    final role = _roleLabel((_profile['role'] ?? '').toString());
+    final initial = _fullName.isNotEmpty ? _fullName[0].toUpperCase() : '?';
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-          gradient: AppTheme.primaryGradient, borderRadius: AppTheme.borderRadius16),
-      child: Row(children: [
-        CircleAvatar(
-          radius: 28,
-          backgroundColor: Colors.white,
-          child: Text(
-            _fullName.isNotEmpty ? _fullName[0].toUpperCase() : '?',
-            style: AppTheme.headingMedium.copyWith(color: AppTheme.greenPrimary),
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_fullName,
-                style: AppTheme.labelLarge.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2), borderRadius: AppTheme.borderRadius8),
-              child: Text(_roleLabel(role),
-                  style: AppTheme.bodySmall.copyWith(color: Colors.white, fontWeight: FontWeight.w600)),
+        gradient: AppTheme.primaryGradient,
+        borderRadius: BorderRadius.circular(Sa.radius),
+        boxShadow: const [AppTheme.greenShadow],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: Colors.white,
+            child: Text(
+              initial,
+              style: const TextStyle(
+                fontFamily: AppTheme.bauhausFontFamily,
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.greenPrimary,
+              ),
             ),
-          ]),
-        ),
-      ]),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _fullName,
+                  style: Sa.headerTitle.copyWith(fontSize: 20),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (role.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: AppTheme.borderRadius8,
+                    ),
+                    child: Text(
+                      role,
+                      style: const TextStyle(
+                        fontFamily: AppTheme.interFontFamily,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -172,38 +185,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
       MapEntry('Section', _profile['section']?.toString()),
     ].where((e) => (e.value ?? '').trim().isNotEmpty).toList();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.badge_outlined, color: AppTheme.greenPrimary, size: 20),
-          const SizedBox(width: 8),
-          Text('Account details',
-              style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700)),
-        ]),
-        const Divider(height: 20),
-        ...rows.map((e) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                SizedBox(
-                  width: 110,
-                  child: Text(e.key, style: AppTheme.bodySmall.copyWith(color: AppTheme.neutral500)),
-                ),
-                Expanded(
-                  child: Text(e.value!.trim(),
-                      style: AppTheme.bodyMedium.copyWith(
-                          color: AppTheme.neutral800, fontWeight: FontWeight.w500)),
-                ),
-              ]),
-            )),
-      ]),
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SaCardHeader(icon: Icons.badge_outlined, title: 'Account details'),
+          if (rows.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 14),
+              child: Text('No additional details on file.', style: Sa.body),
+            )
+          else ...[
+            const Divider(height: 20, color: Sa.stroke),
+            for (var i = 0; i < rows.length; i++) ...[
+              SaInfoRow(label: rows[i].key, value: rows[i].value!.trim()),
+              if (i != rows.length - 1)
+                const Divider(height: 1, color: Sa.stroke),
+            ],
+          ],
+        ],
+      ),
     );
-  }
-
-  Widget _passwordCard() {
-    return _ChangePasswordCard(onChanged: (msg) => _snack(msg, AppTheme.success),
-        onError: (msg) => _snack(msg, AppTheme.error));
   }
 }
 
@@ -261,45 +263,42 @@ class _ChangePasswordCardState extends State<_ChangePasswordCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: AppTheme.glassCardDecoration,
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.lock_outline, color: AppTheme.greenPrimary, size: 20),
-          const SizedBox(width: 8),
-          Text('Change password',
-              style: AppTheme.labelLarge.copyWith(fontWeight: FontWeight.w700)),
-          const Spacer(),
-          IconButton(
-            tooltip: _obscure ? 'Show' : 'Hide',
-            onPressed: () => setState(() => _obscure = !_obscure),
-            icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                size: 18, color: AppTheme.neutral500),
+    return SaCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SaCardHeader(
+            icon: Icons.lock_outline,
+            title: 'Change password',
+            trailing: IconButton(
+              tooltip: _obscure ? 'Show' : 'Hide',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => setState(() => _obscure = !_obscure),
+              icon: Icon(
+                _obscure
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
+                color: AppTheme.neutral500,
+              ),
+            ),
           ),
-        ]),
-        const Divider(height: 16),
-        _field(_current, 'Current password'),
-        const SizedBox(height: 10),
-        _field(_next, 'New password'),
-        const SizedBox(height: 10),
-        _field(_confirm, 'Confirm new password'),
-        const SizedBox(height: 14),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton.icon(
-            onPressed: _saving ? null : _submit,
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.greenPrimary, foregroundColor: Colors.white),
-            icon: _saving
-                ? const SizedBox(
-                    width: 14, height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.check, size: 18),
-            label: Text(_saving ? 'Saving…' : 'Update password'),
+          const SizedBox(height: Sa.gap),
+          _field(_current, 'Current password'),
+          const SizedBox(height: Sa.gap),
+          _field(_next, 'New password'),
+          const SizedBox(height: Sa.gap),
+          _field(_confirm, 'Confirm new password'),
+          const SizedBox(height: Sa.gapLg),
+          SaPrimaryButton(
+            label: _saving ? 'Saving…' : 'Update password',
+            icon: Icons.check_rounded,
+            busy: _saving,
+            expand: true,
+            onPressed: _submit,
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 
@@ -307,11 +306,7 @@ class _ChangePasswordCardState extends State<_ChangePasswordCard> {
     return TextField(
       controller: c,
       obscureText: _obscure,
-      decoration: InputDecoration(
-        labelText: label,
-        isDense: true,
-        border: OutlineInputBorder(borderRadius: AppTheme.borderRadius8),
-      ),
+      decoration: InputDecoration(labelText: label, isDense: true),
     );
   }
 }
