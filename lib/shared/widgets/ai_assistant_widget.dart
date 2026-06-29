@@ -102,7 +102,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
 
   void _addWelcomeMessage() {
     _messages.add(ChatMessage(
-      text: "Hi! I'm EduAssist AI. I can help you understand our platform, features, and answer any questions about school management. How can I assist you today?",
+      text: "Hi! I'm EduAssist AI. I can help you understand our platform, features, and answer any questions about organisation management. How can I assist you today?",
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -363,7 +363,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
                       width: 12,
                       height: 12,
                       decoration: BoxDecoration(
-                        color: AppTheme.success,
+                        color: AppTheme.greenPrimary,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: Colors.white, width: 2),
                       ),
@@ -458,7 +458,7 @@ class _AIAssistantWidgetState extends ConsumerState<AIAssistantWidget>
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: AppTheme.success,
+                      color: AppTheme.greenPrimary,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),

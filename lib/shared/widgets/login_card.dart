@@ -7,24 +7,24 @@ import '../../core/constants/app_theme.dart';
 import '../../services/auth_api_service.dart';
 
 /// Self-contained phone + password login card. Renders the same whether shown
-/// as an in-place dialog (school picker) or on the standalone login page.
+/// as an in-place dialog (organisation picker) or on the standalone login page.
 ///
 /// "Forgot password?" runs INLINE, inside this same card (phone → OTP → new
 /// password), so it never navigates to a separate page/URL. Pass [onForgot] only
 /// if a caller needs to override that with its own navigation.
 class LoginCard extends StatefulWidget {
-  final String? schoolName;
+  final String? name;
   final String? roleLabel; // display only
-  final String? tenantId;
+  final String? organisationId;
   final VoidCallback onSuccess; // AuthSession is populated when this fires
   final VoidCallback? onForgot; // optional override; default = inline reset flow
   final VoidCallback? onClose; // shown as an X when provided (dialog mode)
 
   const LoginCard({
     super.key,
-    this.schoolName,
+    this.name,
     this.roleLabel,
-    this.tenantId,
+    this.organisationId,
     required this.onSuccess,
     this.onForgot,
     this.onClose,
@@ -74,7 +74,7 @@ class _LoginCardState extends State<LoginCard> {
     final result = await AuthApiService.login(
       _phone.text,
       _password.text,
-      tenantId: widget.tenantId,
+      organisationId: widget.organisationId,
     );
     if (!mounted) return;
     setState(() => _loading = false);
@@ -234,7 +234,7 @@ class _LoginCardState extends State<LoginCard> {
 
   @override
   Widget build(BuildContext context) {
-    final hasSchool = widget.schoolName != null && widget.schoolName!.isNotEmpty;
+    final hasOrg = widget.name != null && widget.name!.isNotEmpty;
     final hasRole = widget.roleLabel != null && widget.roleLabel!.isNotEmpty;
     final forgot = _mode == _Mode.forgot;
     final firstTime = _mode == _Mode.firstTime;
@@ -275,7 +275,7 @@ class _LoginCardState extends State<LoginCard> {
                           ? Icons.lock_reset
                           : firstTime
                               ? Icons.how_to_reg
-                              : Icons.school,
+                              : Icons.apartment,
                       size: 28,
                       color: Colors.white),
                 ),
@@ -285,7 +285,7 @@ class _LoginCardState extends State<LoginCard> {
                       ? 'Reset password'
                       : firstTime
                           ? 'Set your password'
-                          : (hasSchool ? widget.schoolName! : 'EduAssist'),
+                          : (hasOrg ? widget.name! : 'EduAssist'),
                   textAlign: TextAlign.center,
                   style: AppTheme.headingSmall.copyWith(color: AppTheme.greenPrimary),
                 ),

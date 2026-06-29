@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for ALL network calls. Must live in the main manifest so it ships in
+         RELEASE builds — the debug/profile flavor manifests inject it for dev only, so
+         without this the release APK/AAB throws SocketException on every API call. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="edu_assist_dynamic"
         android:name="${applicationName}"

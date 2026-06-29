@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../core/constants/app_constants.dart';
 import '../core/auth/auth_session.dart';
 import '../core/auth/permission_store.dart';
+import '../core/utils/org_session.dart';
 
 class AuthResult {
   final bool ok;
@@ -26,14 +27,14 @@ class AuthApiService {
   }
 
   // ---- login (phone + password) ----
-  static Future<AuthResult> login(String phone, String password, {String? tenantId}) async {
+  static Future<AuthResult> login(String phone, String password, {String? organisationId}) async {
     try {
       final r = await http.post(_u('/api/auth/login'),
           headers: _json,
           body: jsonEncode({
             'phone': phone.trim(),
             'password': password,
-            if (tenantId != null && tenantId.isNotEmpty) 'tenant_id': tenantId,
+            if (organisationId != null && organisationId.isNotEmpty) 'organisation_id': organisationId,
           }));
       if (r.statusCode == 200) {
         AuthSession.instance.setFromLogin(jsonDecode(r.body) as Map<String, dynamic>);
@@ -55,6 +56,33 @@ class AuthApiService {
     }
     AuthSession.instance.clear();
     PermissionStore.instance.clear();
+    OrgSession.clearData(); // drop cached tenant data so it can't leak into the next session
+  }
+
+  /// Mint a fresh access token from the stored refresh token — used on launch
+  /// when the restored access token has expired. On success the session is
+  /// updated + re-persisted; on an explicit auth failure it's cleared. A network
+  /// error leaves the session untouched (don't log out over a transient blip).
+  static Future<void> refreshSession() async {
+    final rt = AuthSession.instance.refreshToken;
+    if (rt == null || rt.isEmpty) {
+      AuthSession.instance.clear();
+      return;
+    }
+    try {
+      final r = await http
+          .post(_u('/api/auth/refresh'),
+              headers: _json, body: jsonEncode({'refresh_token': rt}))
+          .timeout(const Duration(seconds: 6));
+      if (r.statusCode == 200) {
+        AuthSession.instance.setFromLogin(jsonDecode(r.body) as Map<String, dynamic>);
+        await PermissionStore.instance.load();
+      } else {
+        AuthSession.instance.clear(); // refresh token rejected/expired → real logout
+      }
+    } catch (_) {
+      // Network/timeout on launch: keep the existing session as-is.
+    }
   }
 
   // ---- first-login signup (phone + OTP, NO invite) ----
@@ -101,14 +129,14 @@ class AuthApiService {
 
   // ---- invites (authed: super-admin / authority) ----
   static Future<AuthResult> inviteAuthority({
-    required String tenantId,
+    required String organisationId,
     required String email,
     required String firstName,
     required String lastName,
     String? phone,
   }) =>
       _authedPost('/api/auth/invites/authority', {
-        'tenant_id': tenantId,
+        'organisation_id': organisationId,
         'email': email,
         'first_name': firstName,
         'last_name': lastName,

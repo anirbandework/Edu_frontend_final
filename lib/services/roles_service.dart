@@ -1,10 +1,10 @@
 // lib/services/roles_service.dart
 //
-// Dynamic RBAC roles for a school (admin-defined). A role is { name, pages
+// Dynamic RBAC roles for a organisation (admin-defined). A role is { name, pages
 // (cross-section module keys), creatable_role_ids (delegated user creation) }.
 // Backed by /api/access/* (catalog, roles, role detail).
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../core/network/app_http.dart' as http; // routes authed calls through the 401-refresh/hard-logout wrapper
 
 import '../core/constants/app_constants.dart';
 import '../core/auth/auth_session.dart';
@@ -18,21 +18,6 @@ class RolesService {
       if (d is Map && d['detail'] != null) return Exception(d['detail'].toString());
     } catch (_) {}
     return Exception('$fallback (${r.statusCode})');
-  }
-
-  /// GET /api/access/catalog -> { modules:[{module_key, module_name, icon, path,
-  /// section, audience, tabs}], user_types }
-  static Future<List<Map<String, dynamic>>> getCatalog() async {
-    final uri = Uri.parse('$_base/api/access/catalog');
-    final r = await http
-        .get(uri, headers: AuthSession.instance.headers(json: false))
-        .timeout(const Duration(seconds: 12));
-    if (r.statusCode == 200) {
-      final d = json.decode(r.body);
-      final list = (d is Map ? d['modules'] : d) as List? ?? const [];
-      return list.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList();
-    }
-    throw _err(r, 'Failed to load page catalog');
   }
 
   /// GET /api/access/grantable-pages -> catalog + `locked` flag (the org doesn't
@@ -51,7 +36,7 @@ class RolesService {
     throw _err(r, 'Failed to load pages');
   }
 
-  /// GET /api/access/roles?user_type=staff -> dynamic roles for this school.
+  /// GET /api/access/roles?user_type=staff -> dynamic roles for this organisation.
   static Future<List<Map<String, dynamic>>> listRoles({String userType = 'staff'}) async {
     final uri = Uri.parse('$_base/api/access/roles')
         .replace(queryParameters: {'user_type': userType});

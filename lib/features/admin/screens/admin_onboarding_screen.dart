@@ -1,8 +1,8 @@
 // lib/features/admin/screens/admin_onboarding_screen.dart
 //
-// Where a freshly-created admin lands the first time they sign in (no school
-// yet). They create their first school here; on success the session is scoped
-// to it and they enter their dashboard. If they already own schools, they can
+// Where a freshly-created admin lands the first time they sign in (no organisation
+// yet). They create their first organisation here; on success the session is scoped
+// to it and they enter their dashboard. If they already own organisations, they can
 // pick one to enter. Standalone full-screen (no shell) — keeps its own Scaffold.
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -12,7 +12,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/super_admin_service.dart';
 import '../../super_admin/widgets/sa_widgets.dart';
-import '../../tenant_management/widgets/tenant_create_dialog.dart';
+import '../../organisation_management/widgets/organisation_create_dialog.dart';
 
 class AdminOnboardingScreen extends StatefulWidget {
   const AdminOnboardingScreen({super.key});
@@ -24,7 +24,7 @@ class AdminOnboardingScreen extends StatefulWidget {
 class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
   bool _loading = true;
   bool _entering = false;
-  List<Map<String, dynamic>> _schools = [];
+  List<Map<String, dynamic>> _orgs = [];
 
   @override
   void initState() {
@@ -35,10 +35,10 @@ class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final schools = await SuperAdminService.getMySchools();
+      final organisations = await SuperAdminService.getMyOrganisations();
       if (!mounted) return;
       setState(() {
-        _schools = schools;
+        _orgs = organisations;
         _loading = false;
       });
     } catch (_) {
@@ -46,14 +46,14 @@ class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
     }
   }
 
-  Future<void> _enter(String tenantId) async {
+  Future<void> _enter(String organisationId) async {
     if (_entering) return;
     setState(() => _entering = true);
     try {
-      await SuperAdminService.switchSchool(tenantId: tenantId);
+      await SuperAdminService.switchOrganisation(organisationId: organisationId);
       if (!mounted) return;
       final uid = AuthSession.instance.userId ?? '';
-      context.go('${AppConstants.adminDashboardRoute}?userId=$uid&tenantId=$tenantId');
+      context.go('${AppConstants.adminStaffRoute}?userId=$uid&organisationId=$organisationId');
     } catch (e) {
       if (!mounted) return;
       setState(() => _entering = false);
@@ -65,17 +65,17 @@ class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
     }
   }
 
-  void _createSchool() {
+  void _createOrg() {
     showDialog(
       context: context,
-      builder: (_) => TenantCreateDialog(
-        onTenantCreated: () async {
-          // Adopt + enter the newly created school.
-          final schools = await SuperAdminService.getMySchools();
+      builder: (_) => OrganisationCreateDialog(
+        onOrganisationCreated: () async {
+          // Adopt + enter the newly created organisation.
+          final organisations = await SuperAdminService.getMyOrganisations();
           if (!mounted) return;
-          setState(() => _schools = schools);
-          if (schools.isNotEmpty) {
-            await _enter(schools.first['id'].toString());
+          setState(() => _orgs = organisations);
+          if (organisations.isNotEmpty) {
+            await _enter(organisations.first['id'].toString());
           }
         },
       ),
@@ -106,12 +106,12 @@ class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
                   if (_loading)
                     const Padding(
                       padding: EdgeInsets.all(24),
-                      child: SaLoading(message: 'Loading your schools…'),
+                      child: SaLoading(message: 'Loading your organisations…'),
                     )
-                  else if (_schools.isEmpty)
+                  else if (_orgs.isEmpty)
                     _createCard()
                   else
-                    _schoolsCard(),
+                    _orgsCard(),
                   const SizedBox(height: Sa.gap),
                   TextButton.icon(
                     onPressed: _logout,
@@ -134,10 +134,10 @@ class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
   Widget _header() {
     return SaGradientHeader(
       icon: Icons.add_business_outlined,
-      title: _schools.isEmpty ? 'Welcome' : 'Your schools',
-      subtitle: _schools.isEmpty
-          ? "Let's set up your first school to get started. You can add more and switch any time."
-          : 'Choose a school to manage, or create another.',
+      title: _orgs.isEmpty ? 'Welcome' : 'Your organisations',
+      subtitle: _orgs.isEmpty
+          ? "Let's set up your first organisation to get started. You can add more and switch any time."
+          : 'Choose a organisation to manage, or create another.',
     );
   }
 
@@ -155,47 +155,47 @@ class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
                 color: Sa.accent.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.school_outlined,
+              child: const Icon(Icons.apartment_outlined,
                   size: 32, color: Sa.accent),
             ),
           ),
           const SizedBox(height: Sa.gap),
-          Text('Create your first school',
+          Text('Create your first organisation',
               style: Sa.cardTitle.copyWith(fontSize: 16),
               textAlign: TextAlign.center),
           const SizedBox(height: Sa.gapXs),
           const Text(
-            'Add your school’s details — name, contact and capacity. You become its owner.',
+            'Add your organisation’s details — name, contact and capacity. You become its owner.',
             style: Sa.body,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: Sa.gapLg),
           SaPrimaryButton(
-            label: _entering ? 'Setting up…' : 'Create school',
+            label: _entering ? 'Setting up…' : 'Create organisation',
             icon: Icons.add,
             busy: _entering,
             expand: true,
-            onPressed: _entering ? null : _createSchool,
+            onPressed: _entering ? null : _createOrg,
           ),
         ],
       ),
     );
   }
 
-  Widget _schoolsCard() {
+  Widget _orgsCard() {
     return SaCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SaCardHeader(
             icon: Icons.apartment_outlined,
-            title: 'Your schools',
+            title: 'Your organisations',
           ),
           const SizedBox(height: Sa.gap),
-          ..._schools.map((s) {
+          ..._orgs.map((s) {
             final id = s['id'].toString();
-            final nm = (s['school_name'] ?? 'School').toString();
-            final code = (s['school_code'] ?? '').toString();
+            final nm = (s['name'] ?? 'Organisation').toString();
+            final code = (s['code'] ?? '').toString();
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Material(
@@ -247,9 +247,9 @@ class _AdminOnboardingScreenState extends State<AdminOnboardingScreen> {
           }),
           const SizedBox(height: Sa.gap),
           OutlinedButton.icon(
-            onPressed: _entering ? null : _createSchool,
+            onPressed: _entering ? null : _createOrg,
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('Create another school'),
+            label: const Text('Create another organisation'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Sa.accent,
               minimumSize: const Size(0, 46),

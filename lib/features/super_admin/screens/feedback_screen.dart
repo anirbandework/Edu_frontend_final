@@ -350,7 +350,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
 
   String _roleLabel(String role) {
     switch (role) {
-      case 'school_authority':
+      case 'authority':
         return 'Admin';
       case 'super_admin':
         return 'Super Admin';

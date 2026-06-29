@@ -90,7 +90,7 @@ class LandingScreen extends StatelessWidget {
               ),
             ],
           ),
-          child: const Icon(Icons.school, size: 42, color: AppTheme.greenPrimary),
+          child: const Icon(Icons.apartment, size: 42, color: AppTheme.greenPrimary),
         ),
         const SizedBox(height: 18),
         Text(
@@ -123,12 +123,12 @@ class LandingScreen extends StatelessWidget {
   Widget _actions(BuildContext context, bool isWide) {
     final getStarted = _ActionCard(
       title: 'Get Started',
-      subtitle: 'Choose your school and sign in',
+      subtitle: 'Choose your organisation and sign in',
       icon: Icons.rocket_launch_outlined,
-      onTap: () => context.go(AppConstants.schoolSelectionRoute),
+      onTap: () => context.go(AppConstants.organisationSelectionRoute),
     );
     final manage = _ActionCard(
-      title: 'Manage Schools',
+      title: 'Manage Organisations',
       subtitle: 'Add and manage educational institutions',
       icon: Icons.admin_panel_settings_outlined,
       onTap: () => _showLoginDialog(context),
@@ -154,8 +154,8 @@ class LandingScreen extends StatelessWidget {
   // ── About panel ─────────────────────────────────────────────────────────
   Widget _about(bool isWide) {
     const desc =
-        'EduAssist is a comprehensive school management platform that streamlines '
-        'administration and strengthens communication between schools, teachers, '
+        'EduAssist is a comprehensive organisation management platform that streamlines '
+        'administration and strengthens communication between organisations, teachers, '
         'students and parents.';
 
     final description = Text(
@@ -281,7 +281,7 @@ class LandingScreen extends StatelessWidget {
     );
   }
 
-  // "Manage Schools" opens the login card directly (phone + password). The
+  // "Manage Organisations" opens the login card directly (phone + password). The
   // forgot-password flow runs inside that same card (no separate page).
   void _showLoginDialog(BuildContext context) {
     showDialog(

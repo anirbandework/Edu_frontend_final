@@ -1,10 +1,13 @@
 // lib/features/admin/screens/staff_management_screen.dart
 //
-// Staff & Users — the unified directory of dynamic-role users for a school.
+// Staff & Users — the unified directory of dynamic-role users for a organisation.
 // Add users into any role you're allowed to assign (admins: all roles; delegated
 // staff: only the roles their own role may create). Manage status / password.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../core/auth/auth_session.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../services/staff_service.dart';
 import '../../super_admin/widgets/sa_widgets.dart';
@@ -18,10 +21,19 @@ class StaffManagementScreen extends StatefulWidget {
 
 class _StaffManagementScreenState extends State<StaffManagementScreen> {
   bool _loading = true;
+  bool _loadingMore = false;
   String? _error;
   List<Map<String, dynamic>> _staff = [];
-  List<Map<String, dynamic>> _roles = []; // assignable roles
+  List<Map<String, dynamic>> _roles = []; // available roles (admin: all org roles)
   String _query = '';
+  String? _roleFilterId; // tapped role chip → server-side filter by that role
+  int _total = 0;
+  int _offset = 0;
+  static const int _pageSize = 50;
+  Timer? _debounce;
+  final TextEditingController _searchCtl = TextEditingController();
+
+  bool get _hasMore => _staff.length < _total;
 
   @override
   void initState() {
@@ -29,45 +41,71 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchCtl.dispose();
+    super.dispose();
+  }
+
+  /// Server-side page load. `reset` starts a fresh search/list; otherwise it appends
+  /// the next page ("load more"). Assignable roles are fetched once.
+  Future<void> _load({bool reset = true}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+      } else {
+        _loadingMore = true;
+      }
     });
     try {
-      final results = await Future.wait([
-        StaffService.listStaff(),
-        StaffService.getAssignableRoles(),
-      ]);
+      final page = await StaffService.listStaffPage(
+        q: _query, roleId: _roleFilterId, limit: _pageSize, offset: reset ? 0 : _offset);
+      if (reset && _roles.isEmpty) {
+        _roles = await StaffService.getAssignableRoles();
+      }
       if (!mounted) return;
       setState(() {
-        _staff = results[0];
-        _roles = results[1];
+        if (reset) {
+          _staff = page.items;
+        } else {
+          _staff = [..._staff, ...page.items];
+        }
+        _offset = _staff.length;
+        _total = page.total;
         _loading = false;
+        _loadingMore = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _loadingMore = false;
         _error = e.toString().replaceAll('Exception: ', '');
       });
     }
+  }
+
+  void _onSearchChanged(String v) {
+    setState(() => _query = v); // live, so the clear (✕) button + empty-state text update
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) _load(reset: true);
+    });
+  }
+
+  void _onRoleTap(String? roleId) {
+    if (_roleFilterId == roleId) return;
+    setState(() => _roleFilterId = roleId);
+    _load(reset: true);
   }
 
   void _snack(String m, [Color? c]) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(m), backgroundColor: c, behavior: SnackBarBehavior.floating));
-  }
-
-  List<Map<String, dynamic>> get _filtered {
-    if (_query.trim().isEmpty) return _staff;
-    final q = _query.toLowerCase();
-    return _staff.where((s) {
-      return [s['name'], s['phone'], s['role_name'], s['position'], s['email']]
-          .whereType<Object>()
-          .any((v) => v.toString().toLowerCase().contains(q));
-    }).toList();
   }
 
   @override
@@ -92,57 +130,156 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
   }
 
   Widget _body() {
-    if (_loading) return const SaLoading(message: 'Loading…');
-    if (_error != null) return SaStateView.error(message: _error!, onRetry: _load);
-
-    final list = _filtered;
+    // Search bar + roles strip stay MOUNTED across reloads (so typing never loses the
+    // field/focus); only the content area below swaps loader / error / list.
     return Column(children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
-        child: TextField(
-          onChanged: (v) => setState(() => _query = v),
-          decoration: InputDecoration(
-            hintText: 'Search staff by name, phone or role',
-            prefixIcon: const Icon(Icons.search, size: 20, color: AppTheme.neutral500),
-            isDense: true,
-            filled: true,
-            fillColor: Sa.surface,
-            border: OutlineInputBorder(
-              borderRadius: AppTheme.borderRadius12,
-              borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: AppTheme.borderRadius12,
-              borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
-            ),
-            focusedBorder: const OutlineInputBorder(
-              borderRadius: AppTheme.borderRadius12,
-              borderSide: BorderSide(color: Sa.accent, width: 1.5),
-            ),
+      _searchBar(),
+      _rolesStrip(),
+      Expanded(child: _content()),
+    ]);
+  }
+
+  Widget _searchBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
+      child: TextField(
+        controller: _searchCtl, // keeps text across rebuilds
+        onChanged: _onSearchChanged, // debounced server-side search
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search by name, phone or role',
+          prefixIcon: const Icon(Icons.search, size: 20, color: AppTheme.neutral500),
+          suffixIcon: _query.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close, size: 18, color: AppTheme.neutral500),
+                  tooltip: 'Clear',
+                  onPressed: () {
+                    _searchCtl.clear();
+                    _onSearchChanged('');
+                  },
+                ),
+          isDense: true,
+          filled: true,
+          fillColor: Sa.surface,
+          border: OutlineInputBorder(
+            borderRadius: AppTheme.borderRadius12,
+            borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: AppTheme.borderRadius12,
+            borderSide: BorderSide(color: Sa.stroke.withValues(alpha: 0.7)),
+          ),
+          focusedBorder: const OutlineInputBorder(
+            borderRadius: AppTheme.borderRadius12,
+            borderSide: BorderSide(color: Sa.accent, width: 1.5),
           ),
         ),
       ),
+    );
+  }
+
+  /// Horizontal strip of every role the admin created (doubles as a filter).
+  Widget _rolesStrip() {
+    if (_roles.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
+        child: Text('Roles · ${_roles.length}',
+            style: Sa.label.copyWith(color: AppTheme.neutral500, fontWeight: FontWeight.w600)),
+      ),
+      SizedBox(
+        height: 38,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          children: [
+            _roleChip('All', null),
+            ..._roles.map((r) => _roleChip(
+                  (r['role_name'] ?? 'Role').toString(),
+                  r['id'].toString(),
+                )),
+          ],
+        ),
+      ),
+    ]);
+  }
+
+  Widget _roleChip(String label, String? id) {
+    final selected = _roleFilterId == id;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+        selectedColor: AppTheme.greenPrimary,
+        backgroundColor: AppTheme.neutral100,
+        side: BorderSide(color: selected ? AppTheme.greenPrimary : Sa.stroke.withValues(alpha: 0.7)),
+        labelStyle: Sa.label.copyWith(
+          color: selected ? Colors.white : AppTheme.neutral700,
+          fontWeight: FontWeight.w600,
+        ),
+        onSelected: (_) => _onRoleTap(id),
+      ),
+    );
+  }
+
+  Widget _content() {
+    if (_loading && _staff.isEmpty) return const SaLoading(message: 'Loading…');
+    if (_error != null) return SaStateView.error(message: _error!, onRetry: _load);
+    final filtered = _query.trim().isNotEmpty || _roleFilterId != null;
+    return Column(children: [
+      // Thin bar while a search/filter reloads — the existing list stays visible beneath.
+      if (_loading)
+        LinearProgressIndicator(
+            minHeight: 2, color: Sa.accent, backgroundColor: Sa.stroke.withValues(alpha: 0.3)),
       Expanded(
-        child: list.isEmpty
+        child: _staff.isEmpty
             ? SaStateView(
                 icon: Icons.badge_outlined,
-                title: _staff.isEmpty ? 'No staff yet' : 'No matches',
-                subtitle: _staff.isEmpty
-                    ? 'Tap "Add user" to create one.'
-                    : 'Try a different search.',
+                title: filtered ? 'No matches' : 'No staff yet',
+                subtitle: filtered
+                    ? 'Try a different search or role.'
+                    : 'Tap "Add user" to create one.',
               )
             : ListView.separated(
                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 96),
-                itemCount: list.length,
+                itemCount: _staff.length + (_hasMore ? 1 : 0),
                 separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
-                itemBuilder: (_, i) => _staffCard(list[i]),
+                itemBuilder: (_, i) {
+                  if (i >= _staff.length) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Center(
+                        child: _loadingMore
+                            ? const SizedBox(
+                                width: 22, height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Sa.accent))
+                            : OutlinedButton.icon(
+                                onPressed: () => _load(reset: false),
+                                icon: const Icon(Icons.expand_more, size: 18),
+                                label: Text('Load more  ·  ${_staff.length} of $_total'),
+                                style: OutlinedButton.styleFrom(foregroundColor: Sa.accent),
+                              ),
+                      ),
+                    );
+                  }
+                  return _staffCard(_staff[i]);
+                },
               ),
       ),
     ]);
   }
 
   Widget _staffCard(Map<String, dynamic> s) {
-    final active = (s['status'] ?? 'active') == 'active';
+    // Three distinct states: active, pending (created, awaiting first-login — NOT
+    // deactivated), and inactive (deactivated by an admin).
+    final status = (s['status'] ?? 'active').toString();
+    final isActive = status == 'active';
+    final isPending = status == 'invited';
+    final isDeactivated = status == 'inactive';
     final name = (s['name'] ?? '').toString().trim();
     final role = (s['role_name'] ?? '—').toString();
     return SaCard(
@@ -166,8 +303,16 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
               ),
               const SizedBox(width: 8),
               SaStatusPill(
-                text: active ? 'Active' : 'Inactive',
-                color: active ? AppTheme.greenPrimary : AppTheme.neutral500,
+                text: isActive
+                    ? 'Active'
+                    : isPending
+                        ? 'Pending'
+                        : 'Inactive',
+                color: isActive
+                    ? AppTheme.greenPrimary
+                    : isPending
+                        ? AppTheme.neutral500
+                        : AppTheme.neutral400,
               ),
             ]),
             const SizedBox(height: 5),
@@ -192,10 +337,10 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
             PopupMenuItem(
                 value: 'toggle',
                 child: Row(children: [
-                  Icon(active ? Icons.block : Icons.check_circle_outline,
-                      size: 18, color: active ? AppTheme.neutral600 : AppTheme.greenPrimary),
+                  Icon(isDeactivated ? Icons.check_circle_outline : Icons.block,
+                      size: 18, color: isDeactivated ? AppTheme.greenPrimary : AppTheme.neutral600),
                   const SizedBox(width: 10),
-                  Text(active ? 'Deactivate' : 'Activate'),
+                  Text(isDeactivated ? 'Activate' : 'Deactivate'),
                 ])),
             const PopupMenuItem(
                 value: 'password',
@@ -225,7 +370,8 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
         break;
       case 'toggle':
         try {
-          await StaffService.setStatus(id: id, isActive: !((s['status'] ?? 'active') == 'active'));
+          // Only a deactivated row re-activates; active AND pending both deactivate.
+          await StaffService.setStatus(id: id, isActive: (s['status'] ?? '') == 'inactive');
           _snack('Updated', AppTheme.greenPrimary);
           _load();
         } catch (e) {
@@ -293,7 +439,16 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
   Future<void> _openEditor({Map<String, dynamic>? existing}) async {
     final isEdit = existing != null;
     if (_roles.isEmpty && !isEdit) {
-      _snack('No roles you can assign. Create a role in "Roles & Access" first.', AppTheme.error);
+      // Admins can create roles; a staff user (e.g. "Management") cannot reach Roles & Access,
+      // so point them at their admin instead of telling them to create roles.
+      final isAdmin = AuthSession.instance.role == 'authority' ||
+          AuthSession.instance.role == 'super_admin';
+      _snack(
+        isAdmin
+            ? 'No roles yet. Create a role in "Roles & Access" first.'
+            : 'No roles are available to assign yet. Ask your admin to add roles in "Roles & Access".',
+        AppTheme.error,
+      );
       return;
     }
     final firstCtl = TextEditingController(text: existing?['first_name']?.toString() ?? '');
@@ -373,7 +528,7 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                     ],
                     _tf(emailCtl, 'Email (optional)', keyboard: TextInputType.emailAddress),
                     const SizedBox(height: Sa.gap),
-                    _tf(posCtl, 'Designation (optional)', hint: 'e.g. Faculty, Principal'),
+                    _tf(posCtl, 'Designation (optional)', hint: 'e.g. Faculty, Head'),
                     const SizedBox(height: Sa.gap),
                     DropdownButtonFormField<String>(
                       initialValue: roleId,

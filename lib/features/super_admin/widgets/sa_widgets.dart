@@ -1,6 +1,6 @@
 // lib/features/super_admin/widgets/sa_widgets.dart
 //
-// Phone-first design system for the SUPER-ADMIN surface (Tenants, Admins,
+// Phone-first design system for the SUPER-ADMIN surface (Organisations, Admins,
 // Module Access, Analytics, Feedback, Profile). The global AppTheme type scale
 // is deliberately desktop-sized ("Was 24 -> 32"), which crowds a phone; these
 // tokens + building blocks give the section a calmer, compact, consistent look:

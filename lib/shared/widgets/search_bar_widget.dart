@@ -67,7 +67,7 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          height: 36, // Reduced height
+          height: 44, // comfortable input height + ≥44px touch target (a11y)
           decoration: AppTheme.getGlassDecoration(
             color: _hasError 
                 ? AppTheme.error.withValues(alpha: 0.05)
@@ -94,13 +94,13 @@ class _SearchBarWidgetState extends State<SearchBarWidget> {
               controller: widget.controller,
               enabled: widget.enabled,
               style: AppTheme.bodyMedium.copyWith(
-                fontSize: 12, // Reduced font size
+                fontSize: 14, // legible input text
                 color: widget.enabled ? AppTheme.neutral900 : AppTheme.neutral400,
               ),
               decoration: InputDecoration(
                 hintText: widget.hintText,
                 hintStyle: AppTheme.bodyMedium.copyWith(
-                  fontSize: 12, // Reduced font size
+                  fontSize: 14, // legible hint text
                   color: AppTheme.neutral400,
                 ),
                 
@@ -316,13 +316,13 @@ class AdvancedSearchBarWidget extends StatelessWidget {
               padding: const EdgeInsets.all(6), // Reduced padding
               margin: const EdgeInsets.symmetric(horizontal: 2), // Reduced margin
               decoration: BoxDecoration(
-                color: AppTheme.info.withValues(alpha: 0.1),
+                color: AppTheme.greenPrimary.withValues(alpha: 0.1),
                 borderRadius: AppTheme.borderRadius8,
               ),
               child: Icon(
                 Icons.mic,
                 size: 14, // Reduced icon size
-                color: enabled ? AppTheme.info : AppTheme.neutral400,
+                color: enabled ? AppTheme.greenPrimary : AppTheme.neutral400,
               ),
             ),
           ),

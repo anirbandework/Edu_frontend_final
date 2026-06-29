@@ -61,7 +61,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Thanks for your feedback!'),
-        backgroundColor: AppTheme.success,
+        backgroundColor: AppTheme.greenPrimary,
         behavior: SnackBarBehavior.floating,
       ));
     } catch (e) {
@@ -121,7 +121,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
                     onPressed: () => setState(() => _rating = i + 1),
                     visualDensity: VisualDensity.compact,
                     icon: Icon(filled ? Icons.star : Icons.star_border,
-                        color: filled ? AppTheme.warning : AppTheme.neutral400, size: 22),
+                        color: filled ? AppTheme.greenPrimary : AppTheme.neutral400, size: 22),
                   );
                 }),
                 if (_rating > 0)

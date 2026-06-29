@@ -6,20 +6,17 @@ import '../../core/constants/app_theme.dart';
 import '../../core/utils/responsive.dart';
 import 'navigation_header.dart';
 import 'navigation_sidebar.dart';
-import '../../core/utils/school_authority_session.dart';
-import '../../core/utils/school_session.dart';
-import '../../core/utils/student_session.dart';
-import '../../core/utils/teacher_session.dart';
+import '../../core/utils/org_session.dart';
 import '../../core/auth/auth_session.dart';
 import '../../services/auth_api_service.dart';
 
 class MainLayout extends StatefulWidget {
   final Widget child;
   final String userRole;
-  final String? tenantId;
+  final String? organisationId;
   final String? userId;
   final String? userName;
-  final String? schoolName;
+  final String? name;
   final bool showBreadcrumbs;
   final List<String>? breadcrumbs;
   final List<Widget>? headerActions;
@@ -30,10 +27,10 @@ class MainLayout extends StatefulWidget {
     super.key,
     required this.child,
     required this.userRole,
-    this.tenantId,
+    this.organisationId,
     this.userId,
     this.userName,
-    this.schoolName,
+    this.name,
     this.showBreadcrumbs = false,
     this.breadcrumbs,
     this.headerActions,
@@ -72,8 +69,7 @@ void initState() {
     try {
       final uri = GoRouterState.of(context).uri;
       _hydrateSessions(
-        fallbackUserId: uri.queryParameters['userId'],
-        fallbackTenantId: uri.queryParameters['tenantId'],
+        fallbackOrganisationId: uri.queryParameters['organisationId'],
       );
     } catch (_) {
       // no-op: GoRouterState may be unavailable in some contexts
@@ -89,32 +85,19 @@ void initState() {
   });
 }
 
-/// Populate the legacy per-role static session holders from AuthSession (the
-/// single source of truth), preferring the widget's own role/identity and
-/// falling back to provided values. Idempotent — only fills what's empty.
-void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
+/// Hydrate `OrgSession` (the only surviving session holder) from AuthSession
+/// — it backs the organisation-name chip in the header/sidebar. Idempotent: only fills
+/// it when empty. Falls back to the route's organisationId when AuthSession is empty.
+void _hydrateSessions({String? fallbackOrganisationId}) {
   final auth = AuthSession.instance;
-  final userId = (auth.userId?.isNotEmpty == true)
-      ? auth.userId!
-      : (widget.userId?.isNotEmpty == true ? widget.userId! : (fallbackUserId ?? ''));
-  final tenantId = (auth.tenantId?.isNotEmpty == true)
-      ? auth.tenantId!
-      : (widget.tenantId?.isNotEmpty == true ? widget.tenantId! : (fallbackTenantId ?? ''));
-  final role = (auth.role?.isNotEmpty == true) ? auth.role! : widget.userRole;
-  if (userId.isEmpty || tenantId.isEmpty) return;
+  final organisationId = (auth.organisationId?.isNotEmpty == true)
+      ? auth.organisationId!
+      : (widget.organisationId?.isNotEmpty == true ? widget.organisationId! : (fallbackOrganisationId ?? ''));
+  if (organisationId.isEmpty) return;
 
-  if ((AuthoritySession.authorityId ?? '').isEmpty) {
-    AuthoritySession.setSession(authorityId: userId, tenantId: tenantId);
-  }
-  if (SchoolSession.tenantId == null) {
-    SchoolSession.setSchoolData(
-        schoolName: 'School', schoolId: tenantId, tenantId: tenantId);
-  }
-  if (role == 'student' && !StudentSession.hasValidSession) {
-    StudentSession.setSession(studentId: userId, tenantId: tenantId);
-  }
-  if (role == 'teacher' && !TeacherSession.hasValidSession) {
-    TeacherSession.setSession(teacherId: userId, tenantId: tenantId);
+  if (OrgSession.organisationId == null) {
+    OrgSession.setData(
+        name: 'Organisation', orgId: organisationId, organisationId: organisationId);
   }
 }
 
@@ -230,10 +213,10 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
               NavigationHeader(
                 onToggleSidebar: _toggleSidebar,
                 userRole: widget.userRole,
-                tenantId: widget.tenantId,
+                organisationId: widget.organisationId,
                 onLogout: _handleLogout,
                 userName: widget.userName,
-                schoolName: widget.schoolName,
+                name: widget.name,
                 notificationCount: _notificationCount,
               ),
 
@@ -287,7 +270,7 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
                       isOpen: _isSidebarOpen,
                       userRole: widget.userRole,
                       userId: widget.userId,
-                      tenantId: widget.tenantId,
+                      organisationId: widget.organisationId,
                       onClose: _closeSidebar,
                       onLogout: _handleLogout,
                     ),
@@ -479,10 +462,10 @@ void _hydrateSessions({String? fallbackUserId, String? fallbackTenantId}) {
 class AdvancedMainLayout extends StatelessWidget {
   final Widget child;
   final String userRole;
-  final String? tenantId;
+  final String? organisationId;
   final String? userId;
   final String? userName;
-  final String? schoolName;
+  final String? name;
   final bool showBreadcrumbs;
   final List<String>? breadcrumbs;
   final Widget? floatingActionButton;
@@ -493,10 +476,10 @@ class AdvancedMainLayout extends StatelessWidget {
     super.key,
     required this.child,
     required this.userRole,
-    this.tenantId,
+    this.organisationId,
     this.userId,
     this.userName,
-    this.schoolName,
+    this.name,
     this.showBreadcrumbs = false,
     this.breadcrumbs,
     this.floatingActionButton,
@@ -508,10 +491,10 @@ class AdvancedMainLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return MainLayout(
       userRole: userRole,
-      tenantId: tenantId,
+      organisationId: organisationId,
       userId: userId,
       userName: userName,
-      schoolName: schoolName,
+      name: name,
       showBreadcrumbs: showBreadcrumbs,
       breadcrumbs: breadcrumbs,
       child: Material(

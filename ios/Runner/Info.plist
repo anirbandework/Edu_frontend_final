@@ -53,6 +53,6 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>EduAssist connects to your school server on the local network.</string>
+	<string>EduAssist connects to your organisation's server on the local network.</string>
 </dict>
 </plist>

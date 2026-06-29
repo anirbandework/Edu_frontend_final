@@ -3,7 +3,7 @@
 // Feedback: any authenticated user can submit; the super-admin lists/triages.
 // /api/v1/feedback (submit = any user; list/status/stats/delete = super-admin).
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../core/network/app_http.dart' as http; // routes authed calls through the 401-refresh/hard-logout wrapper
 
 import '../core/constants/app_constants.dart';
 import '../core/auth/auth_session.dart';

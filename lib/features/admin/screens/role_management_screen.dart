@@ -1,7 +1,7 @@
 // lib/features/admin/screens/role_management_screen.dart
 //
 // Dynamic Roles & Access (admin). The admin defines roles freely — "Teacher",
-// "Faculty", "Principal", "Parent", "HOD", anything — names each, picks its pages
+// "Faculty", "Head", "Parent", "HOD", anything — names each, picks its pages
 // from the WHOLE catalog (any section), and chooses which other roles it may
 // create users into (delegation). Nothing is hardcoded; every role is dynamic.
 import 'package:flutter/material.dart';
@@ -126,7 +126,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Create any role your school needs and pick exactly which pages it can '
+                'Create any role your organisation needs and pick exactly which pages it can '
                 'see — across every section. Grant a role the right to add users into '
                 'other roles to delegate user management.',
                 style: Sa.body.copyWith(color: AppTheme.neutral700),
@@ -198,14 +198,11 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
     final nameCtl = TextEditingController(text: existing?['role_name']?.toString() ?? '');
     final descCtl = TextEditingController(text: existing?['description']?.toString() ?? '');
     final selectedModules = <String>{};
-    final selectedCreatable = <String>{};
 
     if (isEdit) {
       try {
         final detail = await RolesService.getRoleDetail(existing['id'].toString());
         selectedModules.addAll((detail['modules'] as List? ?? const []).map((e) => e.toString()));
-        selectedCreatable
-            .addAll((detail['creatable_role_ids'] as List? ?? const []).map((e) => e.toString()));
       } catch (e) {
         _snack(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
       }
@@ -219,9 +216,6 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
     selectedModules.addAll(_catalog
         .where((m) => m['required'] == true)
         .map((m) => m['module_key'].toString()));
-
-    // other roles available for delegation (exclude self when editing)
-    final otherRoles = _roles.where((r) => r['id'].toString() != existing?['id']?.toString()).toList();
 
     bool saving = false;
     var groupMode = PageGroupMode.function;
@@ -261,7 +255,7 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                       controller: nameCtl,
                       textCapitalization: TextCapitalization.words,
                       decoration: const InputDecoration(
-                          labelText: 'Role name *', hintText: 'e.g. Faculty, Principal, Parent',
+                          labelText: 'Role name *', hintText: 'e.g. Faculty, Head, Parent',
                           border: OutlineInputBorder(), isDense: true),
                     ),
                     const SizedBox(height: 10),
@@ -283,31 +277,30 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                     const SizedBox(height: 8),
                     ...groupCatalog(_catalog, groupMode).entries.map((e) => _moduleSection(
                           e.key, e.value, selectedModules, setLocal)),
-                    const SizedBox(height: 18),
-                    _sectionLabel('Can add users into these roles'),
-                    const Text('Holders of this role may create users assigned to the roles you tick.',
-                        style: Sa.label),
-                    const SizedBox(height: 8),
-                    if (otherRoles.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 6),
-                        child: Text('No other roles yet — create more, then come back to delegate.',
-                            style: Sa.label),
-                      )
-                    else
-                      ...otherRoles.map((r) {
-                        final id = r['id'].toString();
-                        return CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          activeColor: Sa.accent,
-                          value: selectedCreatable.contains(id),
-                          title: Text(r['role_name']?.toString() ?? 'Role', style: Sa.value),
-                          onChanged: (v) => setLocal(() =>
-                              v == true ? selectedCreatable.add(id) : selectedCreatable.remove(id)),
-                        );
-                      }),
+                    // Granting the "Staff & Users" page is what lets a role manage users:
+                    // its holders can then add users into ANY role in this organisation and
+                    // see all available roles. No separate delegation step.
+                    if (selectedModules.contains('staff')) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.green50,
+                          borderRadius: AppTheme.borderRadius8,
+                        ),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Icon(Icons.info_outline, size: 18, color: Sa.accent),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'With “Staff & Users” granted, holders of this role can add users '
+                              'into any role in this organisation and see all available roles.',
+                              style: Sa.label.copyWith(color: AppTheme.neutral800),
+                            ),
+                          ),
+                        ]),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                   ]),
                 ),
@@ -338,14 +331,12 @@ class _RoleManagementScreenState extends State<RoleManagementScreen> {
                                   roleName: name,
                                   description: descCtl.text.trim(),
                                   modules: selectedModules.toList(),
-                                  creatableRoleIds: selectedCreatable.toList(),
                                 );
                               } else {
                                 await RolesService.createRole(
                                   roleName: name,
                                   description: descCtl.text.trim(),
                                   modules: selectedModules.toList(),
-                                  creatableRoleIds: selectedCreatable.toList(),
                                 );
                               }
                               if (ctx.mounted) Navigator.pop(ctx);

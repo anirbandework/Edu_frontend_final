@@ -4,7 +4,7 @@
 // (super-admin / admin / staff / teacher / student). Backed by
 // GET /api/auth/profile and POST /api/auth/change-password.
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../core/network/app_http.dart' as http; // routes authed calls through the 401-refresh/hard-logout wrapper
 
 import '../core/constants/app_constants.dart';
 import '../core/auth/auth_session.dart';

@@ -21,6 +21,11 @@ dependencies:
   # Utilities
   intl: ^0.18.1
   file_picker: ^6.1.1
+  # Persist the auth session (web refresh / app relaunch keeps you logged in)
+  shared_preferences: ^2.2.2
+  # Encrypted storage for the JWT tokens (iOS Keychain / Android Keystore-backed
+  # EncryptedSharedPreferences; web uses its WebCrypto-backed store).
+  flutter_secure_storage: ^9.2.2
   
   # State Management
   flutter_riverpod: ^2.4.9

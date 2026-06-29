@@ -4,7 +4,7 @@
 // assigned to dynamic roles. Creation is delegation-gated server-side.
 // Backed by /api/staff/* and /api/access/assignable-roles.
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../core/network/app_http.dart' as http; // routes authed calls through the 401-refresh/hard-logout wrapper
 
 import '../core/constants/app_constants.dart';
 import '../core/auth/auth_session.dart';
@@ -36,14 +36,28 @@ class StaffService {
     throw _err(r, 'Failed to load roles');
   }
 
-  /// GET /api/staff -> [{id, name, phone, email, position, status, role_name,
-  /// rbac_role_id, has_login}]
-  static Future<List<Map<String, dynamic>>> listStaff() async {
-    final uri = Uri.parse('$_base/api/staff');
+  /// GET /api/staff?q=&limit=&offset= -> paginated + server-side searched.
+  /// Returns the page items plus the total count so callers can "load more".
+  static Future<({List<Map<String, dynamic>> items, int total})> listStaffPage({
+    String q = '',
+    String? roleId,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final uri = Uri.parse('$_base/api/staff').replace(queryParameters: {
+      if (q.trim().isNotEmpty) 'q': q.trim(),
+      if (roleId != null && roleId.isNotEmpty) 'role_id': roleId,
+      'limit': '$limit',
+      'offset': '$offset',
+    });
     final r = await http
         .get(uri, headers: AuthSession.instance.headers(json: false))
         .timeout(const Duration(seconds: 12));
-    if (r.statusCode == 200) return _asList(json.decode(r.body));
+    if (r.statusCode == 200) {
+      final d = json.decode(r.body);
+      final total = (d is Map && d['total'] is num) ? (d['total'] as num).toInt() : 0;
+      return (items: _asList(d), total: total);
+    }
     throw _err(r, 'Failed to load staff');
   }
 
