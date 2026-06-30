@@ -6,9 +6,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../services/super_admin_service.dart';
-import '../widgets/org_pages_dialog.dart';
-import '../widgets/sa_widgets.dart';
+import '../services/super_admin_service.dart';
+import '../widgets/group_pages_dialog.dart';
+import '../../../shared/widgets/sa_widgets.dart';
 
 class ModuleAccessScreen extends StatefulWidget {
   const ModuleAccessScreen({super.key});
@@ -20,7 +20,7 @@ class ModuleAccessScreen extends StatefulWidget {
 class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
   bool _loading = true;
   String? _error;
-  List<Map<String, dynamic>> _orgs = [];
+  List<Map<String, dynamic>> _groups = [];
 
   @override
   void initState() {
@@ -34,10 +34,10 @@ class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
       _error = null;
     });
     try {
-      final orgs = await SuperAdminService.getTenants();
+      final orgs = await SuperAdminService.getGroups();
       if (!mounted) return;
       setState(() {
-        _orgs = orgs;
+        _groups = orgs;
         _loading = false;
       });
     } catch (e) {
@@ -49,11 +49,11 @@ class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
     }
   }
 
-  Future<void> _edit(Map<String, dynamic> org) async {
-    await showOrgPagesDialog(
+  Future<void> _edit(Map<String, dynamic> group) async {
+    await showGroupPagesDialog(
       context,
-      tenantId: org['id'].toString(),
-      tenantName: (org['school_name'] ?? org['name'] ?? 'Organisation').toString(),
+      groupId: group['id'].toString(),
+      groupName: (group['name'] ?? 'Group').toString(),
     );
   }
 
@@ -64,7 +64,7 @@ class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
         padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
         child: SaGradientHeader(
           title: 'Module Access',
-          subtitle: 'Choose which pages each organisation can use',
+          subtitle: 'Set the page ceilings for each institution group',
           icon: Icons.tune,
         ),
       ),
@@ -74,32 +74,33 @@ class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
 
   Widget _body() {
     if (_loading) {
-      return const SaLoading(message: 'Loading organisations…');
+      return const SaLoading(message: 'Loading groups…');
     }
     if (_error != null) {
       return SaStateView.error(message: _error!, onRetry: _load);
     }
-    if (_orgs.isEmpty) {
+    if (_groups.isEmpty) {
       return const SaStateView(
         icon: Icons.tune,
-        title: 'No organisations yet',
-        subtitle: 'Once an admin creates a school, grant its pages here.',
+        title: 'No institution groups yet',
+        subtitle: 'Create a group first, then set its page ceilings here.',
       );
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 28),
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _orgs.length,
+      itemCount: _groups.length,
       separatorBuilder: (_, __) => const SizedBox(height: Sa.gap),
-      itemBuilder: (context, i) => _orgRow(_orgs[i]),
+      itemBuilder: (context, i) => _groupRow(_groups[i]),
     );
   }
 
-  Widget _orgRow(Map<String, dynamic> org) {
-    final name = (org['school_name'] ?? org['name'] ?? 'Organisation').toString();
-    final code = (org['school_code'] ?? '').toString();
+  Widget _groupRow(Map<String, dynamic> group) {
+    final name = (group['name'] ?? 'Group').toString();
+    final admins = (group['admin_count'] ?? 0).toString();
+    final orgs = (group['org_count'] ?? 0).toString();
     return SaCard(
-      onTap: () => _edit(org),
+      onTap: () => _edit(group),
       padding: const EdgeInsets.all(14),
       child: Row(children: [
         Container(
@@ -109,7 +110,7 @@ class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
             color: Sa.accent.withValues(alpha: 0.10),
             borderRadius: AppTheme.borderRadius12,
           ),
-          child: const Icon(Icons.school, color: Sa.accent, size: 22),
+          child: const Icon(Icons.workspaces_outline, color: Sa.accent, size: 22),
         ),
         const SizedBox(width: Sa.gap),
         Expanded(
@@ -120,12 +121,10 @@ class _ModuleAccessScreenState extends State<ModuleAccessScreen> {
               Text(name,
                   style: Sa.cardTitle,
                   maxLines: 1, overflow: TextOverflow.ellipsis),
-              if (code.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(code,
-                    style: Sa.label,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
+              const SizedBox(height: 2),
+              Text('$admins admin(s) · $orgs organisation(s)',
+                  style: Sa.label,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ),
         ),

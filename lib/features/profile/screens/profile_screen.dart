@@ -11,8 +11,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../features/super_admin/widgets/sa_widgets.dart';
-import '../../../services/profile_service.dart';
+import '../../../shared/widgets/sa_widgets.dart';
+import '../services/profile_service.dart';
+import '../../organisation/services/organisation_management_service.dart';
+import '../../organisation/widgets/organisation_create_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -70,7 +72,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     switch (role) {
       case 'super_admin':
         return 'Super Admin';
-      case 'school_authority':
+      case 'authority':
       case 'admin':
         return 'Admin';
       case 'staff':
@@ -89,19 +91,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_error != null) {
       return SaStateView.error(message: _error!, onRetry: _load);
     }
+    final role = (_profile['role'] ?? '').toString();
+    final isAdmin = role == 'authority' || role == 'admin';
     return SaScreen(
       header: Padding(
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
         child: _hero(),
       ),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(8, Sa.gap, 8, 28),
+      // Admins get a 2nd tab to view/edit their organisation; everyone else just
+      // sees their own profile.
+      child: isAdmin ? _adminTabs() : _profileBody(),
+    );
+  }
+
+  Widget _profileBody() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, Sa.gap, 8, 28),
+      children: [
+        _infoCard(),
+        const SizedBox(height: Sa.gap),
+        _ChangePasswordCard(
+          onChanged: (msg) => _snack(msg, AppTheme.greenPrimary),
+          onError: (msg) => _snack(msg, AppTheme.error),
+        ),
+      ],
+    );
+  }
+
+  Widget _adminTabs() {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
         children: [
-          _infoCard(),
-          const SizedBox(height: Sa.gap),
-          _ChangePasswordCard(
-            onChanged: (msg) => _snack(msg, AppTheme.greenPrimary),
-            onError: (msg) => _snack(msg, AppTheme.error),
+          const SizedBox(height: 6),
+          const TabBar(
+            labelColor: Sa.accent,
+            unselectedLabelColor: AppTheme.neutral500,
+            indicatorColor: Sa.accent,
+            labelStyle: Sa.value,
+            tabs: [
+              Tab(text: 'My profile'),
+              Tab(text: 'Organisation'),
+            ],
+          ),
+          const Divider(height: 1, color: Sa.stroke),
+          Expanded(
+            child: TabBarView(
+              children: [
+                _profileBody(),
+                const _OrganisationTab(),
+              ],
+            ),
           ),
         ],
       ),
@@ -307,6 +347,135 @@ class _ChangePasswordCardState extends State<_ChangePasswordCard> {
       controller: c,
       obscureText: _obscure,
       decoration: InputDecoration(labelText: label, isDense: true),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The admin's "Organisation" tab — view the active org's details (collected at
+// creation) and edit them via the shared create/edit dialog.
+class _OrganisationTab extends StatefulWidget {
+  const _OrganisationTab();
+
+  @override
+  State<_OrganisationTab> createState() => _OrganisationTabState();
+}
+
+class _OrganisationTabState extends State<_OrganisationTab> {
+  bool _loading = true;
+  String? _error;
+  Map<String, dynamic>? _org;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final o = await OrganisationService.getMyOrganisation();
+      if (!mounted) return;
+      setState(() {
+        _org = o;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  void _edit() {
+    final o = _org;
+    if (o == null) return;
+    showDialog(
+      context: context,
+      builder: (_) => OrganisationCreateDialog(
+        existing: o,
+        onOrganisationCreated: _load, // reload after a successful save
+      ),
+    );
+  }
+
+  String _money(dynamic v) {
+    final n = (v is num) ? v : num.tryParse('$v');
+    return (n == null || n == 0) ? '—' : '₹${n.toStringAsFixed(0)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const SaLoading(message: 'Loading organisation…');
+    if (_error != null) return SaStateView.error(message: _error!, onRetry: _load);
+    final o = _org;
+    if (o == null) {
+      return const SaStateView(
+        icon: Icons.apartment_outlined,
+        title: 'No organisation yet',
+        subtitle: 'Create an organisation and it will appear here.',
+      );
+    }
+    final levels = (o['levels_offered'] is List)
+        ? (o['levels_offered'] as List).map((e) => e.toString()).toList()
+        : <String>[];
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(8, Sa.gap, 8, 28),
+      children: [
+        SaCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SaCardHeader(
+              icon: Icons.apartment,
+              title: (o['name'] ?? 'Organisation').toString(),
+              trailing: SaStatusPill(
+                text: (o['org_type'] ?? '').toString(),
+                color: AppTheme.neutral400,
+              ),
+            ),
+            const Divider(height: 20, color: Sa.stroke),
+            _row('Code', o['code']),
+            _row('Address', o['address']),
+            _row('Phone', o['phone']),
+            _row('Email', o['email']),
+            _row('Head', o['head_name']),
+            _row('Language', o['language_of_instruction']),
+          ]),
+        ),
+        const SizedBox(height: Sa.gap),
+        SaCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const SaCardHeader(icon: Icons.school_outlined, title: 'Details'),
+            const Divider(height: 20, color: Sa.stroke),
+            _row('Levels / Programs', levels.isEmpty ? '—' : levels.join(', ')),
+            _row('Established', o['established_year']),
+            _row('Accreditation', o['accreditation']),
+            _row('Max capacity', o['maximum_capacity']),
+            _row('Annual fee', _money(o['annual_tuition'])),
+            _row('Registration fee', _money(o['registration_fee'])),
+          ]),
+        ),
+        const SizedBox(height: Sa.gapLg),
+        SaPrimaryButton(
+          label: 'Edit organisation',
+          icon: Icons.edit_outlined,
+          expand: true,
+          onPressed: _edit,
+        ),
+      ],
+    );
+  }
+
+  Widget _row(String label, dynamic value) {
+    final v = (value ?? '').toString().trim();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SaInfoRow(label: label, value: v.isEmpty ? '—' : v),
     );
   }
 }

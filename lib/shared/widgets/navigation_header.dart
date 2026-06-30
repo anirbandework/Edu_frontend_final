@@ -2,27 +2,27 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_theme.dart';
 import '../../core/utils/responsive.dart';
-import '../../core/utils/school_session.dart';
-import 'school_switcher.dart';
-import 'feedback_dialog.dart';
+import '../../core/utils/org_session.dart';
+import 'org_switcher.dart';
+import '../../features/feedback/widgets/feedback_dialog.dart';
 
 class NavigationHeader extends StatefulWidget {
   final VoidCallback onToggleSidebar;
   final String userRole;
-  final String? tenantId;
+  final String? organisationId;
   final VoidCallback onLogout;
   final String? userName;
-  final String? schoolName;
+  final String? name;
   final int notificationCount;
 
   const NavigationHeader({
     super.key,
     required this.onToggleSidebar,
     required this.userRole,
-    this.tenantId,
+    this.organisationId,
     required this.onLogout,
     this.userName,
-    this.schoolName,
+    this.name,
     this.notificationCount = 0,
   });
 
@@ -59,20 +59,19 @@ class _NavigationHeaderState extends State<NavigationHeader>
   }
 
   String _getPortalTitle() {
+    // 3 user types only: super_admin, authority (admin), staff. There is no
+    // teacher/student role — a "Teacher" is a staff user with that role name.
     switch (widget.userRole.toLowerCase()) {
       case 'admin':
-      case 'school_authority':
+      case 'authority':
         return 'Admin Portal';
-      case 'teacher':
-        return 'Teacher Portal';
-      case 'student':
-        return 'Student Portal';
+      case 'staff':
+        return 'Staff Portal';
       case 'super_admin':
-        return 'Super Admin';
+      // global_admin / organisation_manager are legacy aliases for the one super-admin role.
       case 'global_admin':
-        return 'Global Admin';
-      case 'tenant_manager':
-        return 'Manager';
+      case 'organisation_manager':
+        return 'Super Admin';
       default:
         return 'EduAssist';
     }
@@ -80,7 +79,7 @@ class _NavigationHeaderState extends State<NavigationHeader>
 
   bool _isGlobalUser() {
     final r = widget.userRole.toLowerCase();
-    return r == 'super_admin' || r == 'global_admin' || r == 'tenant_manager';
+    return r == 'super_admin' || r == 'global_admin' || r == 'organisation_manager';
   }
 
   @override
@@ -115,22 +114,25 @@ class _NavigationHeaderState extends State<NavigationHeader>
                   child: InkWell(
                     borderRadius: AppTheme.borderRadius8,
                     onTap: () => showFeedbackDialog(context),
-                    child: const Padding(
-                      padding: EdgeInsets.all(6),
-                      child: Icon(Icons.feedback_outlined, color: Colors.white, size: 18),
+                    child: const SizedBox(
+                      width: 44, // ≥44px tap target (a11y)
+                      height: 44,
+                      child: Center(
+                        child: Icon(Icons.feedback_outlined, color: Colors.white, size: 18),
+                      ),
                     ),
                   ),
                 ),
 
                 const SizedBox(width: 6),
 
-                // Admin school switcher (renders only for school_authority)
-                const SchoolSwitcher(),
+                // Admin organisation switcher (renders only for authority)
+                const OrgSwitcher(),
 
                 const SizedBox(width: 6),
 
-                // School Info - Always show
-                _buildSchoolInfo(context),
+                // Organisation Info - Always show
+                _buildOrgInfo(context),
 
                 const SizedBox(width: 6),
                 
@@ -151,6 +153,8 @@ class _NavigationHeaderState extends State<NavigationHeader>
         onTap: widget.onToggleSidebar,
         borderRadius: AppTheme.borderRadius8,
         child: Container(
+          constraints: const BoxConstraints(minWidth: 44, minHeight: 44), // ≥44px tap target (a11y)
+          alignment: Alignment.center,
           padding: const EdgeInsets.all(6),
           decoration: AppTheme.getMicroDecoration(
             color: Colors.white.withValues(alpha: 0.1),
@@ -203,11 +207,11 @@ class _NavigationHeaderState extends State<NavigationHeader>
     );
   }
 
-  Widget _buildSchoolInfo(BuildContext context) {
-    final sessionSchoolName = SchoolSession.schoolName;
-    final widgetSchoolName = widget.schoolName;
+  Widget _buildOrgInfo(BuildContext context) {
+    final sessionName = OrgSession.name;
+    final widgetName = widget.name;
 
-    final schoolName = sessionSchoolName ?? widgetSchoolName ?? '—';
+    final name = sessionName ?? widgetName ?? '—';
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -225,7 +229,7 @@ class _NavigationHeaderState extends State<NavigationHeader>
               borderRadius: AppTheme.borderRadius8,
             ),
             child: Icon(
-              _isGlobalUser() ? Icons.public : Icons.school,
+              _isGlobalUser() ? Icons.public : Icons.apartment,
               color: Colors.white,
               size: 12,
             ),
@@ -236,7 +240,7 @@ class _NavigationHeaderState extends State<NavigationHeader>
               maxWidth: context.screenWidth * 0.25,
             ),
             child: Text(
-              _isGlobalUser() ? 'Global System' : _shortenSchoolName(schoolName),
+              _isGlobalUser() ? 'Global System' : _shortenName(name),
               style: AppTheme.bodyMicro.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
@@ -249,7 +253,7 @@ class _NavigationHeaderState extends State<NavigationHeader>
     );
   }
 
-  String _shortenSchoolName(String name) {
+  String _shortenName(String name) {
     if (name.length <= 20) return name;
     return '${name.substring(0, 17)}...';
   }
@@ -329,10 +333,10 @@ class _NavigationHeaderState extends State<NavigationHeader>
 class AdvancedNavigationHeader extends StatelessWidget {
   final VoidCallback onToggleSidebar;
   final String userRole;
-  final String? tenantId;
+  final String? organisationId;
   final VoidCallback onLogout;
   final String? userName;
-  final String? schoolName;
+  final String? name;
   final int notificationCount;
   final List<Widget>? additionalActions;
   final bool showBreadcrumbs;
@@ -342,10 +346,10 @@ class AdvancedNavigationHeader extends StatelessWidget {
     super.key,
     required this.onToggleSidebar,
     required this.userRole,
-    this.tenantId,
+    this.organisationId,
     required this.onLogout,
     this.userName,
-    this.schoolName,
+    this.name,
     this.notificationCount = 0,
     this.additionalActions,
     this.showBreadcrumbs = false,
@@ -359,10 +363,10 @@ class AdvancedNavigationHeader extends StatelessWidget {
         NavigationHeader(
           onToggleSidebar: onToggleSidebar,
           userRole: userRole,
-          tenantId: tenantId,
+          organisationId: organisationId,
           onLogout: onLogout,
           userName: userName,
-          schoolName: schoolName,
+          name: name,
           notificationCount: notificationCount,
         ),
         

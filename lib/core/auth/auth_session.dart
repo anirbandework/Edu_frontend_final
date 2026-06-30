@@ -1,16 +1,17 @@
 // lib/core/auth/auth_session.dart
 //
 // Holds the authenticated session: the JWT access/refresh tokens and the
-// server-derived identity (userId, role, tenantId). This is the single source
-// of truth for "who am I" — screens must NOT trust role/tenant from the URL for
+// server-derived identity (userId, role, organisationId). This is the single source
+// of truth for "who am I" — screens must NOT trust role/organisation from the URL for
 // anything security-sensitive (the server enforces from the token regardless).
 //
 // NOTE: tokens are kept in memory. For production, persist the refresh token in
 // flutter_secure_storage and rehydrate on launch (follow-up).
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 import '../constants/app_constants.dart';
-import 'permission_store.dart';
+import 'auth_storage.dart';
 
 class AuthSession extends ChangeNotifier {
   AuthSession._();
@@ -20,7 +21,9 @@ class AuthSession extends ChangeNotifier {
   String? refreshToken;
   String? userId;
   String? role;
-  String? tenantId;
+  String? organisationId;
+  // The institution group (set for an admin). Their organisations all belong to it.
+  String? groupId;
 
   bool get isAuthenticated =>
       accessToken != null && accessToken!.isNotEmpty;
@@ -28,57 +31,40 @@ class AuthSession extends ChangeNotifier {
   /// The dashboard route for the logged-in user, derived from the server role.
   /// Single source of truth for post-login navigation.
   String dashboardRoute() {
-    final t = tenantId;
+    final t = organisationId;
     final u = userId ?? '';
-    final qs = (t != null && t.isNotEmpty) ? '?tenantId=$t&userId=$u' : '?userId=$u';
+    final qs = (t != null && t.isNotEmpty) ? '?organisationId=$t&userId=$u' : '?userId=$u';
     switch (role) {
       case 'super_admin':
-        return '${AppConstants.tenantManagementRoute}?role=tenant_manager&userId=$u';
-      case 'school_authority':
-        // A school-less admin (no active school yet) goes to onboarding to create
-        // their first school; otherwise straight to their dashboard.
+        return '${AppConstants.organisationManagementRoute}?role=super_admin&userId=$u';
+      case 'authority':
+        // An organisation-less admin (no active organisation yet) goes to onboarding to create
+        // their first organisation; otherwise to Staff & Users (their home page).
         if (t == null || t.isEmpty) {
           return '${AppConstants.adminOnboardingRoute}?userId=$u';
         }
-        return '${AppConstants.adminDashboardRoute}$qs';
+        return '${AppConstants.adminStaffRoute}$qs';
       case 'staff':
       default:
-        // Every non-admin is a unified dynamic-role user — lands on a hub built
-        // from their granted pages.
-        return '${AppConstants.staffDashboardRoute}$qs';
+        // Dynamic-role users currently have only Profile.
+        return '${AppConstants.staffProfileRoute}$qs';
     }
   }
 
-  /// Where to land right after login. Normally the dashboard, BUT if the user
-  /// has no granted pages at all, fall back to their (always-available) Profile.
-  /// Super-admins keep their full menu; a school-less admin keeps onboarding.
-  String landingRoute() {
-    if (role == 'super_admin') return dashboardRoute();
-    if (role == 'school_authority' && (tenantId == null || tenantId!.isEmpty)) {
-      return dashboardRoute(); // -> create-your-first-school onboarding
-    }
-    final ps = PermissionStore.instance;
-    if (ps.loaded) {
-      final dashboardOn = ps.module('dashboard')?.enabled ?? true;
-      final hasAnyPage = ps.modules.any(
-          (m) => m.enabled && m.key != 'profile' && m.key != 'dashboard');
-      // Land on Profile (always available) if the user has no pages at all, OR if
-      // their Dashboard page was turned off — so they're never dropped onto a page
-      // that's hidden from their own menu with no way back to it.
-      if (!hasAnyPage || !dashboardOn) return profileRoute();
-    }
-    return dashboardRoute();
-  }
+  /// Where to land right after login. Super-admin → their menu; admin → Staff &
+  /// Users (or onboarding if organisation-less); staff → Profile. (dashboardRoute()
+  /// already encodes this; the old "dashboard page" fallback is gone with it.)
+  String landingRoute() => dashboardRoute();
 
   /// The Profile route for the current role (always available, never RBAC-gated).
   String profileRoute() {
     final u = userId ?? '';
-    final t = tenantId ?? '';
-    final qs = (t.isNotEmpty) ? '?tenantId=$t&userId=$u' : '?userId=$u';
+    final t = organisationId ?? '';
+    final qs = (t.isNotEmpty) ? '?organisationId=$t&userId=$u' : '?userId=$u';
     switch (role) {
       case 'super_admin':
         return '${AppConstants.superAdminProfileRoute}?userId=$u';
-      case 'school_authority':
+      case 'authority':
         return '${AppConstants.adminProfileRoute}$qs';
       case 'staff':
       default:
@@ -91,8 +77,10 @@ class AuthSession extends ChangeNotifier {
     refreshToken = r['refresh_token'] as String?;
     userId = r['user_id'] as String?;
     role = r['role'] as String?;
-    tenantId = r['tenant_id'] as String?;
+    organisationId = r['organisation_id'] as String?;
+    groupId = r['group_id'] as String?;
     notifyListeners();
+    _persist(); // survive a web refresh / app relaunch
   }
 
   void clear() {
@@ -100,8 +88,60 @@ class AuthSession extends ChangeNotifier {
     refreshToken = null;
     userId = null;
     role = null;
-    tenantId = null;
+    organisationId = null;
+    groupId = null;
     notifyListeners();
+    AuthStorage.clear(); // fire-and-forget
+  }
+
+  /// Rehydrate the session from storage on app launch (call before runApp).
+  /// Without this, a web page refresh restarts the Dart app with an empty
+  /// session and the router guard bounces the user to /login.
+  Future<void> restore() async {
+    try {
+      final s = await AuthStorage.read();
+      accessToken = s['accessToken'];
+      refreshToken = s['refreshToken'];
+      userId = s['userId'];
+      role = s['role'];
+      organisationId = s['organisationId'];
+      groupId = s['groupId'];
+      notifyListeners();
+    } catch (_) {
+      // Storage unavailable — start logged out rather than crash on launch.
+    }
+  }
+
+  /// True when there's an access token whose JWT `exp` is in the past. Used on
+  /// launch to decide whether to refresh before entering the app. Unknown/
+  /// undecodable tokens return false (let the server be the judge).
+  bool get accessTokenExpired {
+    final t = accessToken;
+    if (t == null || t.isEmpty) return false;
+    try {
+      final parts = t.split('.');
+      if (parts.length != 3) return false;
+      var p = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      p += '=' * ((4 - p.length % 4) % 4);
+      final payload = json.decode(utf8.decode(base64.decode(p))) as Map<String, dynamic>;
+      final exp = payload['exp'];
+      if (exp is! int) return false;
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      return exp <= nowSec + 10; // 10s leeway
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _persist() {
+    AuthStorage.save(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      userId: userId,
+      role: role,
+      organisationId: organisationId,
+      groupId: groupId,
+    );
   }
 
   /// Standard headers for authenticated API calls. Use everywhere instead of

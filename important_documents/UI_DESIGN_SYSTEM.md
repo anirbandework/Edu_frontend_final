@@ -2,7 +2,7 @@
 
 > **Read this before designing ANY page.** Follow it and the page will match the rest of the app
 > with no guesswork. Proven on all 6 super-admin pages (Profile, Analytics, Feedback, Module
-> Access, Admins, Tenants).
+> Access, Admins, Institution Groups).
 
 **Design language in one line:** phone-first, **green + white** with neutral gray, white rounded
 cards with a single green accent, compact type, generous touch targets, no clutter.
@@ -263,7 +263,7 @@ SaCard(child: Row(children: [
   Container(width: 38, height: 38,
     decoration: BoxDecoration(color: Sa.accent.withOpacity(0.12),
       borderRadius: AppTheme.borderRadius12),
-    child: const Icon(Icons.school, color: Sa.accent, size: 22)),
+    child: const Icon(Icons.apartment, color: Sa.accent, size: 22)),
   const Spacer(),
   Text('1,240', style: AppTheme.headingMedium.copyWith(
     color: AppTheme.neutral900, fontWeight: FontWeight.w800)),
@@ -313,6 +313,13 @@ showModalBottomSheet<void>(
           // SwitchListTile(activeColor: Sa.accent, ...), ListTile(...),
         ])))));
 ```
+
+> ⚠️ **Bottom sheet vs. centred dialog.** A `showModalBottomSheet` **always anchors to the bottom
+> edge** of the window. On the wide web/desktop layout that reads as a strip stuck to the bottom with
+> its content spilling off-screen. Use a bottom sheet only for **quick filter/sort/action menus**; for
+> a **content modal** (a list, a detail, a form — anything that needs to feel centred), use the
+> **Responsive dialog** below (`showDialog` + `Dialog` + `ConstrainedBox`). The Institution-Groups
+> "organisations in this group" modal uses the dialog form for exactly this reason.
 
 **Responsive dialog** (never wider than the screen):
 ```dart
@@ -394,7 +401,7 @@ Inside a dialog, wrap the state in vertical padding so it isn't flush:
 | [`lib/features/super_admin/widgets/sa_widgets.dart`](../lib/features/super_admin/widgets/sa_widgets.dart) | **The design system.** All `Sa*` building blocks + `Sa` tokens. Extend here, don't reinvent. |
 | [`lib/core/constants/app_theme.dart`](../lib/core/constants/app_theme.dart) | Colors, gradient, radii, shadows, component themes. (Type scale is desktop-sized — use `Sa.*`.) |
 | [`lib/shared/widgets/main_layout.dart`](../lib/shared/widgets/main_layout.dart) | The shell: top bar, SafeArea, background, 8px inset, fill-remaining scroll area. |
-| Reference implementations | `profile_screen.dart`, `super_admin/screens/{analytics,feedback,module_access,admins}_screen.dart`, `tenant_management/screens/tenant_management_screen.dart` |
+| Reference implementations | `profile_screen.dart`, `super_admin/screens/{analytics,feedback,module_access,admins,institution_groups}_screen.dart` |
 
 > **When the design system is missing something, add a new `Sa*` widget** to `sa_widgets.dart`
 > rather than hardcoding it in a page — that keeps every screen consistent.

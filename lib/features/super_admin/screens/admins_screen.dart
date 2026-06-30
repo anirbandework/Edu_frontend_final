@@ -1,14 +1,16 @@
 // lib/features/super_admin/screens/admins_screen.dart
 //
-// Super-admin → Admin management. Create admins (login is phone+password; email
-// optional), grant their page access, and run the full lifecycle: edit,
-// activate/deactivate, reset password, delete. Consistent gradient header +
-// search + status badges. Real backend, AppTheme only.
+// Super-admin → Admin management, shown as a HIERARCHY: each institution group is a
+// collapsible section that expands to list its admins (the group → admins tree).
+// Create admins (login is phone+password; email optional, created into a group),
+// run the lifecycle per admin: edit, activate/deactivate, reset password. Admins are
+// never deleted — only deactivated (a deactivated admin can't log in; data preserved).
+// Search filters admins and auto-expands the groups that match. Real backend, Sa/AppTheme.
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../services/super_admin_service.dart';
-import '../widgets/sa_widgets.dart';
+import '../services/super_admin_service.dart';
+import '../../../shared/widgets/sa_widgets.dart';
 
 class AdminsScreen extends StatefulWidget {
   const AdminsScreen({super.key});
@@ -21,6 +23,8 @@ class _AdminsScreenState extends State<AdminsScreen> {
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _admins = [];
+  List<Map<String, dynamic>> _groups = [];
+  final Set<String> _expanded = {}; // group ids currently expanded
   String _query = '';
 
   @override
@@ -35,10 +39,15 @@ class _AdminsScreenState extends State<AdminsScreen> {
       _error = null;
     });
     try {
-      final admins = await SuperAdminService.getAdmins();
+      // Load groups + admins together so we can render the group → admins tree.
+      final results = await Future.wait([
+        SuperAdminService.getGroups(),
+        SuperAdminService.getAdmins(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _admins = admins;
+        _groups = results[0];
+        _admins = results[1];
         _loading = false;
       });
     } catch (e) {
@@ -50,16 +59,19 @@ class _AdminsScreenState extends State<AdminsScreen> {
     }
   }
 
-  List<Map<String, dynamic>> get _filtered {
-    if (_query.trim().isEmpty) return _admins;
-    final q = _query.toLowerCase();
-    return _admins.where((a) {
-      final name = '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.toLowerCase();
-      final phone = (a['phone'] ?? '').toString().toLowerCase();
-      final email = (a['email'] ?? '').toString().toLowerCase();
-      return name.contains(q) || phone.contains(q) || email.contains(q);
-    }).toList();
+  bool _matches(Map<String, dynamic> a) {
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    final name = '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.toLowerCase();
+    final phone = (a['phone'] ?? '').toString().toLowerCase();
+    final email = (a['email'] ?? '').toString().toLowerCase();
+    return name.contains(q) || phone.contains(q) || email.contains(q);
   }
+
+  /// The admins belonging to a group (id), honouring the current search.
+  List<Map<String, dynamic>> _adminsOf(String groupId) => _admins
+      .where((a) => a['group_id']?.toString() == groupId && _matches(a))
+      .toList();
 
   void _toast(String msg, Color color) {
     if (!mounted) return;
@@ -67,10 +79,10 @@ class _AdminsScreenState extends State<AdminsScreen> {
       content: Text(msg), backgroundColor: color, behavior: SnackBarBehavior.floating));
   }
 
-  Future<void> _create() async {
+  Future<void> _create({String? presetGroupId}) async {
     final created = await showDialog<bool>(
       context: context,
-      builder: (_) => const _AdminFormDialog(),
+      builder: (_) => _AdminFormDialog(presetGroupId: presetGroupId),
     );
     if (created == true) {
       _load();
@@ -90,20 +102,21 @@ class _AdminsScreenState extends State<AdminsScreen> {
   }
 
   Future<void> _toggleStatus(Map<String, dynamic> a) async {
-    final active = (a['status'] ?? '') == 'active';
+    // Only a deactivated admin re-activates; active AND pending both deactivate.
+    final deactivated = (a['status'] ?? '') == 'inactive';
     final name = '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.trim();
     final ok = await _confirm(
-      title: active ? 'Deactivate $name?' : 'Activate $name?',
-      message: active
-          ? 'They will not be able to log in until reactivated.'
-          : 'They will be able to log in again.',
-      confirmLabel: active ? 'Deactivate' : 'Activate',
-      danger: active,
+      title: deactivated ? 'Activate $name?' : 'Deactivate $name?',
+      message: deactivated
+          ? 'They will be able to log in again.'
+          : 'They will not be able to log in until reactivated.',
+      confirmLabel: deactivated ? 'Activate' : 'Deactivate',
+      danger: !deactivated,
     );
     if (ok != true) return;
     try {
-      await SuperAdminService.setAdminStatus(adminId: a['id'].toString(), isActive: !active);
-      _toast(active ? 'Admin deactivated' : 'Admin activated', AppTheme.greenPrimary);
+      await SuperAdminService.setAdminStatus(adminId: a['id'].toString(), isActive: deactivated);
+      _toast(deactivated ? 'Admin activated' : 'Admin deactivated', AppTheme.greenPrimary);
       _load();
     } catch (e) {
       _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
@@ -119,27 +132,6 @@ class _AdminsScreenState extends State<AdminsScreen> {
       ),
     );
     if (done == true) _toast('Password reset', AppTheme.greenPrimary);
-  }
-
-  Future<void> _delete(Map<String, dynamic> a) async {
-    final name = '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.trim();
-    final schools = a['school_count'] ?? 0;
-    final ok = await _confirm(
-      title: 'Delete $name?',
-      message: schools == 0
-          ? 'This admin will be removed.'
-          : 'This admin and access to their $schools school(s) will be removed. The schools are deactivated, not erased.',
-      confirmLabel: 'Delete',
-      danger: true,
-    );
-    if (ok != true) return;
-    try {
-      await SuperAdminService.deleteAdmin(adminId: a['id'].toString());
-      _toast('Admin deleted', AppTheme.greenPrimary);
-      _load();
-    } catch (e) {
-      _toast(e.toString().replaceAll('Exception: ', ''), AppTheme.error);
-    }
   }
 
   Future<bool?> _confirm({
@@ -172,7 +164,7 @@ class _AdminsScreenState extends State<AdminsScreen> {
         padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
         child: SaGradientHeader(
           title: 'Admin Management',
-          subtitle: 'Create admins and grant their page access',
+          subtitle: 'Admins grouped by institution group',
           icon: Icons.admin_panel_settings,
           trailing: SaHeaderAction(
             icon: Icons.person_add_alt_1,
@@ -217,93 +209,190 @@ class _AdminsScreenState extends State<AdminsScreen> {
     if (_error != null) {
       return SaStateView.error(message: _error!, onRetry: _load);
     }
-    final list = _filtered;
-    if (list.isEmpty) {
-      return _admins.isEmpty
-          ? SaStateView(
-              icon: Icons.group_outlined,
-              title: 'No admins yet',
-              subtitle: 'Create your first admin to get started.',
-              action: SaPrimaryButton(
-                  label: 'Create admin',
-                  icon: Icons.person_add_alt_1,
-                  onPressed: _create),
-            )
-          : const SaStateView(
-              icon: Icons.search_off,
-              title: 'No matches',
-              subtitle: 'No admins match your search.',
-            );
+    if (_groups.isEmpty) {
+      return const SaStateView(
+        icon: Icons.workspaces_outline,
+        title: 'No institution groups yet',
+        subtitle: 'Create an institution group first (Institution Groups page), '
+            'then add admins into it.',
+      );
     }
-    // Single-column list of cards: intrinsic height avoids overflow at large text.
+    final searching = _query.trim().isNotEmpty;
+    // While searching, show only the groups that have a matching admin (and expand
+    // them so the matches are visible).
+    final groups = searching
+        ? _groups.where((g) => _adminsOf(g['id'].toString()).isNotEmpty).toList()
+        : _groups;
+    if (groups.isEmpty) {
+      return const SaStateView(
+        icon: Icons.search_off,
+        title: 'No matches',
+        subtitle: 'No admins match your search.',
+      );
+    }
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: list.length,
+      itemCount: groups.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, i) => _adminCard(list[i]),
+      itemBuilder: (context, i) => _groupSection(groups[i], forceExpanded: searching),
     );
   }
 
-  Widget _adminCard(Map<String, dynamic> a) {
+  // ---- Group section: a collapsible card whose body lists the group's admins ----
+  Widget _groupSection(Map<String, dynamic> group, {bool forceExpanded = false}) {
+    final gid = group['id'].toString();
+    final name = (group['name'] ?? 'Group').toString();
+    final groupActive = group['is_active'] != false;
+    final orgs = group['org_count'] ?? 0;
+    final admins = _adminsOf(gid);
+    final expanded = forceExpanded || _expanded.contains(gid);
+    return SaCard(
+      padding: EdgeInsets.zero,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(Sa.radius),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Tappable group header (toggles expand) — disabled while searching.
+            InkWell(
+              onTap: forceExpanded
+                  ? null
+                  : () => setState(() {
+                        if (!_expanded.remove(gid)) _expanded.add(gid);
+                      }),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 8, 14),
+                child: Row(children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Sa.accent.withValues(alpha: 0.10),
+                      borderRadius: AppTheme.borderRadius8,
+                    ),
+                    child: const Icon(Icons.workspaces_outline, color: Sa.accent, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name,
+                            style: Sa.cardTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${admins.length} admin${admins.length == 1 ? '' : 's'}'
+                          ' · $orgs organisation${orgs == 1 ? '' : 's'}',
+                          style: Sa.label,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!groupActive) ...[
+                    const SaStatusPill(text: 'Inactive', color: AppTheme.neutral400),
+                    const SizedBox(width: 6),
+                  ],
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(Icons.expand_more, color: AppTheme.neutral500),
+                  ),
+                ]),
+              ),
+            ),
+            if (expanded) ...[
+              const Divider(height: 1, color: Sa.stroke),
+              if (admins.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+                  child: Text('No admins in this group yet.', style: Sa.label),
+                )
+              else
+                ..._adminRows(admins),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+                  child: TextButton.icon(
+                    onPressed: () => _create(presetGroupId: gid),
+                    icon: const Icon(Icons.person_add_alt_1, size: 16),
+                    label: const Text('Add admin to this group'),
+                    style: TextButton.styleFrom(
+                        foregroundColor: Sa.accent, visualDensity: VisualDensity.compact),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _adminRows(List<Map<String, dynamic>> admins) {
+    final out = <Widget>[];
+    for (int i = 0; i < admins.length; i++) {
+      out.add(_adminTile(admins[i]));
+      if (i < admins.length - 1) {
+        out.add(const Divider(height: 1, indent: 14, endIndent: 14, color: Sa.stroke));
+      }
+    }
+    return out;
+  }
+
+  Widget _adminTile(Map<String, dynamic> a) {
     final name = '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.trim();
     final phone = (a['phone'] ?? '').toString();
     final email = (a['email'] ?? '').toString();
-    final active = (a['status'] ?? '') == 'active';
-    final schools = a['school_count'] ?? 0;
-    return SaCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: AppTheme.green50,
-              child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: AppTheme.labelLarge.copyWith(color: AppTheme.greenPrimary)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name.isEmpty ? 'Admin' : name,
-                      style: Sa.cardTitle,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                  if (phone.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(phone,
-                        style: Sa.label,
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ],
-                  if (email.isNotEmpty)
-                    Text(email,
-                        style: Sa.label.copyWith(fontSize: 11.5, color: AppTheme.neutral400),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            SaStatusPill(
-              text: active ? 'Active' : 'Inactive',
-              color: active ? AppTheme.greenPrimary : AppTheme.neutral400,
-              icon: active ? Icons.check_circle : Icons.remove_circle_outline,
-            ),
-          ]),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 18,
-            runSpacing: 8,
+    final status = (a['status'] ?? '').toString();
+    final active = status == 'active';
+    final pending = status == 'invited'; // created, awaiting first-login — NOT deactivated
+    final contact = [if (phone.isNotEmpty) phone, if (email.isNotEmpty) email].join('  ·  ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
+      child: Row(children: [
+        CircleAvatar(
+          radius: 18,
+          backgroundColor: active ? AppTheme.green50 : AppTheme.neutral100,
+          child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: AppTheme.labelLarge.copyWith(
+                  color: active ? AppTheme.greenPrimary : AppTheme.neutral500)),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _stat(Icons.business, '$schools', schools == 1 ? 'school' : 'schools'),
+              Row(children: [
+                Flexible(
+                  child: Text(name.isEmpty ? 'Admin' : name,
+                      style: Sa.value, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                SaStatusPill(
+                  text: active
+                      ? 'Active'
+                      : pending
+                          ? 'Pending'
+                          : 'Inactive',
+                  color: active
+                      ? AppTheme.greenPrimary
+                      : pending
+                          ? AppTheme.neutral500
+                          : AppTheme.neutral400,
+                ),
+              ]),
+              if (contact.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(contact, style: Sa.label, maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
             ],
           ),
-          const Divider(height: 22),
-          Align(
-            alignment: Alignment.centerRight,
-            child: _actionsMenu(a, active),
-          ),
-        ],
-      ),
+        ),
+        // Pass not-deactivated so a pending admin still offers "Deactivate".
+        _actionsMenu(a, status != 'inactive'),
+      ]),
     );
   }
 
@@ -322,9 +411,6 @@ class _AdminsScreenState extends State<AdminsScreen> {
           case 'reset':
             _resetPassword(a);
             break;
-          case 'delete':
-            _delete(a);
-            break;
         }
       },
       itemBuilder: (context) => [
@@ -337,23 +423,10 @@ class _AdminsScreenState extends State<AdminsScreen> {
           Text(active ? 'Deactivate' : 'Activate')])),
         const PopupMenuItem(value: 'reset', child: Row(children: [
           Icon(Icons.password, size: 18, color: AppTheme.neutral600), SizedBox(width: 10), Text('Reset password')])),
-        const PopupMenuDivider(),
-        const PopupMenuItem(value: 'delete', child: Row(children: [
-          Icon(Icons.delete_outline, size: 18, color: AppTheme.error),
-          SizedBox(width: 10), Text('Delete', style: TextStyle(color: AppTheme.error))])),
       ],
     );
   }
 
-  Widget _stat(IconData icon, String value, String label) {
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: AppTheme.iconSmall, color: AppTheme.neutral400),
-      const SizedBox(width: 6),
-      Text(value, style: Sa.value.copyWith(fontWeight: FontWeight.w700)),
-      const SizedBox(width: 4),
-      Text(label, style: Sa.label),
-    ]);
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +434,8 @@ class _AdminsScreenState extends State<AdminsScreen> {
 // (optional) + a page-access picker. In edit mode shows name/phone/email only.
 class _AdminFormDialog extends StatefulWidget {
   final Map<String, dynamic>? existing;
-  const _AdminFormDialog({this.existing});
+  final String? presetGroupId; // pre-select this group (from a group's "Add admin")
+  const _AdminFormDialog({this.existing, this.presetGroupId});
 
   @override
   State<_AdminFormDialog> createState() => _AdminFormDialogState();
@@ -379,13 +453,28 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
   bool _saving = false;
   String? _err;
 
-  // module picker (create only)
+  // institution group (create only) — the admin is created INTO a group.
+  List<Map<String, dynamic>> _groups = [];
+  String? _groupId;
 
   bool get _isEdit => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
+    if (!_isEdit) {
+      _groupId = widget.presetGroupId; // pre-selected when adding from a group
+      _loadGroups();
+    }
+  }
+
+  Future<void> _loadGroups() async {
+    try {
+      final g = await SuperAdminService.getGroups();
+      if (mounted) setState(() => _groups = g);
+    } catch (_) {
+      // non-fatal; the dropdown just stays empty and save will prompt to pick one
+    }
   }
 
   @override
@@ -404,6 +493,10 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
     }
     if (_phone.text.trim().isEmpty) {
       setState(() => _err = 'Phone is required (used to log in)');
+      return;
+    }
+    if (!_isEdit && (_groupId == null || _groupId!.isEmpty)) {
+      setState(() => _err = 'Select an institution group for this admin');
       return;
     }
     setState(() {
@@ -425,6 +518,7 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
           lastName: _last.text.trim(),
           phone: _phone.text.trim(),
           email: _email.text.trim(),
+          groupId: _groupId!,
         );
       }
       if (!mounted) return;
@@ -479,7 +573,26 @@ class _AdminFormDialogState extends State<_AdminFormDialog> {
               ),
               const SizedBox(height: 12),
               if (!_isEdit) ...[
-                Text(
+                DropdownButtonFormField<String>(
+                  initialValue: _groupId,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Institution group *',
+                    prefixIcon: Icon(Icons.workspaces_outline),
+                    isDense: true,
+                  ),
+                  hint: Text(_groups.isEmpty ? 'No groups — create one first' : 'Select a group'),
+                  items: _groups
+                      .map((g) => DropdownMenuItem(
+                            value: g['id'].toString(),
+                            child: Text((g['name'] ?? 'Group').toString(),
+                                overflow: TextOverflow.ellipsis),
+                          ))
+                      .toList(),
+                  onChanged: (v) => setState(() => _groupId = v),
+                ),
+                const SizedBox(height: 12),
+                const Text(
                   'No password needed — the admin sets their own at first login (phone + OTP).',
                   style: TextStyle(fontSize: 12, color: AppTheme.neutral600),
                 ),

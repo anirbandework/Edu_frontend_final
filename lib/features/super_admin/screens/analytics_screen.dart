@@ -1,13 +1,13 @@
 // lib/features/super_admin/screens/analytics_screen.dart
 //
-// Super-admin platform analytics: headline KPIs (schools/admins/students/
-// teachers), active-vs-inactive ratios, capacity utilisation, school-type
-// distribution, and top admins by school count. Real backend, AppTheme only.
+// Super-admin platform analytics: headline KPIs (organisations/admins/students/
+// teachers), active-vs-inactive ratios, capacity utilisation, organisation-type
+// distribution, and top admins by organisation count. Real backend, AppTheme only.
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../services/super_admin_service.dart';
-import '../widgets/sa_widgets.dart';
+import '../services/super_admin_service.dart';
+import '../../../shared/widgets/sa_widgets.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -64,7 +64,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
         child: SaGradientHeader(
           title: 'Analytics',
-          subtitle: 'Platform overview across all schools',
+          subtitle: 'Platform overview across all organisations',
           icon: Icons.insights,
         ),
       ),
@@ -98,11 +98,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   // ---- KPI cards ----
   Widget _kpiGrid() {
     final kpis = [
-      _Kpi('Schools', _i('total_tenants'), '${_i('active_tenants')} active',
+      _Kpi('Organisations', _i('total_organisations'), '${_i('active_organisations')} active',
           Icons.business, AppTheme.greenPrimary),
       _Kpi('Admins', _i('total_admins'), '${_i('active_admins')} active',
           Icons.admin_panel_settings, AppTheme.greenPrimary),
-      _Kpi('Students', _i('total_students'), 'enrolled', Icons.school, AppTheme.greenPrimary),
+      _Kpi('Students', _i('total_students'), 'enrolled', Icons.apartment, AppTheme.greenPrimary),
       _Kpi('Teachers', _i('total_teachers'), 'platform-wide', Icons.person, AppTheme.greenPrimary),
     ];
     return LayoutBuilder(builder: (context, c) {
@@ -158,7 +158,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   // ---- active / inactive ratios ----
   Widget _ratiosCard() {
     return _section('Active vs inactive', Icons.toggle_on, [
-      _ratioRow('Schools', _i('active_tenants'), _i('inactive_tenants'), AppTheme.greenPrimary),
+      _ratioRow('Organisations', _i('active_organisations'), _i('inactive_organisations'), AppTheme.greenPrimary),
       const SizedBox(height: 12),
       _ratioRow('Admins', _i('active_admins'), _i('inactive_admins'), AppTheme.greenPrimary),
     ]);
@@ -269,36 +269,36 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  // ---- school-type distribution ----
+  // ---- organisation-type distribution ----
   Widget _distributionCard() {
-    final dist = (_stats['school_type_distribution'] as Map?)?.cast<String, dynamic>() ?? {};
+    final dist = (_stats['org_type_distribution'] as Map?)?.cast<String, dynamic>() ?? {};
     if (dist.isEmpty) {
-      return _section('Schools by type', Icons.category, [
-        const Text('No schools yet', style: Sa.body),
+      return _section('Organisations by type', Icons.category, [
+        const Text('No organisations yet', style: Sa.body),
       ]);
     }
     final entries = dist.entries.toList()
       ..sort((a, b) => ((b.value as num?) ?? 0).compareTo((a.value as num?) ?? 0));
     final maxV = entries.fold<int>(1, (m, e) => ((e.value as num?)?.toInt() ?? 0) > m ? (e.value as num).toInt() : m);
-    return _section('Schools by type', Icons.category,
+    return _section('Organisations by type', Icons.category,
         entries.map((e) => _barRow(e.key, (e.value as num?)?.toInt() ?? 0, maxV, AppTheme.greenPrimary)).toList());
   }
 
-  // ---- top admins by school count ----
+  // ---- top admins by organisation count ----
   Widget _topAdminsCard() {
     final admins = [..._admins]
-      ..sort((a, b) => ((b['school_count'] as num?) ?? 0).compareTo((a['school_count'] as num?) ?? 0));
-    final top = admins.take(6).where((a) => ((a['school_count'] as num?) ?? 0) > 0).toList();
+      ..sort((a, b) => ((b['org_count'] as num?) ?? 0).compareTo((a['org_count'] as num?) ?? 0));
+    final top = admins.take(6).where((a) => ((a['org_count'] as num?) ?? 0) > 0).toList();
     if (top.isEmpty) {
-      return _section('Top admins by schools', Icons.leaderboard, [
-        const Text('No admin owns a school yet', style: Sa.body),
+      return _section('Top admins by organisations', Icons.leaderboard, [
+        const Text('No admin owns a organisation yet', style: Sa.body),
       ]);
     }
-    final maxV = top.fold<int>(1, (m, a) => ((a['school_count'] as num?)?.toInt() ?? 0) > m ? (a['school_count'] as num).toInt() : m);
-    return _section('Top admins by schools', Icons.leaderboard, top.map((a) {
+    final maxV = top.fold<int>(1, (m, a) => ((a['org_count'] as num?)?.toInt() ?? 0) > m ? (a['org_count'] as num).toInt() : m);
+    return _section('Top admins by organisations', Icons.leaderboard, top.map((a) {
       final name = '${a['first_name'] ?? ''} ${a['last_name'] ?? ''}'.trim();
       return _barRow(name.isEmpty ? 'Admin' : name,
-          (a['school_count'] as num?)?.toInt() ?? 0, maxV, AppTheme.greenPrimary);
+          (a['org_count'] as num?)?.toInt() ?? 0, maxV, AppTheme.greenPrimary);
     }).toList());
   }
 
