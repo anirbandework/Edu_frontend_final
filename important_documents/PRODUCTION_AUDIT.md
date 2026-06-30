@@ -811,3 +811,40 @@ Evidence:
 - **iOS ATS allows local networking and the only configured backend is cleartext — production transport posture undefined** — Facts confirmed but the finding describes no actual vulnerability — it's the safe, recommended form of an ATS exception. ios/Runner/Info.plist:50-54 sets NSAppTransportSecurity with ONLY NSAllowsLocal
 - **Dependencies use caret ranges with no committed lockfile guarantee in the build pipeline** — Largely a false positive / non-issue. The finding's own impact says it "only bites if CI runs `pub upgrade` or the lockfile is not committed/honored" — neither condition is true. Verified: pubspec.loc
 - **iOS allows landscape/upside-down orientations app-wide; UI may not be designed for them** — Facts cited are accurate: ios/Runner/Info.plist:31-43 allows Portrait + LandscapeLeft/Right on iPhone (and PortraitUpsideDown on iPad), web/manifest.json:9 declares "portrait-primary", and there is no
+---
+
+## 2026-06-30 — Bulk-import + "active⇒role" invariant + 100k-scale audit (multi-agent, verified)
+
+Scope: this session's changes — per-role custom fields, page-access user-management model, impact-aware role
+deletion, bulk Excel/CSV import, the staff/role screens. 4 auditors (import, invariant, scale, hardening),
+each finding adversarially verified, then fixed and re-tested. DB hygiene: 0 leftover test rows, 0 role-less
+active members.
+
+**CRITICAL/HIGH — fixed & verified:**
+- Phone leading zeros corrupted on Excel import (phone = login id → lockout). FIX: template forces phone
+  columns to Excel TEXT (`number_format='@'`, column-level so no file bloat). `imports.build_template_xlsx`.
+- Active staff with NO role via first-login signup + login never re-checked role. FIX: `complete_signup`
+  refuses to activate a role-less staff (raises pre-commit); `login_service.authenticate` blocks a role-less
+  active staff from getting a token. Login invariant test: with-role logs in, role-less active blocked.
+- `staff_id` 6-hex → ~52% collision in a 5000-row import, no unique constraint. FIX: 12-hex + partial unique
+  index `uq_members_staff_id_active (organisation_id, staff_id) WHERE NOT is_deleted`.
+- Bulk-import multipart upload bypassed the 401-refresh wrapper. FIX: `app_http.multipart(builder)` routes it
+  through `_send` (refresh+retry / hard-logout); `staff_service.dart bulkImport` uses it.
+- Authority phone-dedup missing `is_deleted` filter (`imports.py`). FIX: added.
+- Custom field could shadow a built-in column via a colliding label. FIX: `_RESERVED_LABELS` guard in
+  `normalize_definitions` + built-ins win in `parse_rows`.
+- Cross-role template upload silently mis-mapped. FIX: template stamped with role id (`wb.properties.category`),
+  `parse_rows` rejects a mismatched upload.
+- Orphaned custom-field PII lingered after role delete-unassign. FIX: the unassign UPDATE also clears
+  `profile.custom_fields` (verified before→after `{}`).
+- Number custom field accepted NaN/Inf. FIX: `math.isfinite` reject.
+- Scale: trigram GIN indexes added on `members(email)` + `members(phone)` (search ILIKE was seq-scanning).
+
+**FALSE POSITIVE (recorded):** "Starlette's 1 MB limit caps the upload" — incorrect; that cap applies only to
+non-file form fields. File parts spool to a temp file; the app-code 10 MB cap is the real limit.
+
+**Accepted / by-design (not changed):** import is best-effort partial-commit with a per-row report (the chosen
+contract, not all-or-nothing); soft-deleted phone reuse is allowed (consistent with `_phone_taken`);
+`delete_role` uses one bulk UPDATE (fine in PG; Redis `siat` cache self-heals within its 300 s TTL);
+offset pagination acceptable behind explicit "Load more"; `organisation_uuid`/`organisation_id` coexist via
+coercion (standardize later). Tenant isolation, session-invalidation, soft-delete, and pagination verified solid.

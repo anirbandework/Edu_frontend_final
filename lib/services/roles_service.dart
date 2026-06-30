@@ -69,6 +69,7 @@ class RolesService {
     String? description,
     List<String> modules = const [],
     List<String> creatableRoleIds = const [],
+    List<Map<String, dynamic>>? customFields,
   }) async {
     final uri = Uri.parse('$_base/api/access/roles');
     final r = await http
@@ -80,19 +81,21 @@ class RolesService {
               if (description != null && description.isNotEmpty) 'description': description,
               'modules': modules,
               'creatable_role_ids': creatableRoleIds,
+              if (customFields != null) 'custom_fields': customFields,
             }))
         .timeout(const Duration(seconds: 15));
     if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
     throw _err(r, 'Failed to create role');
   }
 
-  /// PUT /api/access/roles/{id} — update name/pages/delegation.
+  /// PUT /api/access/roles/{id} — update name/pages/delegation/custom fields.
   static Future<void> updateRole({
     required String roleId,
     String? roleName,
     String? description,
     List<String>? modules,
     List<String>? creatableRoleIds,
+    List<Map<String, dynamic>>? customFields,
   }) async {
     final uri = Uri.parse('$_base/api/access/roles/$roleId');
     final r = await http
@@ -103,15 +106,32 @@ class RolesService {
               if (description != null) 'description': description,
               if (modules != null) 'modules': modules,
               if (creatableRoleIds != null) 'creatable_role_ids': creatableRoleIds,
+              if (customFields != null) 'custom_fields': customFields,
             }))
         .timeout(const Duration(seconds: 15));
     if (r.statusCode == 200) return;
     throw _err(r, 'Failed to update role');
   }
 
-  /// DELETE /api/access/roles/{id}
-  static Future<void> deleteRole(String roleId) async {
-    final uri = Uri.parse('$_base/api/access/roles/$roleId');
+  /// GET /api/access/roles/{id}/usage -> how many users currently hold this role.
+  static Future<int> getRoleUsage(String roleId) async {
+    final uri = Uri.parse('$_base/api/access/roles/$roleId/usage');
+    final r = await http
+        .get(uri, headers: AuthSession.instance.headers(json: false))
+        .timeout(const Duration(seconds: 12));
+    if (r.statusCode == 200) {
+      final d = json.decode(r.body);
+      return (d is Map && d['user_count'] is num) ? (d['user_count'] as num).toInt() : 0;
+    }
+    throw _err(r, 'Failed to check role usage');
+  }
+
+  /// DELETE /api/access/roles/{id}. Pass [reassignToRoleId] to move this role's users
+  /// to another role; omit it to leave them unassigned (they get deactivated).
+  static Future<void> deleteRole(String roleId, {String? reassignToRoleId}) async {
+    final uri = Uri.parse('$_base/api/access/roles/$roleId').replace(queryParameters: {
+      if (reassignToRoleId != null && reassignToRoleId.isNotEmpty) 'reassign_to': reassignToRoleId,
+    });
     final r = await http
         .delete(uri, headers: AuthSession.instance.headers(json: false))
         .timeout(const Duration(seconds: 12));

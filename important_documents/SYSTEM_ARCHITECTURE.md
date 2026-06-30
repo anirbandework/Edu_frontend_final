@@ -156,6 +156,58 @@ Both live on **`group_module_permissions`** (one row per **group** × page; uniq
   `role_creatable_roles` table is retired from this flow.)*
 - **Assignment** = `staff_users.rbac_role_id`. The admin (or a staff user holding the Staff page) creates a
   user and assigns a role via **Staff & Users** (`POST /api/staff`).
+- **Role deletion is impact-aware.** Deleting a role is a hard delete (permission rows cascade). Before it,
+  the UI shows how many users hold it (`GET /api/access/roles/{id}/usage`) and forces a choice: **reassign**
+  its users to another role (`DELETE …?reassign_to=<id>` — they keep their login) OR **leave them
+  unassigned**, in which case they are cleared AND **deactivated** (`status='inactive'`, can't log in) until
+  reassigned. Giving an orphaned (role-less + inactive) user a role again **re-activates** them
+  (`StaffService.update`: active if they have a password, else 'invited' for first-login).
+  **Invariant: active staff ⇒ has a role.** Enforced on every path: `create` requires a role; `set_status`
+  rejects activating a role-less user (FE routes "Activate" to the editor to assign one); `update` orphan-
+  recovery only reactivates *when* a role is assigned; `complete_signup` refuses to activate a role-less
+  staff account (raises before commit); and the **login gate** (`authenticate`) blocks a role-less active
+  staff member from getting a token ("isn't assigned to a role yet"). Authorities are role-independent
+  (exempt). So you can never end up with an active, role-less staff user — or one that can log in.
+- **Deactivation kills live tokens.** Both the Activate/Deactivate toggle (`set_status`) and delete→unassign
+  stamp `sessions_invalidated_at=now()`, so an already-issued access/refresh token is rejected on the next
+  request — the per-request check (`get_current_principal`) enforces that timestamp, not `status`. Changing a
+  user's role without sending custom_fields clears the old role's field VALUES (`StaffService.update`), so
+  stale PII never bleeds across roles.
+- **Privacy & scale (audit 2026-06-30).** Custom-field VALUES (parent phone, address…) ride only on the
+  single-member detail fetch (`GET /api/staff/{id}`), never the list payload. The `?role_id=` staff filter is
+  org-validated (no cross-org enumeration). pg_trgm GIN indexes on `members(first_name/last_name)` back the
+  ILIKE search; `rbac_roles(organisation_id)` + partial `members(rbac_role_id) WHERE NOT is_deleted` added.
+- **Bulk Excel/CSV import** (`app/staff_management/services/imports.py`, `lib/.../staff_management_screen.dart`
+  → `_openBulkUpload`): a ✦ header action lets an admin pick a role, **download an .xlsx template** whose
+  columns are the built-in fields + that role's custom fields (`GET /api/staff/import/template?role_id=` —
+  select fields become Excel dropdowns, an Instructions sheet documents each), fill it, and **upload .xlsx or
+  .csv** (`POST /api/staff/import`, multipart). The server streams/parses (openpyxl read-only), validates each
+  row (required + custom-field rules), **skips duplicate phones** (in-file + existing, one batched query
+  each), and bulk-inserts the good rows in 500-row chunks (with per-row fallback on a unique-constraint race).
+  Returns `{created, skipped[], failed[]}` per-row report. Caps: 5000 rows / 10 MB per upload. Members are
+  created password-less (status='invited'); they set their own password at first login. FE deps: `file_picker`
+  (pick), `file_saver` (download); BE dep: `openpyxl` (in requirements — `pip install` if the venv lacks it).
+  Hardened (audit 2026-06-30): **phone columns are forced to Excel TEXT** so leading zeros survive (phone is
+  the login id); the template is **stamped with the role id** and an upload under a different role is rejected;
+  **`staff_id` is 12 hex** + a partial unique index `(organisation_id, staff_id) WHERE NOT is_deleted`; a
+  custom field may not reuse a built-in label (`_RESERVED_LABELS`); the authority phone-dedup filters
+  `is_deleted`; the multipart upload now goes through the `app_http` 401-refresh/retry wrapper
+  (`http.multipart`). Trigram GIN indexes also cover `members(email)` + `members(phone)` for the directory
+  search. Note: import is best-effort partial-commit (per-row report), not all-or-nothing.
+- **Per-role custom fields.** Each role may define extra fields (grade, parent name, parent phone, address…)
+  in the Roles & Access editor — each with a type (text / long text / number / email / phone / date /
+  dropdown / yes-no) and an optional **required** flag. Definitions live on `rbac_roles.custom_fields`
+  (JSONB list of `{key,label,type,required,options}`); the filled values live on
+  `members.profile['custom_fields']` (`{key: value}`). When a user is added to a role in **Staff & Users**,
+  those fields render dynamically and are validated (required + format) on both client and server
+  (`access/custom_fields.py`: `normalize_definitions` on role save, `validate_values` on staff create/update).
+  Built-in identity fields stay: **Full name + Phone are mandatory** (Phone is the login id); Email/Position
+  are optional. Required is enforced going forward (new users + on next edit); existing users keep their data.
+  **Role templates** (`lib/features/admin/widgets/role_templates.dart`): a ✨ header action on Roles & Access
+  offers ~25 ready-made roles for any ed org (schools / colleges / coaching / tutors), grouped into 5
+  categories — *Students & Family, Teaching, Management & Leadership, Office & Front Desk, Support &
+  Operations* — each preloaded with sensible fields. One tap to **Add** (creates the role) or **Customise**
+  (opens the editor prefilled). Pages are still granted separately via the **Page access** header action.
 - Admin UI: **Roles & Access** (`/admin/roles`) + **Staff & Users** (`/admin/staff`).
 
 ---

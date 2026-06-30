@@ -56,6 +56,17 @@ Future<http.Response> delete(Uri url,
         {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
     _send(() => http.delete(url, headers: _auth(json: false), body: body, encoding: encoding).timeout(_timeout));
 
+/// Send a multipart request (file upload) through the same 401-refresh/retry/hard-logout
+/// path. Pass a BUILDER, not a request — a MultipartRequest is single-use, so a retry
+/// after refresh rebuilds it; fresh auth is attached on each attempt (don't set it yourself).
+Future<http.Response> multipart(http.MultipartRequest Function() build,
+        {Duration timeout = const Duration(minutes: 3)}) =>
+    _send(() async {
+      final req = build()..headers.addAll(_auth(json: false));
+      final streamed = await req.send().timeout(timeout);
+      return http.Response.fromStream(streamed);
+    });
+
 /// Runs `call`; on a 401 refreshes once (single-flight) and retries. The closure
 /// rebuilds its headers each invocation, so the retry uses the freshly-minted token.
 Future<http.Response> _send(Future<http.Response> Function() call) async {

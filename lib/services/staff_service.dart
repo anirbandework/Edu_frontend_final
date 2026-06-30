@@ -4,7 +4,9 @@
 // assigned to dynamic roles. Creation is delegation-gated server-side.
 // Backed by /api/staff/* and /api/access/assignable-roles.
 import 'dart:convert';
+import 'dart:typed_data';
 import '../core/network/app_http.dart' as http; // routes authed calls through the 401-refresh/hard-logout wrapper
+import 'package:http/http.dart' as mhttp; // raw client, for the multipart bulk-import upload
 
 import '../core/constants/app_constants.dart';
 import '../core/auth/auth_session.dart';
@@ -61,6 +63,44 @@ class StaffService {
     throw _err(r, 'Failed to load staff');
   }
 
+  /// GET /api/staff/{id} -> one member's full record INCLUDING custom-field values
+  /// (those are intentionally NOT in the list payload). Used by the details view.
+  static Future<Map<String, dynamic>> getStaff(String id) async {
+    final uri = Uri.parse('$_base/api/staff/$id');
+    final r = await http
+        .get(uri, headers: AuthSession.instance.headers(json: false))
+        .timeout(const Duration(seconds: 12));
+    if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
+    throw _err(r, 'Failed to load user');
+  }
+
+  /// GET /api/staff/import/template?role_id= -> the .xlsx template bytes for a role.
+  static Future<Uint8List> downloadImportTemplate(String roleId) async {
+    final uri = Uri.parse('$_base/api/staff/import/template')
+        .replace(queryParameters: {'role_id': roleId});
+    final r = await http.get(uri).timeout(const Duration(seconds: 20));
+    if (r.statusCode == 200) return r.bodyBytes;
+    throw _err(r, 'Failed to download template');
+  }
+
+  /// POST /api/staff/import (multipart) -> bulk-create members of [roleId] from an
+  /// uploaded .xlsx/.csv. Returns {created, skipped:[{row,reason}], failed:[{row,reason}], total}.
+  static Future<Map<String, dynamic>> bulkImport({
+    required String roleId,
+    required String fileName,
+    required Uint8List bytes,
+  }) async {
+    final uri = Uri.parse('$_base/api/staff/import');
+    // Through the app_http wrapper so a token expiring mid-upload is refreshed + retried
+    // (or hard-logged-out), like every other authed call. Builder, not request, so the
+    // retry rebuilds it; the wrapper attaches fresh auth — don't set it here.
+    final r = await http.multipart(() => mhttp.MultipartRequest('POST', uri)
+      ..fields['role_id'] = roleId
+      ..files.add(mhttp.MultipartFile.fromBytes('file', bytes, filename: fileName)));
+    if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
+    throw _err(r, 'Bulk import failed');
+  }
+
   /// POST /api/staff
   static Future<Map<String, dynamic>> createStaff({
     required String firstName,
@@ -69,6 +109,7 @@ class StaffService {
     required String roleId,
     String? email,
     String? position,
+    Map<String, dynamic>? customFields,
   }) async {
     // No password: the user sets their own at first login (phone + OTP).
     final uri = Uri.parse('$_base/api/staff');
@@ -82,6 +123,7 @@ class StaffService {
               'rbac_role_id': roleId,
               if (email != null && email.isNotEmpty) 'email': email,
               if (position != null && position.isNotEmpty) 'position': position,
+              if (customFields != null) 'custom_fields': customFields,
             }))
         .timeout(const Duration(seconds: 15));
     if (r.statusCode == 200) return json.decode(r.body) as Map<String, dynamic>;
@@ -97,6 +139,7 @@ class StaffService {
     String? email,
     String? position,
     String? roleId,
+    Map<String, dynamic>? customFields,
   }) async {
     final uri = Uri.parse('$_base/api/staff/$id');
     final r = await http
@@ -109,6 +152,7 @@ class StaffService {
               if (email != null) 'email': email,
               if (position != null) 'position': position,
               if (roleId != null) 'rbac_role_id': roleId,
+              if (customFields != null) 'custom_fields': customFields,
             }))
         .timeout(const Duration(seconds: 12));
     if (r.statusCode == 200) return;
