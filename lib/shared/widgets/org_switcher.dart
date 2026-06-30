@@ -9,8 +9,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_theme.dart';
-import '../../services/super_admin_service.dart';
-import '../../features/organisation_management/widgets/organisation_create_dialog.dart';
+import '../../features/super_admin/services/super_admin_service.dart';
+import '../../features/organisation/widgets/organisation_create_dialog.dart';
 
 class OrgSwitcher extends StatefulWidget {
   const OrgSwitcher({super.key});

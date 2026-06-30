@@ -11,10 +11,10 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../features/super_admin/widgets/sa_widgets.dart';
-import '../../../services/profile_service.dart';
-import '../../../services/organisation_management_service.dart';
-import '../../organisation_management/widgets/organisation_create_dialog.dart';
+import '../../../shared/widgets/sa_widgets.dart';
+import '../services/profile_service.dart';
+import '../../organisation/services/organisation_management_service.dart';
+import '../../organisation/widgets/organisation_create_dialog.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

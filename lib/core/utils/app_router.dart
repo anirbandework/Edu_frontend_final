@@ -2,8 +2,8 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 
-import '../../features/screens/landing_screen.dart';
-import '../../features/screens/organisation_selection_screen.dart';
+import '../../features/auth/screens/landing_screen.dart';
+import '../../features/auth/screens/organisation_selection_screen.dart';
 import '../auth/auth_session.dart';
 import '../../shared/widgets/main_layout.dart';
 
@@ -12,12 +12,12 @@ import '../../features/super_admin/screens/institution_groups_screen.dart';
 import '../../features/super_admin/screens/admins_screen.dart';
 import '../../features/super_admin/screens/module_access_screen.dart';
 import '../../features/super_admin/screens/analytics_screen.dart';
-import '../../features/super_admin/screens/feedback_screen.dart';
+import '../../features/feedback/screens/feedback_screen.dart';
 
 // Admin + shared
-import '../../features/admin/screens/admin_onboarding_screen.dart';
-import '../../features/admin/screens/role_management_screen.dart';
-import '../../features/admin/screens/staff_management_screen.dart';
+import '../../features/organisation/screens/admin_onboarding_screen.dart';
+import '../../features/rbac/screens/role_management_screen.dart';
+import '../../features/members/screens/staff_management_screen.dart';
 import '../../features/profile/screens/profile_screen.dart';
 
 import '../constants/app_constants.dart';

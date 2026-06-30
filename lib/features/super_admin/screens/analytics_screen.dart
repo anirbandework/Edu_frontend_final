@@ -6,8 +6,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../services/super_admin_service.dart';
-import '../widgets/sa_widgets.dart';
+import '../services/super_admin_service.dart';
+import '../../../shared/widgets/sa_widgets.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});

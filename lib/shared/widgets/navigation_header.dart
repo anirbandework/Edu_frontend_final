@@ -4,7 +4,7 @@ import '../../core/constants/app_theme.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/utils/org_session.dart';
 import 'org_switcher.dart';
-import 'feedback_dialog.dart';
+import '../../features/feedback/widgets/feedback_dialog.dart';
 
 class NavigationHeader extends StatefulWidget {
   final VoidCallback onToggleSidebar;

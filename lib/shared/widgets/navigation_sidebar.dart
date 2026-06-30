@@ -7,7 +7,7 @@ import '../../core/auth/permission_store.dart';
 import '../../core/auth/auth_session.dart';
 import '../../core/utils/responsive.dart';
 import '../../core/utils/org_session.dart';
-import '../../services/profile_service.dart';
+import '../../features/profile/services/profile_service.dart';
 
 class NavigationItem {
   final String id;

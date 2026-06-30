@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_constants.dart';
 import 'core/constants/app_theme.dart';
 import 'core/utils/app_router.dart';
-import 'core/services/ai_assistant_manager.dart';
+import 'features/ai/services/ai_assistant_manager.dart';
 import 'core/auth/auth_session.dart';
 import 'core/auth/permission_store.dart';
-import 'services/auth_api_service.dart';
-import 'shared/widgets/ai_assistant_widget.dart';
+import 'features/auth/services/auth_api_service.dart';
+import 'features/ai/widgets/ai_assistant_widget.dart';
 
 // NEW: global scaffold messenger key
 import 'shared/root_scaffold_messenger.dart';

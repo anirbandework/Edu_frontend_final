@@ -1,4 +1,4 @@
-// lib/features/super_admin/widgets/org_pages_dialog.dart
+// lib/features/super_admin/widgets/group_pages_dialog.dart
 //
 // Per-INSTITUTION-GROUP page control for the super-admin. TWO independent ceilings,
 // one tab each:
@@ -11,9 +11,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../services/super_admin_service.dart';
+import '../services/super_admin_service.dart';
 import '../../../shared/widgets/page_group_toggle.dart';
-import 'sa_widgets.dart';
+import '../../../shared/widgets/sa_widgets.dart';
 
 Future<void> showGroupPagesDialog(
   BuildContext context, {

@@ -6,9 +6,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_theme.dart';
-import '../../../services/super_admin_service.dart';
+import '../services/super_admin_service.dart';
 import '../widgets/group_pages_dialog.dart';
-import '../widgets/sa_widgets.dart';
+import '../../../shared/widgets/sa_widgets.dart';
 
 class ModuleAccessScreen extends StatefulWidget {
   const ModuleAccessScreen({super.key});

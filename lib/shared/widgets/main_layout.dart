@@ -8,7 +8,7 @@ import 'navigation_header.dart';
 import 'navigation_sidebar.dart';
 import '../../core/utils/org_session.dart';
 import '../../core/auth/auth_session.dart';
-import '../../services/auth_api_service.dart';
+import '../../features/auth/services/auth_api_service.dart';
 
 class MainLayout extends StatefulWidget {
   final Widget child;
